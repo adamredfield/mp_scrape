@@ -109,7 +109,7 @@ for page in range(1,total_pages + 1):
             'type': type,
             'fa': fa,
             'description': route_sections.get('description'),
-            'description': route_sections.get('protection')
+            'protection': route_sections.get('protection')
         }
         
 output_file = 'ticks_data.csv'
