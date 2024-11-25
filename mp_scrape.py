@@ -98,7 +98,7 @@ for page in range(1,total_pages + 1):
                 type = value
             elif label == 'FA:':
                 fa = value
-        
+
         current_route_data = {
             'route_name': route_name,
             'route_url': route_link,
