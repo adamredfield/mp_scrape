@@ -16,8 +16,7 @@ with sync_playwright() as playwright:
     # initialize ticklist
     ticklist = []
 
-    #for page in range(1,total_pages + 1):
-    for tick_page in range(1,2):
+    for tick_page in range(1,total_pages + 1):
         print(f'Scraping page: {tick_page}')
         ticks_url_page = f'{helper_functions.ticks_url}{tick_page}'
         print(ticks_url_page)
