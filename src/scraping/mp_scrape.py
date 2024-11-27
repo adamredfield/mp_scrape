@@ -22,7 +22,7 @@ with sync_playwright() as playwright:
     total_pages = helper_functions.get_total_pages()
 
     #for tick_page in range(1,total_pages + 1):
-    for tick_page in range(1,1):
+    for tick_page in range(1,2):
         print(f'Scraping page: {tick_page}')
         ticks_url_page = f'{helper_functions.ticks_url}{tick_page}'
         print(ticks_url_page)
@@ -44,7 +44,7 @@ with sync_playwright() as playwright:
                 current_route_data['tick_details'] = tick_details.text.strip()
                 # We only want to insert a row when we have the tick details
                 try:
-                    helper_functions.insert_route(cursor, current_route_data)
+                    helper_functions.insert_route(cursor, connection, current_route_data)
                     connection.commit()
                 except Exception as e:
                     print(f"Error inserting {current_route_data['route_name']}: {e}")

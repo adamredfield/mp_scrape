@@ -163,7 +163,7 @@ def insert_route(cursor, connection, route_data):
     # Insert comments into RouteComments table
     if route_data['comments']:
         comments_sql = '''
-        INSERT INTO RouteComments (
+        INSERT OR IGNORE INTO RouteComments (
             route_id, comment
         ) VALUES (
             :route_id, :comment)
