@@ -3,3 +3,4 @@ cookies.json
 storage.json
 venv
 keys.py
+ticklist.db
