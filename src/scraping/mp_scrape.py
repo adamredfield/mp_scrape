@@ -9,6 +9,7 @@ from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
 from src.scraping import helper_functions
 from src.database.utils import create_connection
+import re
 
 connection = create_connection()
 cursor = connection.cursor()
@@ -38,49 +39,94 @@ with sync_playwright() as playwright:
         # Table has two type of rows. One type holds route data and the other has tick details
         for row in tick_rows:
             tick_details = row.find('td', class_='text-warm small pt-0')
-            # check if tick details row rather than a route row
-            if tick_details:
+            
+            if not tick_details:
+                cells = row.find_all('td')
+                route_name = ' '.join(cells[0].text.strip().replace('●', '').split())
+                print(f'Retrieving data for {route_name}')
+                route_link = row.find('a', href=True)['href']
+                route_id = route_link.split('/route/')[1].split('/')[0]
+                route_exists = helper_functions.check_route_exists(cursor, route_id)
+                if route_exists:
+                    print(f"Route {route_name} already exists in the database.")
+                    current_route_data = None
+                    continue
+
+                route_html_content = helper_functions.fetch_dynamic_page_content(page, route_link)
+                route_soup = BeautifulSoup(route_html_content, 'html.parser')
+                # Use route_soup to obtain specific route data
+                route_attributes = helper_functions.get_route_attributes(route_soup)
+                route_sections = helper_functions.get_route_sections(route_soup)
+                route_type, fa = helper_functions.get_route_details(route_soup)
+                comments = helper_functions.get_comments(route_soup)
+
+                current_route_data = {
+                    'route_id': route_id,
+                    'route_name': route_name,
+                    'route_url': route_link,
+                    'yds_rating': route_attributes.get('rating'),  
+                    'avg_stars': route_attributes.get('avg_stars'),
+                    'num_votes': route_attributes.get('num_ratings'),
+                    'location': route_attributes.get('formatted_location'),
+                    'type': route_type,
+                    'fa': fa,
+                    'description': route_sections.get('description'),
+                    'protection': route_sections.get('protection'),
+                    'comments': comments
+                }
+                continue
+            
+            # Check if tick details row rather than a route row. 
+            # We need curent_route_data to be set before we can append tick details.
+            if tick_details and current_route_data:
                 # Append the additional info to the previous row's data
-                current_route_data['tick_details'] = tick_details.text.strip()
+                tick_details_text = tick_details.text.strip()
+
+                date_pattern = r'[A-Z][a-z]{2}\s+\d{1,2},\s+\d{4}'
+                date_match = re.search(date_pattern, tick_details_text)
+                tick_date = date_match.group() if date_match else None
+
+                tick_type = None
+                tick_comment = None
+
+                valid_tick_types = [
+                    'Solo', 'TR', 'Follow', 'Lead',
+                    'Lead / Onsight', 'Lead / Flash',
+                    'Lead / Redpoint', 'Lead / Pinkpoint',
+                    'Lead / Fell/Hung'
+                ]
+
+                if ' · ' in tick_details_text:
+                    post_date_text = tick_details_text.split(' · ')[1]  # Get everything after the bullet, following date
+                    if '.' in post_date_text:
+                        parts = post_date_text.split('.', 1)
+                        if "pitches" in parts[0].lower():
+                            next_parts = parts[1].split('.', 1)
+                            potential_type = next_parts[0].strip()
+                            if potential_type in valid_tick_types:
+                                tick_type = potential_type
+                                tick_comment = next_parts[1].strip() if len(next_parts) > 1 else None
+                            else:
+                                tick_comment = parts[1].strip()
+                        else:
+                            potential_type = parts[0].strip()
+                            if potential_type in valid_tick_types:
+                                tick_type = potential_type
+                                tick_comment = parts[1].strip() if len(parts) > 1 else None
+                            else:
+                                tick_comment = parts[1].strip()
+                    else:
+                        tick_comment = post_date_text.strip()
+                        
+                current_route_data['tick_date'] = tick_date
+                current_route_data['tick_type'] = tick_type
+                current_route_data['tick_comment'] = tick_comment
                 # We only want to insert a row when we have the tick details
-                try:
-                    helper_functions.insert_route(cursor, connection, current_route_data)
-                    connection.commit()
-                except Exception as e:
-                    print(f"Error inserting {current_route_data['route_name']}: {e}")
-                    connection.rollback()
+                helper_functions.insert_route(cursor, connection, current_route_data)
                 current_route_data = None
                 continue
 
-            cells = row.find_all('td')
-            route_name = ' '.join(cells[0].text.strip().replace('●', '').split())
-            print(f'Retrieving data for {route_name}')
-            route_link = row.find('a', href=True)['href']
-            route_id = route_link.split('/route/')[1].split('/')[0]
-
-            route_html_content = helper_functions.fetch_dynamic_page_content(page, route_link)
-            route_soup = BeautifulSoup(route_html_content, 'html.parser')
-            # Use route_soup to obtain specific route data
-            route_attributes = helper_functions.get_route_attributes(route_soup)
-            route_sections = helper_functions.get_route_sections(route_soup)
-            route_type, fa = helper_functions.get_route_details(route_soup)
-            comments = helper_functions.get_comments(route_soup)
-
-            current_route_data = {
-                'route_id': route_id,
-                'route_name': route_name,
-                'route_url': route_link,
-                'yds_rating': route_attributes.get('rating'),  
-                'avg_stars': route_attributes.get('avg_stars'),
-                'num_votes': route_attributes.get('num_ratings'),
-                'location': route_attributes.get('formatted_location'),
-                'type': route_type,
-                'fa': fa,
-                'description': route_sections.get('description'),
-                'protection': route_sections.get('protection'),
-                'comments': comments
-            }
-
     browser.close()
     connection.close()
+    
     

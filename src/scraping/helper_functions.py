@@ -141,24 +141,20 @@ def get_route_attributes(route_soup):
     return route_attributes
 
 def insert_route(cursor, connection, route_data):
-
-    # Insert into Routes table
+    # Insert into Routes table if the route_id is not already in the table (unique constraint)
     route_sql = '''
     INSERT OR IGNORE INTO Routes (
         id, route_name, route_url, yds_rating, avg_stars, num_votes,
-        location, type, fa, description, protection, tick_details
+    location, type, fa, description, protection, tick_date, tick_type, tick_comment
     ) VALUES (     
         :route_id, :route_name, :route_url, :yds_rating, :avg_stars, :num_votes,
-        :location, :type, :fa, :description, :protection, :tick_details)
+        :location, :type, :fa, :description, :protection, :tick_date, :tick_type, :tick_comment)
     '''
     try:
         cursor.execute(route_sql, route_data)
         connection.commit()
     except sqlite3.IntegrityError as e:
         print(f"Error inserting {route_data['route_name']}: {e}")
-    
-    # Get the route_id of the just-inserted route
-    route_id = cursor.lastrowid
     
     # Insert comments into RouteComments table
     if route_data['comments']:
@@ -168,7 +164,7 @@ def insert_route(cursor, connection, route_data):
         ) VALUES (
             :route_id, :comment)
         '''
-        comments_data = [(route_id, comment) for comment in route_data['comments']]
+        comments_data = [(route_data['route_id'], comment) for comment in route_data['comments']]
 
         try:    
             cursor.executemany(comments_sql, comments_data)
@@ -176,4 +172,10 @@ def insert_route(cursor, connection, route_data):
         except sqlite3.IntegrityError as e:
             print(f"Error inserting comments for {route_data['route_name']}: {e}")
 
-    return route_id
+    return None
+
+def check_route_exists(cursor, route_id):
+    cursor.execute("SELECT id FROM Routes WHERE id = :route_id", (route_id,))
+    existing_route = cursor.fetchone()
+    return existing_route is not None   
+

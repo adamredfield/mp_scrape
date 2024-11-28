@@ -25,8 +25,10 @@ CREATE TABLE IF NOT EXISTS Routes (
     description TEXT,
     protection TEXT,
     comments TEXT,
-    tick_details TEXT,
-    UNIQUE(id, tick_details)
+    tick_date TEXT,
+    tick_type TEXT,
+    tick_comment TEXT,
+    UNIQUE(id, tick_date, tick_type)
 );
 
 CREATE TABLE IF NOT EXISTS RouteComments (
