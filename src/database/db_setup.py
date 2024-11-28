@@ -25,10 +25,17 @@ CREATE TABLE IF NOT EXISTS Routes (
     description TEXT,
     protection TEXT,
     comments TEXT,
+    UNIQUE(id)
+);
+
+CREATE TABLE IF NOT EXISTS Ticks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    route_id INTEGER,
     tick_date TEXT,
     tick_type TEXT,
     tick_comment TEXT,
-    UNIQUE(id, tick_date, tick_type)
+    FOREIGN KEY (route_id) REFERENCES Routes(id),
+    UNIQUE(route_id, tick_date)
 );
 
 CREATE TABLE IF NOT EXISTS RouteComments (

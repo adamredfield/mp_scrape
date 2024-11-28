@@ -12,6 +12,7 @@ cursor = connection.cursor()
  # Write the SQL command to create the Students table
 drop_table_query = '''
 DROP TABLE IF EXISTS Routes;
+DROP TABLE IF EXISTS Ticks;
 DROP TABLE IF EXISTS RouteComments;
 DROP TABLE IF EXISTS RouteAnalysis;
 '''

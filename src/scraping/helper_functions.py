@@ -145,10 +145,10 @@ def insert_route(cursor, connection, route_data):
     route_sql = '''
     INSERT OR IGNORE INTO Routes (
         id, route_name, route_url, yds_rating, avg_stars, num_votes,
-    location, type, fa, description, protection, tick_date, tick_type, tick_comment
+    location, type, fa, description, protection
     ) VALUES (     
         :route_id, :route_name, :route_url, :yds_rating, :avg_stars, :num_votes,
-        :location, :type, :fa, :description, :protection, :tick_date, :tick_type, :tick_comment)
+        :location, :type, :fa, :description, :protection)
     '''
     try:
         cursor.execute(route_sql, route_data)
@@ -174,8 +174,32 @@ def insert_route(cursor, connection, route_data):
 
     return None
 
+def insert_tick(cursor, connection, tick_data):
+    tick_sql = '''
+    INSERT OR IGNORE INTO Ticks (
+        route_id, tick_date, tick_type, tick_comment
+    ) VALUES (
+        :route_id, :tick_date, :tick_type, :tick_comment
+    )
+    '''
+    try:
+        cursor.execute(tick_sql, tick_data)
+        connection.commit()
+    except sqlite3.IntegrityError as e:
+        print(f"Error inserting {tick['route_name']}: {e}")
+
+
 def check_route_exists(cursor, route_id):
-    cursor.execute("SELECT id FROM Routes WHERE id = :route_id", (route_id,))
+    cursor.execute("SELECT id FROM Routes WHERE id = :route_id", {"route_id": route_id})
     existing_route = cursor.fetchone()
     return existing_route is not None   
+
+def check_tick_exists(cursor, route_id, tick_date):
+    """Check if specific tick exists in Ticks table"""
+    cursor.execute(
+        "SELECT id FROM Ticks WHERE route_id = :route_id AND tick_date = :tick_date", 
+        {"route_id": route_id, "tick_date": tick_date}
+    )
+    existing_tick = cursor.fetchone()
+    return existing_tick is not None
 

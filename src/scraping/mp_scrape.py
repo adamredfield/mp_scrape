@@ -74,10 +74,16 @@ with sync_playwright() as playwright:
                     'protection': route_sections.get('protection'),
                     'comments': comments
                 }
+
+                helper_functions.insert_route(cursor, connection, current_route_data)
+
+                current_route_data = {
+                    'route_id': route_id,
+                    'route_name': route_name
+                }
                 continue
             
             # Check if tick details row rather than a route row. 
-            # We need curent_route_data to be set before we can append tick details.
             if tick_details and current_route_data:
                 # Append the additional info to the previous row's data
                 tick_details_text = tick_details.text.strip()
@@ -118,11 +124,14 @@ with sync_playwright() as playwright:
                     else:
                         tick_comment = post_date_text.strip()
                         
-                current_route_data['tick_date'] = tick_date
-                current_route_data['tick_type'] = tick_type
-                current_route_data['tick_comment'] = tick_comment
+                tick_data = {
+                    'route_id': current_route_data['route_id'],
+                    'tick_date': tick_date,
+                    'tick_type': tick_type,
+                    'tick_comment': tick_comment
+                }
                 # We only want to insert a row when we have the tick details
-                helper_functions.insert_route(cursor, connection, current_route_data)
+                helper_functions.insert_tick(cursor, connection, tick_data)
                 current_route_data = None
                 continue
 
