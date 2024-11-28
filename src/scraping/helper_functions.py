@@ -2,7 +2,6 @@ import json
 import requests
 from bs4 import BeautifulSoup
 import re
-import sqlite3
 
 # login creds -- can only see full comments if logged in while viewing route pages
 username = "mpscrape2024@gmail.com"
@@ -139,67 +138,3 @@ def get_route_attributes(route_soup):
     route_attributes['formatted_location'] = ' > '.join(link.text.strip() for link in route_soup.select('.mb-half.small.text-warm a'))
 
     return route_attributes
-
-def insert_route(cursor, connection, route_data):
-    # Insert into Routes table if the route_id is not already in the table (unique constraint)
-    route_sql = '''
-    INSERT OR IGNORE INTO Routes (
-        id, route_name, route_url, yds_rating, avg_stars, num_votes,
-    location, type, fa, description, protection
-    ) VALUES (     
-        :route_id, :route_name, :route_url, :yds_rating, :avg_stars, :num_votes,
-        :location, :type, :fa, :description, :protection)
-    '''
-    try:
-        cursor.execute(route_sql, route_data)
-        connection.commit()
-    except sqlite3.IntegrityError as e:
-        print(f"Error inserting {route_data['route_name']}: {e}")
-    
-    # Insert comments into RouteComments table
-    if route_data['comments']:
-        comments_sql = '''
-        INSERT OR IGNORE INTO RouteComments (
-            route_id, comment
-        ) VALUES (
-            :route_id, :comment)
-        '''
-        comments_data = [(route_data['route_id'], comment) for comment in route_data['comments']]
-
-        try:    
-            cursor.executemany(comments_sql, comments_data)
-            connection.commit()
-        except sqlite3.IntegrityError as e:
-            print(f"Error inserting comments for {route_data['route_name']}: {e}")
-
-    return None
-
-def insert_tick(cursor, connection, tick_data):
-    tick_sql = '''
-    INSERT OR IGNORE INTO Ticks (
-        route_id, tick_date, tick_type, tick_comment
-    ) VALUES (
-        :route_id, :tick_date, :tick_type, :tick_comment
-    )
-    '''
-    try:
-        cursor.execute(tick_sql, tick_data)
-        connection.commit()
-    except sqlite3.IntegrityError as e:
-        print(f"Error inserting {tick['route_name']}: {e}")
-
-
-def check_route_exists(cursor, route_id):
-    cursor.execute("SELECT id FROM Routes WHERE id = :route_id", {"route_id": route_id})
-    existing_route = cursor.fetchone()
-    return existing_route is not None   
-
-def check_tick_exists(cursor, route_id, tick_date):
-    """Check if specific tick exists in Ticks table"""
-    cursor.execute(
-        "SELECT id FROM Ticks WHERE route_id = :route_id AND tick_date = :tick_date", 
-        {"route_id": route_id, "tick_date": tick_date}
-    )
-    existing_tick = cursor.fetchone()
-    return existing_tick is not None
-

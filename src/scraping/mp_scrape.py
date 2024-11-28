@@ -9,6 +9,7 @@ from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
 from src.scraping import helper_functions
 from src.database.utils import create_connection
+from src.database import queries
 import re
 
 connection = create_connection()
@@ -46,42 +47,43 @@ with sync_playwright() as playwright:
                 print(f'Retrieving data for {route_name}')
                 route_link = row.find('a', href=True)['href']
                 route_id = route_link.split('/route/')[1].split('/')[0]
-                route_exists = helper_functions.check_route_exists(cursor, route_id)
+                route_exists = queries.check_route_exists(cursor, route_id)
                 if route_exists:
                     print(f"Route {route_name} already exists in the database.")
-                    current_route_data = None
-                    continue
-
-                route_html_content = helper_functions.fetch_dynamic_page_content(page, route_link)
-                route_soup = BeautifulSoup(route_html_content, 'html.parser')
-                # Use route_soup to obtain specific route data
-                route_attributes = helper_functions.get_route_attributes(route_soup)
-                route_sections = helper_functions.get_route_sections(route_soup)
-                route_type, fa = helper_functions.get_route_details(route_soup)
-                comments = helper_functions.get_comments(route_soup)
-
-                current_route_data = {
-                    'route_id': route_id,
-                    'route_name': route_name,
-                    'route_url': route_link,
-                    'yds_rating': route_attributes.get('rating'),  
-                    'avg_stars': route_attributes.get('avg_stars'),
-                    'num_votes': route_attributes.get('num_ratings'),
-                    'location': route_attributes.get('formatted_location'),
-                    'type': route_type,
-                    'fa': fa,
-                    'description': route_sections.get('description'),
-                    'protection': route_sections.get('protection'),
-                    'comments': comments
-                }
-
-                helper_functions.insert_route(cursor, connection, current_route_data)
-
-                current_route_data = {
+                    current_route_data = {
                     'route_id': route_id,
                     'route_name': route_name
                 }
-                continue
+                else:
+                    route_html_content = helper_functions.fetch_dynamic_page_content(page, route_link)
+                    route_soup = BeautifulSoup(route_html_content, 'html.parser')
+                    # Use route_soup to obtain specific route data
+                    route_attributes = helper_functions.get_route_attributes(route_soup)
+                    route_sections = helper_functions.get_route_sections(route_soup)
+                    route_type, fa = helper_functions.get_route_details(route_soup)
+                    comments = helper_functions.get_comments(route_soup)
+
+                    current_route_data = {
+                        'route_id': route_id,
+                        'route_name': route_name,
+                        'route_url': route_link,
+                        'yds_rating': route_attributes.get('rating'),  
+                        'avg_stars': route_attributes.get('avg_stars'),
+                        'num_votes': route_attributes.get('num_ratings'),
+                        'location': route_attributes.get('formatted_location'),
+                        'type': route_type,
+                        'fa': fa,
+                        'description': route_sections.get('description'),
+                        'protection': route_sections.get('protection'),
+                        'comments': comments
+                    }
+
+                    queries.insert_route(cursor, connection, current_route_data)
+
+                    current_route_data = {
+                        'route_id': route_id,
+                        'route_name': route_name
+                    }
             
             # Check if tick details row rather than a route row. 
             if tick_details and current_route_data:
@@ -131,9 +133,8 @@ with sync_playwright() as playwright:
                     'tick_comment': tick_comment
                 }
                 # We only want to insert a row when we have the tick details
-                helper_functions.insert_tick(cursor, connection, tick_data)
+                queries.insert_tick(cursor, connection, tick_data)
                 current_route_data = None
-                continue
 
     browser.close()
     connection.close()
