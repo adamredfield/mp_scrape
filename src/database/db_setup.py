@@ -19,23 +19,28 @@ CREATE TABLE IF NOT EXISTS Routes (
     yds_rating TEXT,
     avg_stars REAL,
     num_votes INTEGER,
-    location TEXT,
-    type TEXT,
+    region TEXT,
+    main_area TEXT,
+    sub_area TEXT,
+    specific_location TEXT,
+    route_type TEXT,
+    length_ft INTEGER,
+    pitches INTEGER,
+    commitment_grade TEXT,
     fa TEXT,
     description TEXT,
     protection TEXT,
-    comments TEXT,
     UNIQUE(id)
 );
 
 CREATE TABLE IF NOT EXISTS Ticks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     route_id INTEGER,
-    tick_date TEXT,
-    tick_type TEXT,
-    tick_comment TEXT,
+    date TEXT,
+    type TEXT,
+    note TEXT,
     FOREIGN KEY (route_id) REFERENCES Routes(id),
-    UNIQUE(route_id, tick_date)
+    UNIQUE(route_id, date)
 );
 
 CREATE TABLE IF NOT EXISTS RouteComments (
@@ -50,7 +55,6 @@ CREATE TABLE IF NOT EXISTS RouteAnalysis (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     route_id INTEGER,
     tags TEXT,
-    sentiment_analysis TEXT,
     FOREIGN KEY (route_id) REFERENCES Routes(id)
 );
 '''

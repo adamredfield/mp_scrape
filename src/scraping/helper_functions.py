@@ -8,7 +8,7 @@ username = "mpscrape2024@gmail.com"
 password = "mpscrape"
 mp_home_url = "https://www.mountainproject.com"
 
-base_url = 'https://www.mountainproject.com/user/'
+base_url = f'{mp_home_url}/user/'
 user = '200362278/doctor-choss'
 constructed_url = f'{base_url}{user}'
 ticks_url = f'{constructed_url}/ticks?page='
@@ -34,7 +34,7 @@ def login_and_save_session(playwright):
 
     storage_state = context.storage_state()
     with open("storage.json", "w") as storage_file:
-        json.dump(storage_state, storage_file)  # Convert dictionary to JSON string
+        json.dump(storage_state, storage_file)
 
     print("Login successful, session saved!")
 
@@ -91,20 +91,28 @@ def get_comments(route_soup):
 
 def get_route_details(route_soup):
     description_details_tbl = route_soup.find('table', class_='description-details')
+    route_details = {
+    'route_type': None,
+    'length_ft': None,
+    'pitches': None,
+    'commitment_grade': None,
+    'fa': None
+}
     # desc_rows is where type and FA data is held
     desc_rows = description_details_tbl.find_all('tr') 
     for row in desc_rows:
         cells = row.find_all('td')
-        
+
         label = cells[0].text.strip()
         value = cells[1].text.strip()
 
         # Check for Type and FA labels
         if label == 'Type:':
-            route_type = value
+            parsed_type = parse_route_type(value)
+            route_details.update(parsed_type)
         elif label == 'FA:':
-            fa = value
-    return route_type, fa
+            route_details['fa'] = value
+    return route_details
 
 def get_route_sections(route_soup):
     # sections we want to extract text for. Can add as more relevant sections are found
@@ -138,3 +146,100 @@ def get_route_attributes(route_soup):
     route_attributes['formatted_location'] = ' > '.join(link.text.strip() for link in route_soup.select('.mb-half.small.text-warm a'))
 
     return route_attributes
+
+def parse_route_type(route_details_string):
+    """
+    Parse route type string into components:
+    - route_type: Trad, Sport, Aid, etc.
+    - route_length: in feet/meters
+    - pitches: number of pitches
+    - commitment_grade: Grade I, II, III, etc.
+    """
+    if not route_details_string:
+        return {
+            'route_type': None,
+            'route_length': None,
+            'pitches': None,
+            'commitment_grade': None
+        }
+
+    parsed_details = {
+        'route_type': None,
+        'length_ft': None,
+        'pitches': None,
+        'commitment_grade': None
+    }
+
+    # Split the string by commas
+    parts = [p.strip() for p in route_details_string.split(',')]
+
+    # Get route type (always first)
+    parsed_details['route_type'] = parts[0]
+
+    # Process remaining parts
+    for part in parts[1:]:
+        # Match route length (e.g., "500 ft (152 m)")
+        length_match = re.search(r'(\d+)\s*ft', part)
+        if length_match:
+            parsed_details['length_ft'] = int(length_match.group(1))  # Store in feet
+            continue
+
+        # Match pitches (e.g., "6 pitches" or "6 pitch")
+        pitch_match = re.search(r'(\d+)\s*pitch', part)
+        if pitch_match:
+            parsed_details['pitches'] = int(pitch_match.group(1))
+            continue
+
+        # Match commitment grade (e.g., "Grade III")
+        grade_match = re.search(r'Grade\s+(VI|IV|V|I{1,3})', part)
+        if grade_match:
+            parsed_details['commitment_grade'] = grade_match.group(1)
+            continue
+
+    return parsed_details
+
+def parse_location(location_string):
+    """
+    Parse location string into components:
+    - state
+    - main_area (e.g., Joshua Tree NP, Yosemite NP)
+    - sub_area (e.g., Yosemite Valley, Hidden Valley Area)
+    - specific_location (everything else combined)
+    """
+    if not location_string:
+        return {
+            'state': None,
+            'main_area': None,
+            'sub_area': None,
+            'specific_location': None
+        }
+
+    # Split by ' > ' and remove 'All Locations'
+    parts = [p.strip() for p in location_string.split(' > ')]
+    if parts[0] == 'All Locations':
+        parts = parts[1:]
+
+    location_data = {
+        'region': None,
+        'main_area': None,
+        'sub_area': None,
+        'specific_location': None
+    }
+
+    # Always get state (should be first part)
+    if len(parts) > 0:
+        location_data['region'] = parts[0]
+
+    # Get main area (e.g., Joshua Tree NP, Yosemite NP)
+    if len(parts) > 1:
+        location_data['main_area'] = parts[1]
+
+    # Get sub area (e.g., Yosemite Valley, Hidden Valley Area)
+    if len(parts) > 2:
+        location_data['sub_area'] = parts[2]
+
+    # Combine remaining parts for specific location
+    if len(parts) > 3:
+        location_data['specific_location'] = ' > '.join(parts[3:])
+
+    return location_data

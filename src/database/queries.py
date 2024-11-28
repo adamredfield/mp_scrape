@@ -5,10 +5,10 @@ def insert_route(cursor, connection, route_data):
     route_sql = '''
     INSERT OR IGNORE INTO Routes (
         id, route_name, route_url, yds_rating, avg_stars, num_votes,
-    location, type, fa, description, protection
+    region, main_area, sub_area, specific_location, route_type, length_ft, pitches, commitment_grade, fa, description, protection
     ) VALUES (     
         :route_id, :route_name, :route_url, :yds_rating, :avg_stars, :num_votes,
-        :location, :type, :fa, :description, :protection)
+        :region, :main_area, :sub_area, :specific_location, :route_type, :length_ft, :pitches, :commitment_grade, :fa, :description, :protection)
     '''
     try:
         cursor.execute(route_sql, route_data)
@@ -16,30 +16,27 @@ def insert_route(cursor, connection, route_data):
     except sqlite3.IntegrityError as e:
         print(f"Error inserting {route_data['route_name']}: {e}")
     
+def insert_comments(cursor, connection, comments):
     # Insert comments into RouteComments table
-    if route_data['comments']:
+    if comments:
         comments_sql = '''
         INSERT OR IGNORE INTO RouteComments (
             route_id, comment
         ) VALUES (
             :route_id, :comment)
         '''
-        comments_data = [(route_data['route_id'], comment) for comment in route_data['comments']]
-
         try:    
-            cursor.executemany(comments_sql, comments_data)
+            cursor.executemany(comments_sql, comments)
             connection.commit()
         except sqlite3.IntegrityError as e:
-            print(f"Error inserting comments for {route_data['route_name']}: {e}")
-
-    return None
+            print(f"Error inserting comments: {e}")
 
 def insert_tick(cursor, connection, tick_data):
     tick_sql = '''
     INSERT OR IGNORE INTO Ticks (
-        route_id, tick_date, tick_type, tick_comment
+        route_id, date, type, note
     ) VALUES (
-        :route_id, :tick_date, :tick_type, :tick_comment
+        :route_id, :date, :type, :note
     )
     '''
     try:
@@ -47,7 +44,6 @@ def insert_tick(cursor, connection, tick_data):
         connection.commit()
     except sqlite3.IntegrityError as e:
         print(f"Error inserting {tick_data['route_name']}: {e}")
-
 
 def check_route_exists(cursor, route_id):
     cursor.execute("SELECT id FROM Routes WHERE id = :route_id", {"route_id": route_id})

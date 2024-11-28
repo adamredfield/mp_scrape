@@ -1,72 +1,136 @@
+import os
+import sys
+
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+sys.path.append(project_root)
+
 import openai
-import pandas as pd
-import csv
-import src.config.keys as keys
+import sqlite3
+from src.database.utils import create_connection
+from typing import List
 
-api_key = keys.open_ai_key
+openai.api_key = os.getenv('OPENAI_API_KEY')
 
-data = pd.read_csv('ticks_data.csv')
+def get_routes_for_analysis(cursor, batch_size=1):
+    """Get routes from database that haven't been analyzed yet"""
+    query = '''
+    SELECT 
+        r.id,
+        r.route_name,
+        r.yds_rating,
+        r.avg_stars,
+        r.num_votes,
+        r.region,
+        r.main_area,
+        r.sub_area,
+        r.specific_location,
+        r.route_type,
+        r.length_ft,
+        r.pitches,
+        r.commitment_grade,
+        r.fa,
+        r.description,
+        r.protection,
+        GROUP_CONCAT(rc.comment, ' | ') as comments
+    FROM Routes r
+    LEFT JOIN RouteComments rc ON r.id = rc.route_id
+    LEFT JOIN RouteAnalysis ra ON r.id = ra.route_id
+    WHERE ra.id IS NULL  -- Only get routes not yet analyzed
+    GROUP BY r.id
+    LIMIT :batch_size
+    '''
+    cursor.execute(query, {'batch_size': batch_size})
+    columns = [description[0] for description in cursor.description]
+    results = cursor.fetchall()
+    return [dict(zip(columns, row)) for row in results]
 
-batch = data.head(5).to_dict(orient='records')
-
-def construct_prompt(batch):
+def construct_single_prompt(route):
     prompt = "Analyze the following climbing routes. For each route, provide:\n"
     prompt += "- Tags: Key classifications such as 'dihedral,' 'crack-climb,' 'face-climb,' etc.\n"
-    prompt += "- Sentiment Analysis: Summarize the general sentiment about this route based on the description and comments in 1-3 sentences.\n\n"
-    for idx, row in enumerate(batch, 1):
-        prompt += f"Route {idx}:\n[START]\n"
-        prompt += f"Name: {row['route_name']}\n"
-        prompt += f"URL: {row['route_url']}\n"
-        prompt += f"Description: {row['description']}\n"
-        prompt += f"Comments: {row['comments']}\n[END]\n\n"
+    prompt += f"Name: {route['route_name']}\n"
+    prompt += f"Grade: {route['yds_rating']}\n"
+    prompt += f"Location: {route['region']} > {route['main_area']} > {route['sub_area']}\n"
+    prompt += f"Type: {route['route_type']}"
+    if route['length_ft']:
+        prompt += f" | Length: {route['length_ft']} ft"
+    if route['pitches']:
+        prompt += f" | Pitches: {route['pitches']}"
+    prompt += f"\nDescription: {route['description']}\n"
+    if route['protection']:
+        prompt += f"Protection: {route['protection']}\n"
+    prompt += f"Comments: {route['comments']}\n[END]\n\n"
     return prompt
 
-prompt = construct_prompt(batch)
+def process_batch(batch: List[dict]) -> List[dict]:
+    """Process a batch of routes"""
+    messages = [
+        {"role": "system", "content": "You are a climbing route analyzer. For each route, provide only comma-separated tags."},
+        {"role": "user", "content": "\n".join([construct_single_prompt(route) for route in batch])}
+    ]
 
-try:
-
+    # Make batch API call
     response = openai.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "system", "content": "You are an expert climbing route analyzer."},
-            {"role": "user", "content": prompt}
-        ],
-        max_tokens=1500,
-        temperature=0.6
+        model="gpt-3.5-turbo",
+        messages=messages,
+        max_tokens=500,
+        temperature=0.3
     )
 
-    output_text = response.choices[0].message.content
-
-    print("GPT-4 Response:\n", output_text)
-
-    # Step 6: Parse GPT-4 Response into a Data Structure
+    # Process responses
     results = []
-    for idx, row in enumerate(batch, 1):
-        result = {
-            "route_name": row["route_name"],
-            "route_url": row["route_url"],
-            "tags": None,
-            "sentiment_analysis": None
-        }
-        # Find the corresponding route response in GPT-4 output
-        route_output = output_text.split(f"Route {idx}:")[1].split(f"Route {idx+1}:")[0] if idx < len(batch) else output_text.split(f"Route {idx}:")[1]
+    responses = response.choices[0].message.content.strip().split("\n\n")
+
+    for i, response in enumerate(responses):
+        if i < len(batch):  # Safety check
+            result = {
+                "route_id": batch[i]["id"],
+                "tags": response.strip()
+            }
+            results.append(result)
+    
+    return results
+
+
+def save_analysis_results(cursor, connection, results):
+    """Save analysis results to database"""
+    insert_sql = '''
+    INSERT INTO RouteAnalysis (
+        route_id,
+        tags
+    ) VALUES (
+        :route_id,
+        :tags
+    )
+    '''
+    
+    try:
+        cursor.executemany(insert_sql, results)
+        connection.commit()
+    except sqlite3.IntegrityError as e:
+        print(f"Error inserting analysis results: {e}")
+
+def main():
+    try:    
+        connection = create_connection()
+        cursor = connection.cursor()
+
+        batch = get_routes_for_analysis(cursor)
+        if not batch:
+            print("No new routes to analyze")
+            return
         
-        # Extract tags and sentiment
-        if "Tags:" in route_output:
-            result["tags"] = route_output.split("Tags:")[1].split("Sentiment Analysis:")[0].strip()
-        if "Sentiment Analysis:" in route_output:
-            result["sentiment_analysis"] = route_output.split("Sentiment Analysis:")[1].strip()
+        print(f"Processing {len(batch)} routes...")
+        results = process_batch(batch)
         
-        results.append(result)
+        if results:
+            save_analysis_results(cursor, connection, results)
+            print(f"Analyzed and saved results for {len(results)} routes")
 
-    # Step 7: Write Results to a New CSV
-    output_file = 'route_analysis.csv'
-    with open(output_file, mode='w', newline='', encoding='utf-8') as file:
-        writer = csv.DictWriter(file, fieldnames=results[0].keys())
-        writer.writeheader()
-        writer.writerows(results)
+    except Exception as e:
+        print(f"Error: {e}")
+    finally:
+        if connection:
+            connection.close()
 
-    print(f"Results saved to {output_file}")
-
-except Exception as e:
-    print(f"Error: {e}")
+if __name__ == "__main__":
+    main()

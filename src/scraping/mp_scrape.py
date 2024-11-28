@@ -23,8 +23,7 @@ with sync_playwright() as playwright:
     # how many pages in user's ticks to paginate through
     total_pages = helper_functions.get_total_pages()
 
-    #for tick_page in range(1,total_pages + 1):
-    for tick_page in range(1,2):
+    for tick_page in range(1,total_pages + 1):
         print(f'Scraping page: {tick_page}')
         ticks_url_page = f'{helper_functions.ticks_url}{tick_page}'
         print(ticks_url_page)
@@ -59,8 +58,9 @@ with sync_playwright() as playwright:
                     route_soup = BeautifulSoup(route_html_content, 'html.parser')
                     # Use route_soup to obtain specific route data
                     route_attributes = helper_functions.get_route_attributes(route_soup)
+                    route_location = helper_functions.parse_location(route_attributes.get('formatted_location'))
                     route_sections = helper_functions.get_route_sections(route_soup)
-                    route_type, fa = helper_functions.get_route_details(route_soup)
+                    route_details = helper_functions.get_route_details(route_soup)
                     comments = helper_functions.get_comments(route_soup)
 
                     current_route_data = {
@@ -70,15 +70,23 @@ with sync_playwright() as playwright:
                         'yds_rating': route_attributes.get('rating'),  
                         'avg_stars': route_attributes.get('avg_stars'),
                         'num_votes': route_attributes.get('num_ratings'),
-                        'location': route_attributes.get('formatted_location'),
-                        'type': route_type,
-                        'fa': fa,
+                        'region': route_location.get('region'),
+                        'main_area': route_location.get('main_area'),
+                        'sub_area': route_location.get('sub_area'),
+                        'specific_location': route_location.get('specific_location'),
+                        'route_type': route_details.get('route_type'),
+                        'length_ft': route_details.get('length_ft'),
+                        'pitches': route_details.get('pitches'),
+                        'commitment_grade': route_details.get('commitment_grade'),
+                        'fa': route_details.get('fa'),
                         'description': route_sections.get('description'),
                         'protection': route_sections.get('protection'),
-                        'comments': comments
                     }
 
+                    comments_dict = [{'route_id': route_id, 'comment': comment} for comment in comments]
+
                     queries.insert_route(cursor, connection, current_route_data)
+                    queries.insert_comments(cursor, connection, comments_dict)
 
                     current_route_data = {
                         'route_id': route_id,
@@ -95,7 +103,7 @@ with sync_playwright() as playwright:
                 tick_date = date_match.group() if date_match else None
 
                 tick_type = None
-                tick_comment = None
+                tick_note = None
 
                 valid_tick_types = [
                     'Solo', 'TR', 'Follow', 'Lead',
@@ -113,26 +121,25 @@ with sync_playwright() as playwright:
                             potential_type = next_parts[0].strip()
                             if potential_type in valid_tick_types:
                                 tick_type = potential_type
-                                tick_comment = next_parts[1].strip() if len(next_parts) > 1 else None
+                                tick_note = next_parts[1].strip() if len(next_parts) > 1 else None
                             else:
-                                tick_comment = parts[1].strip()
+                                tick_note = parts[1].strip()
                         else:
                             potential_type = parts[0].strip()
                             if potential_type in valid_tick_types:
                                 tick_type = potential_type
-                                tick_comment = parts[1].strip() if len(parts) > 1 else None
+                                tick_note = parts[1].strip() if len(parts) > 1 else None
                             else:
-                                tick_comment = parts[1].strip()
+                                tick_note = parts[1].strip()
                     else:
-                        tick_comment = post_date_text.strip()
+                        tick_note = post_date_text.strip()
                         
                 tick_data = {
                     'route_id': current_route_data['route_id'],
-                    'tick_date': tick_date,
-                    'tick_type': tick_type,
-                    'tick_comment': tick_comment
+                    'date': tick_date,
+                    'type': tick_type,
+                    'note': tick_note
                 }
-                # We only want to insert a row when we have the tick details
                 queries.insert_tick(cursor, connection, tick_data)
                 current_route_data = None
 
