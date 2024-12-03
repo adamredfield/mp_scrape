@@ -8,10 +8,12 @@ import openai
 import sqlite3
 from src.database.utils import create_connection
 from typing import List
+from datetime import datetime
+import json
 
 openai.api_key = os.getenv('OPENAI_API_KEY')
 
-def get_routes_for_analysis(cursor, batch_size=1):
+def get_routes_for_analysis(cursor, batch_size=10):
     """Get routes from database that haven't been analyzed yet"""
     query = '''
     SELECT 
@@ -45,61 +47,109 @@ def get_routes_for_analysis(cursor, batch_size=1):
     return [dict(zip(columns, row)) for row in results]
 
 def construct_single_prompt(route):
-    prompt = "Analyze the following climbing routes. For each route, provide:\n"
-    prompt += "- Tags: Key classifications such as 'dihedral,' 'crack-climb,' 'face-climb,' etc.\n"
-    prompt += f"Name: {route['route_name']}\n"
-    prompt += f"Grade: {route['yds_rating']}\n"
-    prompt += f"Location: {route['region']} > {route['main_area']} > {route['sub_area']}\n"
-    prompt += f"Type: {route['route_type']}"
-    if route['length_ft']:
-        prompt += f" | Length: {route['length_ft']} ft"
-    if route['pitches']:
-        prompt += f" | Pitches: {route['pitches']}"
-    prompt += f"\nDescription: {route['description']}\n"
-    if route['protection']:
-        prompt += f"Protection: {route['protection']}\n"
-    prompt += f"Comments: {route['comments']}\n[END]\n\n"
+
+    prompt_header = '''
+    Analyze the following climbing route data and classify it into tags based on the provided JSON structure:
+
+    Return a JSON object containing:
+    1. "style": General climbing styles (e.g., crack, face, slab, overhang, chimney, etc.).
+    2. "features": Specific route features (e.g., hand-crack, finger-crack, fist-crack, off-fingers, offwidth, dihedral, corner, seam, etc.).
+    3. "descriptors": Characteristics that describe difficulty or experience (e.g., technical, burly, runout, polished, chossy, adventurous, scary, mellow, exciting, bigwall, etc.).
+    4. "rock_type": Type of rock (e.g., granite, limestone, sandstone, gneiss, etc.). Do not include characteristics like "polished" here—only the rock type.
+
+    Ensure that the tags reflect the key attributes of the climbing route. The final output must strictly adhere to this format:
+    Return ONLY the JSON object, without any markdown formatting or code blocks.
+
+    {
+        "tags": {
+            "style": [],
+            "features": [],
+            "descriptors": [],
+            "rock_type": []
+        }
+    }
+    '''
+
+    route_details = [
+        f"Name: {route['route_name']}",
+        f"Grade: {route['yds_rating']}",
+        f"Location: {route['region']} > {route['main_area']} > {route['sub_area']}",
+        f"Type: {route['route_type']}",
+    ]
+
+    if route.get('length_ft'):
+        route_details.append(f"Length: {route['length_ft']} ft")
+    if route.get('pitches'):
+        route_details.append(f"Pitches: {route['pitches']}")
+    if route.get('description'):
+        route_details.append(f"Description: {route['description']}")
+    if route.get('protection'):
+        route_details.append(f"Protection: {route['protection']}")
+    if route.get('comments'):
+        route_details.append(f"Comments: {route['comments']}")
+    
+    prompt = f"{prompt_header}\n\nRoute Data:\n" + "\n".join(route_details) + "\n"
+
     return prompt
 
 def process_batch(batch: List[dict]) -> List[dict]:
     """Process a batch of routes"""
-    messages = [
-        {"role": "system", "content": "You are a climbing route analyzer. For each route, provide only comma-separated tags."},
-        {"role": "user", "content": "\n".join([construct_single_prompt(route) for route in batch])}
-    ]
 
-    # Make batch API call
-    response = openai.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=messages,
-        max_tokens=500,
-        temperature=0.3
-    )
+    results = []    
+    for route in batch:
+        messages = [
+            {"role": "system",
+            "content": (
+                "You are an experienced and expert climber tasked with analyzing and classifiying climbing routes. "
+                "The outputs will be used in a dashboard. "
+                "This dashboard will allow climbers to visualize the types of routes they climb and to find other climbs in styles they enjoy. "
+                "For each route, provide tags in the specified JSON structure."
+                "Return ONLY the JSON object, without any markdown formatting or code blocks."
+            )},
+            {"role": "user", "content": construct_single_prompt(route)}
+        ]
+        try:    
+            # Make API call
+            response = openai.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=messages,
+            max_tokens=500,
+                temperature=0.3
+            )
 
-    # Process responses
-    results = []
-    responses = response.choices[0].message.content.strip().split("\n\n")
+            # Process responses
+            response_text = response.choices[0].message.content.strip()
+            print(f"Response for {route['route_name']}: {response_text}")
 
-    for i, response in enumerate(responses):
-        if i < len(batch):  # Safety check
-            result = {
-                "route_id": batch[i]["id"],
-                "tags": response.strip()
-            }
-            results.append(result)
+            try:
+                parsed_tags = json.loads(response_text)  # Make sure it's valid JSON
+                result = {
+                    "route_id": route["id"],
+                    "tags": json.dumps(parsed_tags),
+                    "insert_date": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                }
+                results.append(result)
+            except json.JSONDecodeError as e:
+                print(f"Invalid JSON for route {route['route_name']}: {e}")
+                continue
+
+        except Exception as e:
+            print(f"Error processing route {route['route_name']}: {e}")
+            continue
     
     return results
-
 
 def save_analysis_results(cursor, connection, results):
     """Save analysis results to database"""
     insert_sql = '''
     INSERT INTO RouteAnalysis (
         route_id,
-        tags
+        tags,
+        insert_date
     ) VALUES (
         :route_id,
-        :tags
+        json(:tags),
+        :insert_date
     )
     '''
     
@@ -114,17 +164,18 @@ def main():
         connection = create_connection()
         cursor = connection.cursor()
 
-        batch = get_routes_for_analysis(cursor)
-        if not batch:
-            print("No new routes to analyze")
-            return
+        while True:
+            batch = get_routes_for_analysis(cursor)
+            if not batch:
+                print("No new routes to analyze")
+                return
         
-        print(f"Processing {len(batch)} routes...")
-        results = process_batch(batch)
-        
-        if results:
-            save_analysis_results(cursor, connection, results)
-            print(f"Analyzed and saved results for {len(results)} routes")
+            print(f"Processing {len(batch)} routes...")
+            results = process_batch(batch)
+            
+            if results:
+                save_analysis_results(cursor, connection, results)
+                print(f"Analyzed and saved results for {len(results)} routes")
 
     except Exception as e:
         print(f"Error: {e}")

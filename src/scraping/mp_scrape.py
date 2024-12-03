@@ -11,6 +11,7 @@ from src.scraping import helper_functions
 from src.database.utils import create_connection
 from src.database import queries
 import re
+from datetime import datetime
 
 connection = create_connection()
 cursor = connection.cursor()
@@ -81,9 +82,10 @@ with sync_playwright() as playwright:
                         'fa': route_details.get('fa'),
                         'description': route_sections.get('description'),
                         'protection': route_sections.get('protection'),
+                        'insert_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                     }
 
-                    comments_dict = [{'route_id': route_id, 'comment': comment} for comment in comments]
+                    comments_dict = [{'route_id': route_id, 'comment': comment, 'insert_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S')} for comment in comments]
 
                     queries.insert_route(cursor, connection, current_route_data)
                     queries.insert_comments(cursor, connection, comments_dict)
@@ -138,7 +140,8 @@ with sync_playwright() as playwright:
                     'route_id': current_route_data['route_id'],
                     'date': tick_date,
                     'type': tick_type,
-                    'note': tick_note
+                    'note': tick_note,
+                    'insert_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 }
                 queries.insert_tick(cursor, connection, tick_data)
                 current_route_data = None

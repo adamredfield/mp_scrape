@@ -30,7 +30,9 @@ CREATE TABLE IF NOT EXISTS Routes (
     fa TEXT,
     description TEXT,
     protection TEXT,
+    insert_date TEXT,
     UNIQUE(id)
+
 );
 
 CREATE TABLE IF NOT EXISTS Ticks (
@@ -40,6 +42,7 @@ CREATE TABLE IF NOT EXISTS Ticks (
     type TEXT,
     note TEXT,
     FOREIGN KEY (route_id) REFERENCES Routes(id),
+    insert_date TEXT,
     UNIQUE(route_id, date)
 );
 
@@ -48,6 +51,7 @@ CREATE TABLE IF NOT EXISTS RouteComments (
     route_id INTEGER,
     comment TEXT,
     FOREIGN KEY (route_id) REFERENCES Routes(id),
+    insert_date TEXT,
     UNIQUE(route_id, comment)
 );
 
@@ -55,6 +59,7 @@ CREATE TABLE IF NOT EXISTS RouteAnalysis (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     route_id INTEGER,
     tags TEXT,
+    insert_date TEXT,
     FOREIGN KEY (route_id) REFERENCES Routes(id)
 );
 '''
