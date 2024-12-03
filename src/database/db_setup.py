@@ -17,6 +17,9 @@ CREATE TABLE IF NOT EXISTS Routes (
     route_name TEXT NOT NULL,
     route_url TEXT NOT NULL,
     yds_rating TEXT,
+    hueco_rating TEXT,
+    aid_rating TEXT,
+    danger_rating TEXT,
     avg_stars REAL,
     num_votes INTEGER,
     region TEXT,
@@ -32,11 +35,11 @@ CREATE TABLE IF NOT EXISTS Routes (
     protection TEXT,
     insert_date TEXT,
     UNIQUE(id)
-
 );
 
 CREATE TABLE IF NOT EXISTS Ticks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user TEXT,
     route_id INTEGER,
     date TEXT,
     type TEXT,
@@ -48,7 +51,7 @@ CREATE TABLE IF NOT EXISTS Ticks (
 
 CREATE TABLE IF NOT EXISTS RouteComments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    route_id INTEGER,
+    analysis_id INTEGER,
     comment TEXT,
     FOREIGN KEY (route_id) REFERENCES Routes(id),
     insert_date TEXT,
@@ -58,9 +61,26 @@ CREATE TABLE IF NOT EXISTS RouteComments (
 CREATE TABLE IF NOT EXISTS RouteAnalysis (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     route_id INTEGER,
-    tags TEXT,
     insert_date TEXT,
     FOREIGN KEY (route_id) REFERENCES Routes(id)
+);
+
+CREATE TABLE IF NOT EXISTS RouteAnalysisTags (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    analysis_id INTEGER,
+    tag_type TEXT,
+    tag_value TEXT,
+    insert_date TEXT,
+    FOREIGN KEY (analysis_id) REFERENCES RouteAnalysis(id)
+);
+
+CREATE TABLE IF NOT EXISTS RouteAnalysisTagsReasoning (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    analysis_id INTEGER,
+    tag_type TEXT,
+    reasoning TEXT,
+    insert_date TEXT,
+    FOREIGN KEY (analysis_id) REFERENCES RouteAnalysis(id)
 );
 '''
 

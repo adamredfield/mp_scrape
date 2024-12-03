@@ -4,11 +4,11 @@ def insert_route(cursor, connection, route_data):
     # Insert into Routes table if the route_id is not already in the table (unique constraint)
     route_sql = '''
     INSERT OR IGNORE INTO Routes (
-        id, route_name, route_url, yds_rating, avg_stars, num_votes,
-    region, main_area, sub_area, specific_location, route_type, length_ft, pitches, commitment_grade, fa, description, protection
+        id, route_name, route_url, yds_rating, hueco_rating, aid_rating, danger_rating, avg_stars, num_votes,
+    region, main_area, sub_area, specific_location, route_type, length_ft, pitches, commitment_grade, fa, description, protection, insert_date
     ) VALUES (     
-        :route_id, :route_name, :route_url, :yds_rating, :avg_stars, :num_votes,
-        :region, :main_area, :sub_area, :specific_location, :route_type, :length_ft, :pitches, :commitment_grade, :fa, :description, :protection)
+        :route_id, :route_name, :route_url, :yds_rating, :hueco_rating, :aid_rating, :danger_rating, :avg_stars, :num_votes,
+        :region, :main_area, :sub_area, :specific_location, :route_type, :length_ft, :pitches, :commitment_grade, :fa, :description, :protection, :insert_date)
     '''
     try:
         cursor.execute(route_sql, route_data)

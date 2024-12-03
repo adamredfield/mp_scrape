@@ -131,13 +131,42 @@ def get_route_sections(route_soup):
                 break
     return route_sections
 
+def get_grade(route_soup):
+    grade_types = {
+        'yds_rating': None,     # e.g., "5.11d"
+        'hueco_rating': None,   # e.g., "V3"
+        'aid_rating': None,     # e.g., "A2"
+        'danger_rating': None   # e.g., "R"
+    }
+    danger_list = ['PG', 'PG13', 'R', 'X'] 
+
+    rating_h2 = route_soup.find('h2', class_='inline-block mr-2')
+    if rating_h2:
+        # Get all YDS spans (could contain both YDS and Hueco)
+        rating_spans = rating_h2.find_all('span', class_='rateYDS')
+        for span in rating_spans:
+            rating = span.text.split()[0]  # Get the rating without "YDS"
+            if rating.startswith('5.'):
+                grade_types['yds_rating'] = rating
+            elif rating.startswith('V'):
+                grade_types['hueco_rating'] = rating
+        
+        danger_text = rating_h2.get_text().strip()
+        for word in danger_text.split():
+            if (word.startswith('A') or word.startswith('C')) and len(word) > 1 and word[1].isdigit():
+                grade_types['aid_rating'] = word
+            elif word in danger_list:
+                grade_types['danger_rating'] = word
+        
+    return grade_types
 def get_route_attributes(route_soup):
 
     route_attributes = {}
-
-    rate_yds_element = route_soup.find('span', class_='rateYDS')
-    if rate_yds_element:
-        route_attributes['rating'] = rate_yds_element.text.strip().split()[0]
+    grade_types = get_grade(route_soup)
+    route_attributes['yds_rating'] = grade_types['yds_rating']
+    route_attributes['hueco_rating'] = grade_types['hueco_rating']
+    route_attributes['aid_rating'] = grade_types['aid_rating']
+    route_attributes['danger_rating'] = grade_types['danger_rating']
     stars_avg_text_element = route_soup.find('span', id=re.compile('^starsWithAvgText-'))
     avg_rating_text = stars_avg_text_element.text.strip().replace('\n', ' ')
     avg_rating_parts = avg_rating_text.split('from')

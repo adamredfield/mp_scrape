@@ -5,9 +5,7 @@ project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(project_root)
 
 import openai
-import sqlite3
 from src.database.utils import create_connection
-from typing import List
 from datetime import datetime
 import json
 
@@ -86,7 +84,7 @@ def process_route(route: dict, max_retries = 2) -> dict:
         "content": (
             "You are an experienced climbing route analyst. Your task is to analyze routes and categorize their characteristics.\n\n"
             "Tag Categories:\n"
-            "1. style: General climbing styles (e.g., crack, face, slab, overhang, chimney). "
+            "1. styles: General climbing styles (e.g., crack, face, slab, overhang, chimney). "
             "Note: This should NOT include climb types like trad/sport - only the physical style. "
             "Multiple styles are allowed if they are defining characteristics.\n"
             "2. features: Specific route features (e.g., hand-crack, finger-crack, fist-crack, off-fingers, offwidth, dihedral, corner, seam, squeeze).\n"
@@ -96,7 +94,7 @@ def process_route(route: dict, max_retries = 2) -> dict:
             "4. rock_type: Type of rock only (e.g., granite, limestone, sandstone, gneiss). Do not include characteristics here.\n\n"
             "CRITICAL: You must return a valid JSON object exactly matching this format:\n"
             '{"tags": {'
-            '"style": {"tags": [], "reasoning": "brief explanation of why these styles were chosen"}, '
+            '"styles": {"tags": [], "reasoning": "brief explanation of why these styles were chosen"}, '
             '"features": {"tags": [], "reasoning": "brief explanation of identified features"}, '
             '"descriptors": {"tags": [], "reasoning": "brief explanation of chosen characteristics"}, '
             '"rock_type": {"tags": [], "reasoning": "brief explanation of rock type determination"}'
@@ -151,26 +149,90 @@ def process_route(route: dict, max_retries = 2) -> dict:
     print(f"Failed to process {route['route_name']} after {max_retries} attempts")
     return None
 
+def process_route_response(ai_response: dict) -> dict:
+    try:
+        tags = ai_response['tags']
+
+        tag_type_mapping = {
+            'styles': 'style',
+            'features': 'feature',
+            'descriptors': 'descriptor',
+            'rock_type': 'rock_type'
+        }
+
+        processed_data = {
+            'tags': [], # [(db_col_name, tag), ...]
+            'reasoning': [] # [(db_col_name, reasoning), ...]
+        }
+
+        for ai_response_key, db_col_name in tag_type_mapping.items():
+            data = tags[ai_response_key]
+
+            # extend for multiple tags per type
+            processed_data['tags'].extend((db_col_name, tag) for tag in data['tags'])
+            # append for single reasoning per type
+            processed_data['reasoning'].append((db_col_name, data['reasoning']))
+
+        return processed_data
+    except KeyError as e:
+        print(f"Error processing AI response: {e}")
+        return None
 
 def save_analysis_results(cursor, connection, result):
-    """Save analysis results to database"""
-    insert_sql = '''
-    INSERT INTO RouteAnalysis (
-        route_id,
-        tags,
-        insert_date
-    ) VALUES (
-        :route_id,
-        json(:tags),
-        :insert_date
-    )
-    '''
-    
+
     try:
-        cursor.execute(insert_sql, result)
+        ai_response = json.loads(result['tags'])
+        processed_response = process_route_response(ai_response)
+
+        """Save analysis results to database"""
+        analysis_insert_sql = f"""
+        INSERT INTO RouteAnalysis (
+            route_id,
+            insert_date
+        ) VALUES (
+            {result['route_id']},
+            "{result['insert_date']}"
+        )
+        """
+        cursor.execute(analysis_insert_sql)
+        analysis_id = cursor.lastrowid
+
+        for tag_type, tag_value in processed_response['tags']:
+            tag_insert_sql = f"""
+            INSERT INTO RouteAnalysisTags (
+                analysis_id,
+                tag_type,
+                tag_value,
+                insert_date
+            ) VALUES (
+                {analysis_id},
+                "{tag_type}",
+                "{tag_value}",
+                "{result['insert_date']}"
+            )
+            """
+            cursor.execute(tag_insert_sql)
+
+        for tag_type, reasoning in processed_response['reasoning']:
+            reasoning_insert_sql = f"""
+            INSERT INTO RouteAnalysisTagsReasoning (
+                analysis_id,
+                tag_type,
+                reasoning,
+                insert_date
+            ) VALUES (
+                {analysis_id},
+                "{tag_type}",
+                "{reasoning}",
+                "{result['insert_date']}"
+            )
+            """
+            cursor.execute(reasoning_insert_sql)
+
         connection.commit()
-    except sqlite3.IntegrityError as e:
-        print(f"Error inserting analysis results: {e}")
+    except Exception as e:
+        print(f"Error saving analysis results: {e}")
+        connection.rollback()
 
 def main():
     try:    

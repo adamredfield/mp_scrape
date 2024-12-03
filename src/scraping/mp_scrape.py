@@ -68,7 +68,10 @@ with sync_playwright() as playwright:
                         'route_id': route_id,
                         'route_name': route_name,
                         'route_url': route_link,
-                        'yds_rating': route_attributes.get('rating'),  
+                        'yds_rating': route_attributes.get('yds_rating'),  
+                        'hueco_rating': route_attributes.get('hueco_rating'),
+                        'aid_rating': route_attributes.get('aid_rating'),
+                        'danger_rating': route_attributes.get('danger_rating'),
                         'avg_stars': route_attributes.get('avg_stars'),
                         'num_votes': route_attributes.get('num_ratings'),
                         'region': route_location.get('region'),
@@ -137,6 +140,7 @@ with sync_playwright() as playwright:
                         tick_note = post_date_text.strip()
                         
                 tick_data = {
+                    'user': helper_functions.user,
                     'route_id': current_route_data['route_id'],
                     'date': tick_date,
                     'type': tick_type,
