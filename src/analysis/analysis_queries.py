@@ -1,3 +1,11 @@
+import os
+import sys
+
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+sys.path.append(project_root)
+
+from src.analysis.analysis_utils import get_grade_group
+
 def get_tick_type_distribution(cursor):
     """Get distribution of tick types (Lead, TR, etc.)"""
     query = '''
@@ -13,20 +21,45 @@ def get_tick_type_distribution(cursor):
     cursor.execute(query)
     return cursor.fetchall()
 
-def get_trad_grade_distribution(cursor):
-    """Get distribution of trad sends by grade"""
-    query = '''
+def get_grade_distribution(cursor, route_types=None, level='base'):
+    """Get distribution of sends by grade with configurable grouping and route"""
+
+    type_filter = f"AND r.route_type IN ({','.join(['?']*len(route_types))})" if route_types else ''
+
+    query = f'''
     SELECT 
         r.yds_rating,
-        ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM Ticks WHERE type NOT IN ('Lead / Fell/Hung')), 2) as percentage
+        COUNT(*) as count,
+        ROUND(COUNT(*) * 100.0 / (
+            SELECT COUNT(*)
+            FROM Ticks
+            JOIN Routes r ON t.route_id = r.id
+            WHERE type NOT IN ('Lead / Fell/Hung')
+            {type_filter}
+        ), 2) as percentage
     FROM Routes r
     JOIN Ticks t ON r.id = t.route_id
-    WHERE r.yds_rating IS NOT NULL AND route_type = 'Trad'
+    WHERE r.yds_rating IS NOT NULL
+    {type_filter}
     GROUP BY r.yds_rating
     ORDER BY COUNT(*) DESC;
     '''
-    cursor.execute(query)
-    return cursor.fetchall()
+    params = route_types * 2 if route_types else []
+    cursor.execute(query, params)
+    results = cursor.fetchall()
+
+    grouped_grades = {}
+
+    for grade, count, percentage in results:
+        grouped_grade = get_grade_group(grade, level)
+        if grouped_grade in grouped_grades:
+            grouped_grades[grouped_grade] += count
+        else:
+            grouped_grades[grouped_grade] = count
+
+    total_count = sum(grouped_grades.values())
+    return [(grade, count, round(count * 100.0 / total_count, 2)) 
+        for grade, count in grouped_grades.items()]
 
 def get_most_climbed_areas(cursor):
     """Get most frequently climbed areas"""
