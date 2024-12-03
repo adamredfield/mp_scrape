@@ -1,3 +1,0 @@
-import openai
-
-open_ai_key = openai.api_key = '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'
