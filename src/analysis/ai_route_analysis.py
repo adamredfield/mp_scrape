@@ -13,7 +13,7 @@ import json
 
 openai.api_key = os.getenv('OPENAI_API_KEY')
 
-def get_routes_for_analysis(cursor, batch_size=10):
+def get_next_route(cursor):
     """Get routes from database that haven't been analyzed yet"""
     query = '''
     SELECT 
@@ -39,35 +39,22 @@ def get_routes_for_analysis(cursor, batch_size=10):
     LEFT JOIN RouteAnalysis ra ON r.id = ra.route_id
     WHERE ra.id IS NULL  -- Only get routes not yet analyzed
     GROUP BY r.id
-    LIMIT :batch_size
+    LIMIT 1
     '''
-    cursor.execute(query, {'batch_size': batch_size})
+    cursor.execute(query)
     columns = [description[0] for description in cursor.description]
-    results = cursor.fetchall()
-    return [dict(zip(columns, row)) for row in results]
+    result = cursor.fetchone()
+    return dict(zip(columns, result)) if result else None
 
-def construct_single_prompt(route):
+def construct_prompt(route):
 
     prompt_header = '''
     Analyze the following climbing route data and classify it into tags based on the provided JSON structure:
 
-    Return a JSON object containing:
-    1. "style": General climbing styles (e.g., crack, face, slab, overhang, chimney, etc.).
-    2. "features": Specific route features (e.g., hand-crack, finger-crack, fist-crack, off-fingers, offwidth, dihedral, corner, seam, etc.).
-    3. "descriptors": Characteristics that describe difficulty or experience (e.g., technical, burly, runout, polished, chossy, adventurous, scary, mellow, exciting, bigwall, etc.).
-    4. "rock_type": Type of rock (e.g., granite, limestone, sandstone, gneiss, etc.). Do not include characteristics like "polished" here—only the rock type.
-
-    Ensure that the tags reflect the key attributes of the climbing route. The final output must strictly adhere to this format:
+    Return a JSON object with tags and reasoning for style, features, descriptors, and rock_type.
+    Ensure that the tags reflect the key attributes of the climbing route.
     Return ONLY the JSON object, without any markdown formatting or code blocks.
 
-    {
-        "tags": {
-            "style": [],
-            "features": [],
-            "descriptors": [],
-            "rock_type": []
-        }
-    }
     '''
 
     route_details = [
@@ -92,26 +79,43 @@ def construct_single_prompt(route):
 
     return prompt
 
-def process_batch(batch: List[dict]) -> List[dict]:
-    """Process a batch of routes"""
+def process_route(route: dict, max_retries = 2) -> dict:
 
-    results = []    
-    for route in batch:
-        messages = [
-            {"role": "system",
-            "content": (
-                "You are an experienced and expert climber tasked with analyzing and classifiying climbing routes. "
-                "The outputs will be used in a dashboard. "
-                "This dashboard will allow climbers to visualize the types of routes they climb and to find other climbs in styles they enjoy. "
-                "For each route, provide tags in the specified JSON structure."
-                "Return ONLY the JSON object, without any markdown formatting or code blocks."
-            )},
-            {"role": "user", "content": construct_single_prompt(route)}
-        ]
+    messages = [
+        {"role": "system",
+        "content": (
+            "You are an experienced climbing route analyst. Your task is to analyze routes and categorize their characteristics.\n\n"
+            "Tag Categories:\n"
+            "1. style: General climbing styles (e.g., crack, face, slab, overhang, chimney). "
+            "Note: This should NOT include climb types like trad/sport - only the physical style. "
+            "Multiple styles are allowed if they are defining characteristics.\n"
+            "2. features: Specific route features (e.g., hand-crack, finger-crack, fist-crack, off-fingers, offwidth, dihedral, corner, seam, squeeze).\n"
+            "Note: ideally these should act as sub-tags of the style. (e.g. style: crack, features: hand-crack)\n"
+            "Note: We want to keep these specific but relatively general. (e.g. hand-crack vs. double-hand crack)\n"
+            "3. descriptors: Characteristics about difficulty or experience (e.g., technical, burly, runout, polished, chossy, adventurous, scary, mellow).\n"
+            "4. rock_type: Type of rock only (e.g., granite, limestone, sandstone, gneiss). Do not include characteristics here.\n\n"
+            "CRITICAL: You must return a valid JSON object exactly matching this format:\n"
+            '{"tags": {'
+            '"style": {"tags": [], "reasoning": "brief explanation of why these styles were chosen"}, '
+            '"features": {"tags": [], "reasoning": "brief explanation of identified features"}, '
+            '"descriptors": {"tags": [], "reasoning": "brief explanation of chosen characteristics"}, '
+            '"rock_type": {"tags": [], "reasoning": "brief explanation of rock type determination"}'
+            '}}\n\n'
+            "Important Rules:\n"
+            "- Include ONLY features explicitly mentioned or clearly implied in the route's data\n"
+            "- Provide concise but specific reasoning for each category\n"
+            "- Do not add any extra text or formatting"
+            "- Ensure all JSON strings are properly escaped\n"
+            "- Do not use line breaks within reasoning strings"
+        )},
+        {"role": "user", "content": construct_prompt(route)}
+    ]
+
+    for attempt in range(max_retries):
         try:    
             # Make API call
             response = openai.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4o-mini",  
             messages=messages,
             max_tokens=500,
                 temperature=0.3
@@ -119,27 +123,36 @@ def process_batch(batch: List[dict]) -> List[dict]:
 
             # Process responses
             response_text = response.choices[0].message.content.strip()
-            print(f"Response for {route['route_name']}: {response_text}")
+            parsed_tags = json.loads(response_text)
 
-            try:
-                parsed_tags = json.loads(response_text)  # Make sure it's valid JSON
-                result = {
-                    "route_id": route["id"],
-                    "tags": json.dumps(parsed_tags),
-                    "insert_date": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                }
-                results.append(result)
-            except json.JSONDecodeError as e:
-                print(f"Invalid JSON for route {route['route_name']}: {e}")
+            result = {
+                "route_id": route["id"],
+                "tags": json.dumps(parsed_tags),
+                "insert_date": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            }
+            return result
+        except json.JSONDecodeError as e:
+            print(f"JSON Parse Error on attempt {attempt + 1}:")
+            print(f"Error details: {str(e)}")
+            print(f"Error position: {e.pos}")
+            print(f"Problematic text around error:\n{response_text[max(0, e.pos-50):e.pos+50]}")
+            
+            if attempt > max_retries - 1:
+                print(f"Retrying... ({attempt + 2}/{max_retries})")
                 continue
-
+            return None
         except Exception as e:
-            print(f"Error processing route {route['route_name']}: {e}")
-            continue
-    
-    return results
+            print(f"API Error on attempt {attempt + 1}: {e}")
+            if attempt < max_retries - 1:
+                print(f"Retrying... ({attempt + 2}/{max_retries})")
+                continue
+            return None
 
-def save_analysis_results(cursor, connection, results):
+    print(f"Failed to process {route['route_name']} after {max_retries} attempts")
+    return None
+
+
+def save_analysis_results(cursor, connection, result):
     """Save analysis results to database"""
     insert_sql = '''
     INSERT INTO RouteAnalysis (
@@ -154,7 +167,7 @@ def save_analysis_results(cursor, connection, results):
     '''
     
     try:
-        cursor.executemany(insert_sql, results)
+        cursor.execute(insert_sql, result)
         connection.commit()
     except sqlite3.IntegrityError as e:
         print(f"Error inserting analysis results: {e}")
@@ -165,17 +178,16 @@ def main():
         cursor = connection.cursor()
 
         while True:
-            batch = get_routes_for_analysis(cursor)
-            if not batch:
+            route = get_next_route(cursor)
+            if not route:
                 print("No new routes to analyze")
-                return
+                break
         
-            print(f"Processing {len(batch)} routes...")
-            results = process_batch(batch)
+            result = process_route(route)
             
-            if results:
-                save_analysis_results(cursor, connection, results)
-                print(f"Analyzed and saved results for {len(results)} routes")
+            if result:
+                save_analysis_results(cursor, connection, result)
+                print(f"Successfully analyzed {route['route_name']}")
 
     except Exception as e:
         print(f"Error: {e}")
