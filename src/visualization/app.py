@@ -22,12 +22,8 @@ def load_data():
             columns=['Type', 'Count', 'Percentage']
         ),
         'grade_data': pd.DataFrame(
-            get_grade_distribution(cursor),
+            get_trad_grade_distribution(cursor),
             columns=['Grade', 'Percentage']
-        ),
-        'seasonal_data': pd.DataFrame(
-            get_seasonal_patterns(cursor),
-            columns=['Month', 'Climb_Count', 'Avg_Grade']
         ),
         'areas_data': pd.DataFrame(
             get_most_climbed_areas(cursor),
@@ -64,24 +60,6 @@ grade_fig = px.bar(data['grade_data'],
                    y='Percentage',
                    title='Grade Distribution')
 
-seasonal_fig = go.Figure()
-seasonal_fig.add_trace(go.Bar(
-    name='Climbs', 
-    x=data['seasonal_data']['Month'], 
-    y=data['seasonal_data']['Climb_Count']
-))
-seasonal_fig.add_trace(go.Scatter(
-    name='Avg Grade',
-    x=data['seasonal_data']['Month'],
-    y=data['seasonal_data']['Avg_Grade'],
-    yaxis='y2'
-))
-seasonal_fig.update_layout(
-    title='Seasonal Climbing Patterns',
-    yaxis2=dict(overlaying='y', side='right'),
-    hovermode='x unified'
-)
-
 areas_fig = px.bar(data['areas_data'], 
                    x='Location', 
                    y='Visits',
@@ -108,11 +86,6 @@ app.layout = html.Div([
         html.Div([
             dcc.Graph(figure=grade_fig)
         ], style={'width': '50%', 'display': 'inline-block'})
-    ]),
-    
-    # Seasonal patterns (full width)
-    html.Div([
-        dcc.Graph(figure=seasonal_fig)
     ]),
     
     # Another row of graphs
