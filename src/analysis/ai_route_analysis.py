@@ -86,6 +86,8 @@ def process_route(route: dict, max_retries = 2) -> dict:
             "Tag Categories:\n"
             "1. styles: General climbing styles (e.g., crack, face, slab, overhang, chimney). "
             "Note: This should NOT include climb types like trad/sport - only the physical style. "
+            "Examples: (crack, chimney, face, overhang, slab, scramble, ridge)"
+            "Examples that should be features, not styles: (offwidth, corner, roof, dihedral, flake, arete, traverse, lieback, undercling, pinch)"
             "Multiple styles are allowed if they are defining characteristics.\n"
             "2. features: Specific route features (e.g., hand-crack, finger-crack, fist-crack, off-fingers, offwidth, dihedral, corner, seam, squeeze).\n"
             "Note: ideally these should act as sub-tags of the style. (e.g. style: crack, features: hand-crack)\n"

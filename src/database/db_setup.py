@@ -82,6 +82,17 @@ CREATE TABLE IF NOT EXISTS RouteAnalysisTagsReasoning (
     insert_date TEXT,
     FOREIGN KEY (analysis_id) REFERENCES RouteAnalysis(id)
 );
+
+CREATE TABLE TagMapping (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    raw_tag TEXT,          
+    clean_tag TEXT,         
+    original_tag_type TEXT,
+    mapped_tag_type TEXT,
+    is_active BOOLEAN,
+    insert_date TEXT,
+    UNIQUE(raw_tag, original_tag_type) 
+);
 '''
 
 cursor.executescript(create_table_query)

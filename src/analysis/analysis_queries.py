@@ -64,8 +64,7 @@ def get_grade_distribution(cursor, route_types=None, level='base'):
     GROUP BY grade
     ORDER BY COUNT(*) DESC;
     '''
-    params = route_types * 2 if route_types else []
-    cursor.execute(query, params)
+    cursor.execute(query)
     results = cursor.fetchall()
 
     grouped_grades = {}

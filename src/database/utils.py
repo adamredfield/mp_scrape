@@ -13,3 +13,20 @@ def create_connection():
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
 
     return sqlite3.connect(db_path) 
+
+def add_new_tags_to_mapping(cursor):
+    """Add any new tags from Tags table to TagMapping with default values"""
+    
+    # Insert new tags with themselves as clean_tag
+    cursor.execute('''
+        INSERT OR IGNORE INTO TagMapping (raw_tag, original_tag_type, is_active)
+        SELECT DISTINCT 
+            rat.tag_value ,
+            rat.tag_type,
+            True,
+            rat.insert_date
+        FROM RouteAnalysisTags rat
+        LEFT JOIN TagMapping m ON rat.tag_value = m.raw_tag
+        WHERE m.raw_tag IS NULL;
+
+    ''')
