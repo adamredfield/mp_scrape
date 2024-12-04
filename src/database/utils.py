@@ -19,7 +19,7 @@ def add_new_tags_to_mapping(cursor):
     
     # Insert new tags with themselves as clean_tag
     cursor.execute('''
-        INSERT OR IGNORE INTO TagMapping (raw_tag, original_tag_type, is_active)
+        INSERT OR IGNORE INTO TagMapping (raw_tag, original_tag_type, is_active, insert_date)
         SELECT DISTINCT 
             rat.tag_value ,
             rat.tag_type,
@@ -28,5 +28,4 @@ def add_new_tags_to_mapping(cursor):
         FROM RouteAnalysisTags rat
         LEFT JOIN TagMapping m ON rat.tag_value = m.raw_tag
         WHERE m.raw_tag IS NULL;
-
     ''')
