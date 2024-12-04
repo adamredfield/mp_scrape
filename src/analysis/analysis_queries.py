@@ -24,24 +24,44 @@ def get_tick_type_distribution(cursor):
 def get_grade_distribution(cursor, route_types=None, level='base'):
     """Get distribution of sends by grade with configurable grouping and route"""
 
-    type_filter = f"AND r.route_type IN ({','.join(['?']*len(route_types))})" if route_types else ''
+    grade_column = "CASE "
+    grade_column += "WHEN r.route_type LIKE '%Boulder%' THEN r.hueco_rating "
+    grade_column += "WHEN r.route_type LIKE '%Aid%' THEN r.aid_rating "
+    grade_column += "ELSE r.yds_rating END"
+
+    # Build type filter using LIKE for comma-separated values
+    if route_types:
+        type_conditions = []
+        for route_type in route_types:
+            type_conditions.append(f"r.route_type LIKE '%{route_type}%'")
+        type_filter = f"AND ({' OR '.join(type_conditions)})"
+    else:
+        type_filter = ''
 
     query = f'''
     SELECT 
-        r.yds_rating,
+        {grade_column} as grade,
         COUNT(*) as count,
         ROUND(COUNT(*) * 100.0 / (
             SELECT COUNT(*)
-            FROM Ticks
-            JOIN Routes r ON t.route_id = r.id
-            WHERE type NOT IN ('Lead / Fell/Hung')
+            FROM Ticks t2
+            JOIN Routes r2 ON t2.route_id = r2.id
+            WHERE r2.route_type IS NOT NULL
+            AND (
+                (r2.route_type NOT LIKE '%Aid%' AND t2.type != 'Lead / Fell/Hung')  -- Filter out fell/hung for non-aid
+                OR (r2.route_type LIKE '%Aid%')                                  -- Keep all ticks for aid
+            )
             {type_filter}
         ), 2) as percentage
     FROM Routes r
     JOIN Ticks t ON r.id = t.route_id
-    WHERE r.yds_rating IS NOT NULL
+    WHERE {grade_column} IS NOT NULL
+    AND (
+        (r.route_type NOT LIKE '%Aid%' AND t.type != 'Lead / Fell/Hung') -- only include fell / hung for aid routes
+        OR (r.route_type LIKE '%Aid%')
+    )
     {type_filter}
-    GROUP BY r.yds_rating
+    GROUP BY grade
     ORDER BY COUNT(*) DESC;
     '''
     params = route_types * 2 if route_types else []

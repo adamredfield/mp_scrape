@@ -2,8 +2,12 @@ def get_grade_group(grade:str, level:str = 'base') -> str:
 
     if not grade:
         return None
+    if grade.startswith('V'):
+        return grade
+    if grade.startswith('A') or grade.startswith('C'):
+        return grade 
 
-    if grade[:2] == '5.':
+    if grade.startswith('5.'):
         grade_prefix = '5.'
         cleaned_grade = grade.replace('5.', '')
     else:
