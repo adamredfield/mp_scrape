@@ -93,6 +93,18 @@ CREATE TABLE TagMapping (
     insert_date TEXT,
     UNIQUE(raw_tag, original_tag_type) 
 );
+
+CREATE VIEW TagAnalysisView AS
+SELECT DISTINCT 
+    r.id route_id,
+    r.route_name,
+    COALESCE(tm.mapped_tag_type, tm.original_tag_type) as mapped_type, 
+    COALESCE(tm.clean_tag, tm.raw_tag) as mapped_tag
+FROM RouteAnalysisTags rat 
+LEFT JOIN TagMapping tm on tm.raw_tag = rat.tag_value 
+JOIN RouteAnalysis ra on rat.analysis_id = ra.id
+JOIN Routes r on r.id = ra.route_id 
+WHERE tm.is_active = 1;
 '''
 
 cursor.executescript(create_table_query)
