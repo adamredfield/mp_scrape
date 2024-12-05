@@ -101,14 +101,22 @@ def get_highest_rated_climbs(cursor):
     query = '''
     SELECT 
         DISTINCT r.route_name,
-        r.yds_rating,
+        TRIM(NULLIF(CONCAT_WS(' ', 
+            r.yds_rating,
+            r.hueco_rating,
+            r.aid_rating,
+            r.danger_rating,
+            r.commitment_grade), '')) as grade,
         r.avg_stars,
-        r.num_votes
+        r.num_votes,
+        GROUP_CONCAT(tav.mapped_tag, ', ') as styles
     FROM Routes r
+    LEFT JOIN TagAnalysisView tav on r.id = tav.route_id AND tav.mapped_type = 'style'
     JOIN Ticks t ON r.id = t.route_id
     WHERE r.num_votes >= 10
+    GROUP BY r.route_name, r.yds_rating, r.avg_stars, r.num_votes
     ORDER BY r.avg_stars DESC, num_votes DESC
-    LIMIT 40
+    LIMIT 20
     '''
     cursor.execute(query)
     return cursor.fetchall()

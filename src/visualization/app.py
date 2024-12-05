@@ -25,15 +25,15 @@ def load_data():
         'areas_data': pd.DataFrame(
             get_most_climbed_areas(cursor),
             columns=['Location', 'Visits', 'Avg_Rating']
-        ).head(10),
+        ).head(20),
         'type_data': pd.DataFrame(
             get_route_type_preferences(cursor),
             columns=['Type', 'Count', 'Avg_Rating', 'Percentage']
         ),
         'rated_data': pd.DataFrame(
             get_highest_rated_climbs(cursor),
-            columns=['Route', 'Grade', 'Stars', 'Votes']
-        ).head(10)
+            columns=['Route', 'Grade', 'Stars', 'Votes', 'Styles']
+        ).head(20)
     }
     
     conn.close()

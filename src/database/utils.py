@@ -29,3 +29,5 @@ def add_new_tags_to_mapping(cursor):
         LEFT JOIN TagMapping m ON rat.tag_value = m.raw_tag
         WHERE m.raw_tag IS NULL;
     ''')
+
+    
