@@ -46,7 +46,11 @@ def load_data():
         'length_ft': 'Length',
         'avg_stars': 'Stars',
         'num_votes': 'Votes',
-        'styles': 'Style'})
+        'styles': 'Style'}),
+        'length_data': pd.DataFrame(
+            get_length_climbed(cursor),
+            columns=['Year', 'Location', 'Length']
+        )
     }
     
     conn.close()
@@ -58,17 +62,7 @@ server = app.server
 
 data = load_data()
 
-# Create figures
-tick_fig = px.pie(data['tick_data'], 
-                  values='Count', 
-                  names='Type', 
-                  title='Tick Type Distribution')
-
-areas_fig = px.bar(data['areas_data'], 
-                   x='Location', 
-                   y='Visits',
-                   color='Avg_Rating',
-                   title='Top 10 Most Visited Areas')
+# Create static figures
 
 type_fig = px.bar(data['type_data'],
                   x='Type',
@@ -78,6 +72,8 @@ type_fig = px.bar(data['type_data'],
 
 # Layout
 app.layout = html.Div([
+
+    html.Div(id='_', children='', style={'display': 'none'}),
     # Header
     html.H1('🧗‍♂️ Climbing Analytics Dashboard', style={'textAlign': 'center', 'padding': '20px'}),
     create_filters_section(),
@@ -88,7 +84,7 @@ app.layout = html.Div([
 ], style={'padding': '20px', 'backgroundColor': 'white'})
 
 
-register_callbacks(app)
+register_callbacks(app, data)
 
 # Run the app
 if __name__ == '__main__':

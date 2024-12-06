@@ -209,3 +209,35 @@ def get_bigwall_routes(cursor):
     '''
     cursor.execute(query)
     return cursor.fetchall()
+
+def get_length_climbed(cursor):
+    query = f"""
+    WITH estimated_lengths AS (
+    SELECT  id,
+            CASE WHEN route_type LIKE '%trad%' AND length_ft IS NULL AND pitches IS NULL -- trad single-pitch
+                THEN (SELECT avg(length_ft) FROM Routes r WHERE route_type LIKE '%trad%'AND length_ft IS NOT NULL and pitches IS NULL AND length_ft < 230) -- avg single-pitch trad pitch length
+                WHEN route_type LIKE '%trad%' AND length_ft IS NULL AND pitches IS NOT NULL -- trad multipitch
+                THEN (SELECT avg(length_ft/ pitches) FROM Routes r WHERE route_type LIKE '%trad%' AND length_ft IS NOT NULL and pitches IS NOT NULL) * pitches
+                WHEN route_type LIKE '%sport%' AND length_ft IS NULL AND pitches IS NOT NULL -- sport multipitch
+                THEN (SELECT avg(length_ft) FROM Routes r WHERE route_type LIKE '%sport%'AND length_ft IS NOT NULL and pitches IS NULL AND length_ft < 230) -- avg single-pitch sport pitch length
+                WHEN route_type LIKE '%trad%' AND length_ft IS NULL AND pitches IS NOT NULL -- trad multipitch
+                THEN (SELECT avg(length_ft/ pitches) FROM Routes r WHERE route_type LIKE '%trad%' AND length_ft IS NOT NULL and pitches IS NOT NULL) * pitches
+                WHEN route_type LIKE '%boulder%' AND length_ft IS NULL
+                THEN (SELECT avg(length_ft) FROM Routes r WHERE route_type LIKE '%boulder%' AND length_ft IS NOT NULL) -- boulder
+            END AS estimated_length
+    FROM routes
+    WHERE estimated_length IS NOT NULL
+    )
+    SELECT 
+        substr(t.date, -4) as year,
+        r.main_area,
+        sum(coalesce(r.length_ft, el.estimated_length)) length_climbed
+    FROM routes r
+    JOIN Ticks t ON r.id = t.route_id
+    LEFT JOIN estimated_lengths el on el.id = r.id
+    WHERE t.date IS NOT NULL AND CAST(year AS INTEGER) >= 1999
+    GROUP BY year, r.main_area
+    ORDER BY year DESC, length_climbed DESC;
+    """
+    cursor.execute(query)
+    return cursor.fetchall()

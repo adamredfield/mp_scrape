@@ -9,16 +9,22 @@ import plotly.express as px
 from src.analysis.analysis_queries import *
 from src.visualization.components.filters import create_grade_grouping_filter
 
-def apply_chart_style(fig, width='50%', height='350px', vertical_align='top'):
+def apply_chart_style(id=None, fig=None, width='50%', height='350px', vertical_align='top'):
     """Apply consistent styling to a chart"""
-    return html.Div([
-        dcc.Graph(figure=fig)
-    ], style={
+    graph_style = {'height': height}
+    container_style = {
         'width': width,
         'display': 'inline-block',
-        'verticalAlign': vertical_align,
-        'height': height,
-    })
+        'verticalAlign': vertical_align
+    }
+    if fig:      
+        return html.Div([
+            dcc.Graph(figure=fig, style=graph_style)
+        ], style=container_style)
+    else:
+        return html.Div([
+            dcc.Graph(id=id, style=graph_style)
+        ], style=container_style)
 
 def create_charts_section(data):
     type_fig = px.bar(data['type_data'], x='Type', y='Count', color='Avg_Rating', title='Route Type Preferences')
@@ -32,9 +38,11 @@ def create_charts_section(data):
                 dcc.Graph(id='grade-distribution', style={'height': '350px'})], style={'width': '50%', 'display': 'inline-block', 'verticalAlign': 'top'})
         ], style={'marginBottom': '20px' }),
         html.Div([
-            #apply_chart_style(None, id='areas-chart'),
-            html.Div([dcc.Graph(id='areas-chart', style={'height': '350px'})], style={'width': '50%', 'display': 'inline-block', 'verticalAlign': 'top'}),
-            apply_chart_style(type_fig)
+            apply_chart_style(id='areas-chart'),
+            #html.Div([dcc.Graph(id='areas-chart', style={'height': '350px'})], style={'width': '50%', 'display': 'inline-block', 'verticalAlign': 'top'}),
+            apply_chart_style(id='type-chart', fig=type_fig),
+            #html.Div([dcc.Graph(id='length-climbed-chart', style={'height': '350px'})], style={'width': '50%', 'display': 'inline-block', 'verticalAlign': 'top'})
+            apply_chart_style(id='length-climbed-chart')
         ],style={'marginBottom': '50px'})
     ])
 
