@@ -6,6 +6,17 @@ sys.path.append(project_root)
 
 from src.analysis.analysis_utils import get_grade_group
 
+def route_type_filter(route_types):
+    if route_types:
+        type_conditions = []
+        for route_type in route_types:
+            type_conditions.append(f"r.route_type LIKE '%{route_type}%'")
+        type_filter = f"AND ({' OR '.join(type_conditions)})"
+    else:
+        type_filter = ''
+    return type_filter
+
+
 def get_tick_type_distribution(cursor):
     """Get distribution of tick types (Lead, TR, etc.)"""
     query = '''
@@ -29,15 +40,6 @@ def get_grade_distribution(cursor, route_types=None, level='base'):
     grade_column += "WHEN r.route_type LIKE '%Aid%' THEN r.aid_rating "
     grade_column += "ELSE r.yds_rating END"
 
-    # Build type filter using LIKE for comma-separated values
-    if route_types:
-        type_conditions = []
-        for route_type in route_types:
-            type_conditions.append(f"r.route_type LIKE '%{route_type}%'")
-        type_filter = f"AND ({' OR '.join(type_conditions)})"
-    else:
-        type_filter = ''
-
     query = f'''
     SELECT 
         {grade_column} as grade,
@@ -51,7 +53,7 @@ def get_grade_distribution(cursor, route_types=None, level='base'):
                 (r2.route_type NOT LIKE '%Aid%' AND t2.type != 'Lead / Fell/Hung')  -- Filter out fell/hung for non-aid
                 OR (r2.route_type LIKE '%Aid%')                                  -- Keep all ticks for aid
             )
-            {type_filter}
+            {route_type_filter(route_types)}
         ), 2) as percentage
     FROM Routes r
     JOIN Ticks t ON r.id = t.route_id
@@ -60,7 +62,7 @@ def get_grade_distribution(cursor, route_types=None, level='base'):
         (r.route_type NOT LIKE '%Aid%' AND t.type != 'Lead / Fell/Hung') -- only include fell / hung for aid routes
         OR (r.route_type LIKE '%Aid%')
     )
-    {type_filter}
+    {route_type_filter(route_types)}
     GROUP BY grade
     ORDER BY COUNT(*) DESC;
     '''
@@ -80,25 +82,48 @@ def get_grade_distribution(cursor, route_types=None, level='base'):
     return [(grade, count, round(count * 100.0 / total_count, 2)) 
         for grade, count in grouped_grades.items()]
 
-def get_most_climbed_areas(cursor):
+def get_most_climbed_areas(cursor, route_types=None):
+
+    if route_types:
+        type_conditions = []
+        for route_type in route_types:
+            type_conditions.append(f"r.route_type LIKE '%{route_type}%'")
+        type_filter = f"WHERE ({' OR '.join(type_conditions)})"
+    else:
+        type_filter = ''
     """Get most frequently climbed areas"""
-    query = '''
+    query = f"""
     SELECT 
         r.sub_area ,
         COUNT(*) as visit_count,
         AVG(r.avg_stars) as avg_rating
     FROM Routes r
     JOIN Ticks t ON r.id = t.route_id
+    {type_filter}
     GROUP BY r.sub_area
     ORDER BY visit_count DESC
     LIMIT 20;
-    '''
+    """
     cursor.execute(query)
     return cursor.fetchall()
 
-def get_highest_rated_climbs(cursor):
+def get_highest_rated_climbs(cursor, selected_styles=None, route_types=None):
     """Get highest rated climbs"""
-    query = '''
+
+    style_filter = ""
+    if selected_styles:
+        style_conditions = [
+            f"(',' || GROUP_CONCAT(tav.mapped_tag, ',') || ',') LIKE '%,{style},%'"
+            for style in selected_styles
+        ]
+        style_filter = f"HAVING {' AND '.join(style_conditions)}"
+
+    query = f"""
+    WITH deduped_ticks AS(
+    SELECT *,
+           ROW_NUMBER() OVER (PARTITION BY route_id ORDER BY date DESC) as rn
+    FROM Ticks
+    )
     SELECT 
         DISTINCT r.route_name,
         TRIM(NULLIF(CONCAT_WS(' ', 
@@ -112,12 +137,14 @@ def get_highest_rated_climbs(cursor):
         GROUP_CONCAT(tav.mapped_tag, ', ') as styles
     FROM Routes r
     LEFT JOIN TagAnalysisView tav on r.id = tav.route_id AND tav.mapped_type = 'style'
-    JOIN Ticks t ON r.id = t.route_id
+    JOIN deduped_ticks t ON r.id = t.route_id AND rn = 1
     WHERE r.num_votes >= 10
+    {route_type_filter(route_types)}
     GROUP BY r.route_name, r.yds_rating, r.avg_stars, r.num_votes
+    {style_filter}
     ORDER BY r.avg_stars DESC, num_votes DESC
     LIMIT 20
-    '''
+    """
     cursor.execute(query)
     return cursor.fetchall()
 
@@ -138,3 +165,15 @@ def get_route_type_preferences(cursor):
     '''
     cursor.execute(query)
     return cursor.fetchall()        
+
+def get_distinct_styles(cursor):
+    """Get all distinct active styles from TagMapping"""
+    query = '''
+    SELECT DISTINCT coalesce(clean_tag, raw_tag) as style
+    FROM TagMapping
+    WHERE is_active = 1
+    AND COALESCE(mapped_tag_type, original_tag_type) = 'style'
+    ORDER BY style;
+    '''
+    cursor.execute(query)
+    return [row[0] for row in cursor.fetchall()]      
