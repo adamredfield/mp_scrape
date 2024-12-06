@@ -35,7 +35,7 @@ def get_route_type_filter(width='50%'):
         html.Label('Filter by Route Type:', 
                  style={'fontWeight': 'bold', 'marginBottom': '10px'}),
         dcc.Dropdown(
-        id='route-type-selector',
+        id='route-type-filter',
         options=[type for type in route_types],
         value=['Trad', 'Sport'],
         multi=True,

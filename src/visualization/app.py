@@ -34,7 +34,19 @@ def load_data():
         'rated_data': pd.DataFrame(
             get_highest_rated_climbs(cursor),
             columns=['Route', 'Grade', 'Stars', 'Votes', 'Styles']
-        ).head(20)
+        ).head(20),
+        'bigwall_data': pd.DataFrame(
+            get_bigwall_routes(cursor),
+            columns=['Route', 'Grade', 'Committment', 'Location', 'Length', 'Stars', 'Votes', 'Style']
+        ).rename(columns={
+        'route_name': 'Route',
+        'grade': 'Grade',
+        'committment': 'Committment',
+        'location': 'Location',
+        'length_ft': 'Length',
+        'avg_stars': 'Stars',
+        'num_votes': 'Votes',
+        'styles': 'Style'})
     }
     
     conn.close()
@@ -70,7 +82,8 @@ app.layout = html.Div([
     html.H1('🧗‍♂️ Climbing Analytics Dashboard', style={'textAlign': 'center', 'padding': '20px'}),
     create_filters_section(),
     create_charts_section(data),
-    create_table_section(data),
+    create_table_section(data, table_type='rated'),
+    create_table_section(data, table_type='bigwall'),
     html.Div([html.P('Data sourced from Mountain Project', style={'textAlign': 'center', 'padding': '20px'})])
 ], style={'padding': '20px', 'backgroundColor': 'white'})
 

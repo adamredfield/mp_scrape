@@ -5,6 +5,7 @@ project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(project_root)
 
 from src.analysis.analysis_utils import get_grade_group
+from operator import itemgetter
 
 def route_type_filter(route_types):
     if route_types:
@@ -17,18 +18,20 @@ def route_type_filter(route_types):
     return type_filter
 
 
-def get_tick_type_distribution(cursor):
+def get_tick_type_distribution(cursor, route_types=None):
     """Get distribution of tick types (Lead, TR, etc.)"""
-    query = '''
+    query = f"""
     SELECT 
         type,
         COUNT(*) as count,
         ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM Ticks WHERE type IS NOT NULL), 2) as percentage
-    FROM Ticks
+    FROM Ticks t
+    JOIN Routes r ON t.route_id = r.id
     WHERE type IS NOT NULL
+    {route_type_filter(route_types)}
     GROUP BY type
     ORDER BY count DESC;
-    '''
+    """
     cursor.execute(query)
     return cursor.fetchall()
 
@@ -79,8 +82,13 @@ def get_grade_distribution(cursor, route_types=None, level='base'):
             grouped_grades[grouped_grade] = count
 
     total_count = sum(grouped_grades.values())
-    return [(grade, count, round(count * 100.0 / total_count, 2)) 
+
+    filtered_results = [{'Grade':grade, 'Count':count, 'Percentage':round(count * 100.0 / total_count, 2)}
         for grade, count in grouped_grades.items()]
+    
+    filtered_results.sort(key = itemgetter('Count'), reverse = True)
+    
+    return filtered_results
 
 def get_most_climbed_areas(cursor, route_types=None):
 
@@ -177,3 +185,27 @@ def get_distinct_styles(cursor):
     '''
     cursor.execute(query)
     return [row[0] for row in cursor.fetchall()]      
+
+def get_bigwall_routes(cursor):
+    """Get all bigwall routes"""
+    query = '''
+    SELECT 
+        DISTINCT r.route_name,
+        TRIM(NULLIF(CONCAT_WS(' ', 
+            r.yds_rating,
+            r.hueco_rating,
+            r.aid_rating,
+            r.danger_rating), '')) as grade,
+            r.commitment_grade committment,
+        concat(r.region, ' > ', r.main_area, ' > ', r.sub_area, ' > ', r.specific_location) as location,
+        r.length_ft ,
+        r.avg_stars,
+        r.num_votes,
+        GROUP_CONCAT(tav.mapped_tag, ', ') as styles 
+        FROM Routes r
+        LEFT JOIN TagAnalysisView tav on r.id = tav.route_id AND tav.mapped_type = 'style'
+        WHERE commitment_grade IN ('V', 'VI', 'VII')
+        GROUP BY 1,2,3,4,5;
+    '''
+    cursor.execute(query)
+    return cursor.fetchall()

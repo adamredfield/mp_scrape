@@ -1,7 +1,7 @@
 from dash.dependencies import Input, Output
 import pandas as pd
 from src.database.utils import create_connection
-from src.analysis.analysis_queries import get_grade_distribution, get_highest_rated_climbs, get_most_climbed_areas
+from src.analysis.analysis_queries import get_grade_distribution, get_highest_rated_climbs, get_most_climbed_areas, get_tick_type_distribution
 from src.visualization.components.filters import create_filters_section
 import plotly.express as px
 
@@ -59,7 +59,30 @@ def register_callbacks(app):
         
         conn.close()
         return fig
+    @app.callback(
+        Output('tick-distribution', 'figure'), 
+        Input('route-type-filter', 'value')
+    )
+    def update_tick_type_distribution(selected_types):
+        conn = create_connection()
+        cursor = conn.cursor()
 
+        results = get_tick_type_distribution(cursor, selected_types)
+        df = pd.DataFrame(results, columns=['Type', 'Count', 'Percentage'])
+        
+        fig = px.pie(df, 
+                 values='Count', 
+                 names='Type', 
+                 title='Tick Type Distribution')
+    
+        fig.update_layout(
+            margin=dict(t=30, l=50, r=20, b=50),
+            height=350,
+            title={'y': 0.95, 'x': 0.5, 'xanchor': 'center', 'yanchor': 'top'}
+        )
+
+        conn.close()
+        return fig
 
     @app.callback(
         Output('highest-rated-climbs-table', 'data'),
