@@ -20,27 +20,153 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+conn = create_connection()
+cursor = conn.cursor()
+
+total_routes = mp_wrapped_metrics.total_routes(cursor)
+
+most_climbed_route = mp_wrapped_metrics.most_climbed_route(cursor)
+
+top_rated_routes = mp_wrapped_metrics.top_rated_routes(cursor)
+
+days_climbed = mp_wrapped_metrics.days_climbed(cursor)
+
+top_climbing_style = mp_wrapped_metrics.top_climbing_style(cursor)
+
+top_grade = mp_wrapped_metrics.top_grade(cursor, "granular")
+
+length_climbed = analysis_queries.get_length_climbed(cursor, year='2024')
 
 # Main app
 def main():
     # Title
     st.title("Your 2024 Mountain Project Racked 🧗‍♂️")
+
+    # Basic metrics
+    col1, col2, col3 = st.columns(3)
     
-    # Let's start with one visualization
-    conn = create_connection()
-    cursor = conn.cursor()
+    with col1:
+        st.metric("Total Routes Climbed", mp_wrapped_metrics.total_routes(cursor))
+    with col2:
+        st.metric("Days Climbed", mp_wrapped_metrics.days_climbed(cursor))
+    with col3:
+        st.metric("Most Common Style", mp_wrapped_metrics.top_climbing_style(cursor))
 
-    total_routes = mp_wrapped_metrics.total_routes()
+    # Detailed metrics
+    st.subheader("Most Climbed Route")
+    st.write(mp_wrapped_metrics.most_climbed_route(cursor))
 
-    most_climbed_route = cursor.execute("SELECT r.route_name, COUNT(*) FROM Ticks t JOIN Routes r ON t.route_id = r.id WHERE t.date LIKE '%2024%' GROUP BY r.route_name ORDER BY COUNT(*) DESC LIMIT 1").fetchone()[0]
+    st.subheader("Top Rated Routes")
+    top_rated = mp_wrapped_metrics.top_rated_routes(cursor)
+    for route, stars in top_rated:
+        st.write(f"{route}: {stars}⭐")
 
-    top_rated_routes = mp_wrapped_metrics.top_rated_routes()
+    st.subheader("Biggest Climbing Day")
+    st.write(mp_wrapped_metrics.biggest_climbing_day(cursor))
 
-    days_climbed = mp_wrapped_metrics.days_climbed()
+    st.subheader("Length Climbed")
+    col1, col2 = st.columns([1, 2])
+    
+    # Calculate total length climbed
+    length_data = analysis_queries.get_length_climbed(cursor, year='2024')
+    length_df = pd.DataFrame(length_data, columns=['Year', 'Location', 'Length'])
+    total_length = length_df['Length'].sum()
+    
+    with col1:
+        st.metric("2024 Total", f"{int(total_length):,} ft")
+        el_caps = total_length / 3000  # El Cap height in feet
+        # Only show decimal if not a whole number
+        el_caps_str = f"{el_caps:.1f}" if el_caps % 1 != 0 else f"{int(el_caps)}"
+        st.write(f"That's like climbing **{el_caps_str}** El Caps! 🏔️")
+    
+    with col2:
+        # Add custom CSS for styling
+        st.markdown("""
+        <style>
+        .big-number {
+            font-size: 60px;
+            font-weight: bold;
+            color: black;
+        }
+        .area-name {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 0;
+        }
+        .length-count {
+            font-size: 18px;
+            color: #666;
+        }
+        .area-container {
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+        </style>
+        """, unsafe_allow_html=True)
 
-    top_climbing_style = mp_wrapped_metrics.top_climbing_style()
+        # Sort the dataframe by length in descending order
+        length_df_sorted = length_df.sort_values('Length', ascending=False)
 
-                # Custom CSS for Spotify-style display
+        # Display top areas by length
+        for i, (_, row) in enumerate(length_df_sorted.head().iterrows(), 1):
+            with st.container():
+                cols = st.columns([1, 4])
+                
+                # Number column
+                with cols[0]:
+                    st.markdown(f'<div class="big-number">{i}</div>', unsafe_allow_html=True)
+                
+                # Area details column
+                with cols[1]:
+                    st.markdown(
+                        f'''
+                        <div class="area-container">
+                            <p class="area-name">{row['Location']}</p>
+                            <p class="length-count">{int(row['Length'])} ft • {row['Location']}</p>
+                        </div>
+                        ''', 
+                        unsafe_allow_html=True
+                    )
+
+    st.subheader("Most Common Grade")
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        st.metric("Top Grade", top_grade)
+    with col2:
+        grade_dist = analysis_queries.get_grade_distribution(cursor, route_types=None, level="base", year='2024')
+        
+        # Create DataFrame for plotting
+        df = pd.DataFrame(grade_dist)
+        
+  # Create bar chart using Graph Objects
+        fig = go.Figure(data=[
+            go.Bar(
+                x=df['Grade'],
+                y=df['Percentage'],
+                text=df['Count'],
+                textposition='auto'
+            )
+        ])
+        
+        # Update layout
+        fig.update_layout(
+            title='Grade Distribution',
+            xaxis_title="Grade",
+            yaxis_title="Percentage of Climbs (%)",
+            bargap=0.1,
+            margin=dict(t=30, l=50, r=20, b=50),
+            height=350,
+            xaxis=dict(
+                type='category',
+                categoryorder='array',
+                categoryarray=df['Grade']
+            )
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
+
+
+    # Custom CSS for Spotify-style display
     st.markdown("""
         <style>
         .spotify-container {
@@ -133,11 +259,11 @@ def main():
                     unsafe_allow_html=True
                 )
 
-    # Get length data (your existing query)
+    # Get length data
     results = analysis_queries.get_length_climbed(cursor)
     df = pd.DataFrame(results, columns=['Year', 'Location', 'Length'])
 
-        # Create the length climbed chart (your existing visualization)
+        # Create the length climbed chart
     fig = px.bar(
         df,
         x='Length',
@@ -160,11 +286,6 @@ def main():
     st.plotly_chart(fig, use_container_width=True)
     
     
-    
-    
-    
-    
-
     st.header("Your Favorite Route")
     st.subheader("One route again and again and again...")
     
@@ -183,6 +304,7 @@ def main():
     # Solo Section
     st.header("Solo Adventures")
 
+    conn.close()
 
 if __name__ == "__main__":
     main()

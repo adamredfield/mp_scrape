@@ -5,61 +5,13 @@ project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(project_root)
 
 from src.database.utils import create_connection
+from src.analysis.analysis_utils import get_grade_group
+from operator import itemgetter
 
 conn = create_connection()
 cursor = conn.cursor()
 
-def total_routes():
-    query = "SELECT COUNT(DISTINCT route_id) FROM Ticks WHERE date LIKE '%2024%'"
-    return cursor.execute(query).fetchone()[0]
-
-def most_climbed_route():
-    query = """
-        SELECT r.route_name, group_concat(t.note) notes, min(t.date) first_climbed, COUNT(*) times_climbed
-        FROM Ticks t
-        JOIN Routes r ON t.route_id = r.id
-        WHERE t.date LIKE '%2024%'
-        GROUP BY r.route_name
-        ORDER BY COUNT(*) DESC
-        LIMIT 1
-    """
-    return cursor.execute(query).fetchone()[0]
-
-def top_rated_routes():
-    query = """
-        SELECT r.route_name, r.avg_stars
-        FROM Routes r
-        JOIN ticks t ON t.route_id = r.id
-        WHERE t.date LIKE '%2024%'
-        ORDER BY r.avg_stars DESC
-        LIMIT 5
-    """
-    return cursor.execute(query).fetchall()
-
-def days_climbed():
-    query = """
-        SELECT COUNT(DISTINCT date)
-        FROM Ticks
-        WHERE date LIKE '%2024%'
-    """
-    return cursor.execute(query).fetchone()[0]
-
-def top_climbing_style():
-    query = """
-        SELECT rat.tag_value, count(*)
-        from RouteAnalysis ra
-        JOIN RouteAnalysisTags rat on rat.analysis_id = ra.id
-        JOIN RouteAnalysisTagsReasoning ratr on ratr.analysis_id = rat.analysis_id AND rat.tag_type = ratr.tag_type
-        JOIN ticks t on t.route_id = ra.route_id 
-        WHERE rat.tag_type = 'style' AND t.date LIKE '%2024%'
-        GROUP BY rat.tag_value 
-        ORDER BY count(*) desc
-        LIMIT 1;
-    """
-    return cursor.execute(query).fetchone()[0]
-
-def biggest_climbing_day():
-    query = """
+estimated_lengths_cte = """
         WITH estimated_lengths AS (
             SELECT  id,
                     CASE WHEN route_type LIKE '%trad%' AND length_ft IS NULL AND pitches IS NULL -- trad single-pitch
@@ -76,6 +28,61 @@ def biggest_climbing_day():
                 FROM routes
             WHERE estimated_length IS NOT NULL
         )
+        """
+
+
+def total_routes(cursor):
+    query = "SELECT COUNT(DISTINCT route_id) FROM Ticks WHERE date LIKE '%2024%'"
+    return cursor.execute(query).fetchone()[0]
+
+def most_climbed_route(cursor):
+    query = """
+        SELECT r.route_name, group_concat(t.note) notes, min(t.date) first_climbed, COUNT(*) times_climbed
+        FROM Ticks t
+        JOIN Routes r ON t.route_id = r.id
+        WHERE t.date LIKE '%2024%'
+        GROUP BY r.route_name
+        ORDER BY COUNT(*) DESC
+        LIMIT 1
+    """
+    return cursor.execute(query).fetchone()[0]
+
+def top_rated_routes(cursor):
+    query = """
+        SELECT r.route_name, r.avg_stars
+        FROM Routes r
+        JOIN ticks t ON t.route_id = r.id
+        WHERE t.date LIKE '%2024%'
+        ORDER BY r.avg_stars DESC
+        LIMIT 5
+    """
+    return cursor.execute(query).fetchall()
+
+def days_climbed(cursor):
+    query = """
+        SELECT COUNT(DISTINCT date)
+        FROM Ticks
+        WHERE date LIKE '%2024%'
+    """
+    return cursor.execute(query).fetchone()[0]
+
+def top_climbing_style(cursor):
+    query = """
+        SELECT rat.tag_value, count(*)
+        from RouteAnalysis ra
+        JOIN RouteAnalysisTags rat on rat.analysis_id = ra.id
+        JOIN RouteAnalysisTagsReasoning ratr on ratr.analysis_id = rat.analysis_id AND rat.tag_type = ratr.tag_type
+        JOIN ticks t on t.route_id = ra.route_id 
+        WHERE rat.tag_type = 'style' AND t.date LIKE '%2024%'
+        GROUP BY rat.tag_value 
+        ORDER BY count(*) desc
+        LIMIT 1;
+    """
+    return cursor.execute(query).fetchone()[0]
+
+def biggest_climbing_day(cursor):
+    query = f"""
+        {estimated_lengths_cte}
         SELECT  t.date,
                 group_concat(r.route_name, ' | ') routes,
                 round(sum(coalesce(r.length_ft, el.estimated_length)),0) total_length
@@ -89,4 +96,65 @@ def biggest_climbing_day():
     """
     return cursor.execute(query).fetchone()[0]
 
+def top_grade(cursor, level):
+    query = """
+        SELECT
+        	CASE
+	        	WHEN r.route_type LIKE '%Boulder%' THEN r.hueco_rating 
+	        	WHEN r.route_type LIKE '%Aid%' THEN r.aid_rating 
+	        	ELSE r.yds_rating END AS primary_rating,
+	        	count(*)
+        FROM routes r
+        join ticks t on t.route_id = r.id
+        WHERE date LIKE '%2024%'
+        GROUP BY primary_rating 
+        ORDER BY count(*) desc;
+    """
 
+    cursor.execute(query)
+    results = cursor.fetchall()
+
+    grouped_grades = {}
+
+    for grade, count in results:
+        grouped_grade = get_grade_group(grade, level)
+        if grouped_grade in grouped_grades:
+            grouped_grades[grouped_grade] += count
+        else:
+            grouped_grades[grouped_grade] = count
+    
+    return max(grouped_grades.items(), key=itemgetter(1))[0]  
+
+def get_grade_distribution(cursor, level):
+    query = """
+        SELECT
+            CASE
+                WHEN r.route_type LIKE '%Boulder%' THEN r.hueco_rating 
+                WHEN r.route_type LIKE '%Aid%' THEN r.aid_rating 
+                ELSE r.yds_rating END AS primary_rating,
+                count(*) as count
+        FROM routes r
+        join ticks t on t.route_id = r.id
+        WHERE date LIKE '%2024%'
+        GROUP BY primary_rating 
+        ORDER BY count desc;
+    """
+
+    cursor.execute(query)
+    results = cursor.fetchall()
+
+    grouped_grades = {}
+    total_climbs = sum(count for _, count in results)
+
+    for grade, count in results:
+        grouped_grade = get_grade_group(grade, level)
+        if grouped_grade in grouped_grades:
+            grouped_grades[grouped_grade] += count
+        else:
+            grouped_grades[grouped_grade] = count
+    
+    # Convert to list of tuples with percentages
+    distribution = [(grade, count, (count/total_climbs)*100) 
+                   for grade, count in grouped_grades.items()]
+    
+    return sorted(distribution, key=lambda x: x[1], reverse=True)

@@ -17,6 +17,9 @@ def route_type_filter(route_types):
         type_filter = ''
     return type_filter
 
+def year_filter(year):
+    return f"AND t.date LIKE '%{year}%'" if year else ''
+
 
 def get_tick_type_distribution(cursor, route_types=None):
     """Get distribution of tick types (Lead, TR, etc.)"""
@@ -35,28 +38,30 @@ def get_tick_type_distribution(cursor, route_types=None):
     cursor.execute(query)
     return cursor.fetchall()
 
-def get_grade_distribution(cursor, route_types=None, level='base'):
+def get_grade_distribution(cursor, route_types=None, level='base', year=None):
     """Get distribution of sends by grade with configurable grouping and route"""
 
-    grade_column = "CASE "
-    grade_column += "WHEN r.route_type LIKE '%Boulder%' THEN r.hueco_rating "
-    grade_column += "WHEN r.route_type LIKE '%Aid%' THEN r.aid_rating "
-    grade_column += "ELSE r.yds_rating END"
+    grade_column = """
+    CASE 
+        WHEN r.route_type LIKE '%Boulder%' THEN r.hueco_rating 
+        WHEN r.route_type LIKE '%Aid%' THEN r.aid_rating 
+    ELSE r.yds_rating END"""
 
-    query = f'''
+    query = f"""
     SELECT 
-        {grade_column} as grade,
+        {grade_column} AS grade,
         COUNT(*) as count,
         ROUND(COUNT(*) * 100.0 / (
             SELECT COUNT(*)
-            FROM Ticks t2
-            JOIN Routes r2 ON t2.route_id = r2.id
+            FROM Ticks t
+            JOIN Routes r2 ON t.route_id = r2.id
             WHERE r2.route_type IS NOT NULL
             AND (
-                (r2.route_type NOT LIKE '%Aid%' AND t2.type != 'Lead / Fell/Hung')  -- Filter out fell/hung for non-aid
-                OR (r2.route_type LIKE '%Aid%')                                  -- Keep all ticks for aid
+                (r2.route_type NOT LIKE '%Aid%' AND t.type != 'Lead / Fell/Hung')  -- Filter out fell/hung for non-aid
+                OR (r2.route_type LIKE '%Aid%')                                     -- Keep all ticks for aid
             )
             {route_type_filter(route_types)}
+            {year_filter(year)}
         ), 2) as percentage
     FROM Routes r
     JOIN Ticks t ON r.id = t.route_id
@@ -66,9 +71,12 @@ def get_grade_distribution(cursor, route_types=None, level='base'):
         OR (r.route_type LIKE '%Aid%')
     )
     {route_type_filter(route_types)}
+    {year_filter(year)}
     GROUP BY grade
     ORDER BY COUNT(*) DESC;
-    '''
+    """
+
+    print(query)
     cursor.execute(query)
     results = cursor.fetchall()
 
@@ -210,7 +218,7 @@ def get_bigwall_routes(cursor):
     cursor.execute(query)
     return cursor.fetchall()
 
-def get_length_climbed(cursor):
+def get_length_climbed(cursor, year=None):
     query = f"""
     WITH estimated_lengths AS (
     SELECT  id,
@@ -230,12 +238,13 @@ def get_length_climbed(cursor):
     )
     SELECT 
         substr(t.date, -4) as year,
-        r.main_area,
+        r.main_area location,
         sum(coalesce(r.length_ft, el.estimated_length)) length_climbed
     FROM routes r
     JOIN Ticks t ON r.id = t.route_id
     LEFT JOIN estimated_lengths el on el.id = r.id
     WHERE t.date IS NOT NULL AND CAST(year AS INTEGER) >= 1999
+    {year_filter(year)}
     GROUP BY year, r.main_area
     ORDER BY year DESC, length_climbed DESC;
     """
