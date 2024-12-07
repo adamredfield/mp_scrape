@@ -131,7 +131,7 @@ def register_callbacks(app, data):
             hovertemplate="<br>".join([
                 "Area: %{customdata[0]}",
                 "Year: %{y}",
-                "Distance: %{x} feet",
+                "Distance: %{x:,d} feet",
                 "<extra></extra>"
             ])
         )
