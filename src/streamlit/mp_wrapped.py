@@ -10,6 +10,7 @@ import plotly.graph_objects as go
 import pandas as pd
 from src.database.utils import create_connection
 import src.analysis.analysis_queries as analysis_queries
+import src.analysis.mp_wrapped_metrics as mp_wrapped_metrics
 
 # Page config
 st.set_page_config(
@@ -29,15 +30,15 @@ def main():
     conn = create_connection()
     cursor = conn.cursor()
 
-    total_routes = cursor.execute("SELECT COUNT(DISTINCT route_id) FROM Ticks WHERE date LIKE '%2024%'").fetchone()[0]
+    total_routes = mp_wrapped_metrics.total_routes()
 
     most_climbed_route = cursor.execute("SELECT r.route_name, COUNT(*) FROM Ticks t JOIN Routes r ON t.route_id = r.id WHERE t.date LIKE '%2024%' GROUP BY r.route_name ORDER BY COUNT(*) DESC LIMIT 1").fetchone()[0]
 
-    top_rated_routes = cursor.execute("SELECT r.route_name, r.avg_stars FROM Routes r JOIN ticks t ON t.route_id = r.id WHERE t.date LIKE '%2024%' ORDER BY r.avg_stars DESC LIMIT 5").fetchall()
+    top_rated_routes = mp_wrapped_metrics.top_rated_routes()
 
-    days_climbed = cursor.execute("SELECT COUNT(DISTINCT date) FROM Ticks WHERE date LIKE '%2024%'").fetchone()[0]
+    days_climbed = mp_wrapped_metrics.days_climbed()
 
-    top_climbing_style = cursor.execute("SELECT style, COUNT(*) FROM Ticks t JOIN Routes r ON t.route_id = r.id WHERE t.date LIKE '%2024%' GROUP BY style ORDER BY COUNT(*) DESC LIMIT 1").fetchone()[0]
+    top_climbing_style = mp_wrapped_metrics.top_climbing_style()
 
                 # Custom CSS for Spotify-style display
     st.markdown("""

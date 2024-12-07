@@ -220,7 +220,7 @@ def get_length_climbed(cursor):
                 THEN (SELECT avg(length_ft/ pitches) FROM Routes r WHERE route_type LIKE '%trad%' AND length_ft IS NOT NULL and pitches IS NOT NULL) * pitches
                 WHEN route_type LIKE '%sport%' AND length_ft IS NULL AND pitches IS NOT NULL -- sport multipitch
                 THEN (SELECT avg(length_ft) FROM Routes r WHERE route_type LIKE '%sport%'AND length_ft IS NOT NULL and pitches IS NULL AND length_ft < 230) -- avg single-pitch sport pitch length
-                WHEN route_type LIKE '%trad%' AND length_ft IS NULL AND pitches IS NOT NULL -- trad multipitch
+                WHEN route_type LIKE '%sport%' AND length_ft IS NULL AND pitches IS NOT NULL -- sport multipitch
                 THEN (SELECT avg(length_ft/ pitches) FROM Routes r WHERE route_type LIKE '%trad%' AND length_ft IS NOT NULL and pitches IS NOT NULL) * pitches
                 WHEN route_type LIKE '%boulder%' AND length_ft IS NULL
                 THEN (SELECT avg(length_ft) FROM Routes r WHERE route_type LIKE '%boulder%' AND length_ft IS NOT NULL) -- boulder
