@@ -333,16 +333,17 @@ def page_biggest_day():
         date = biggest_day[0]
         routes = biggest_day[1]
         total_length = int(biggest_day[2])
+        areas = biggest_day[3].rstrip(" & ")
         
         # Format routes list
         route_list = routes.split(" | ")
         formatted_routes = "<br>".join(route_list)
         
-        main_text = f"Your biggest climbing day<br>was {date} with<br>{total_length:,d} feet"
+        main_text = f"Your biggest climbing day<br>was {date} with<br>{total_length:,d} feet of GNAR GNAR"
         st.markdown(
             wrapped_template(
                 main_text=main_text,
-                subtitle="What did you climb?",
+                subtitle=f"You Climbed these rigs in {areas}",
                 detail_text=formatted_routes
             ),
             unsafe_allow_html=True

@@ -24,6 +24,7 @@ estimated_lengths_cte = f"""
                         THEN (SELECT avg(length_ft/ pitches) FROM Routes r WHERE route_type LIKE '%trad%' AND length_ft IS NOT NULL and pitches IS NOT NULL) * pitches
                         WHEN route_type LIKE '%boulder%' AND length_ft IS NULL
                         THEN (SELECT avg(length_ft) FROM Routes r WHERE route_type LIKE '%boulder%' AND length_ft IS NOT NULL) -- boulder
+                        ELSE length_ft
                     END AS estimated_length
                 FROM routes
             WHERE estimated_length IS NOT NULL
@@ -36,10 +37,20 @@ def total_routes(cursor):
     return cursor.execute(query).fetchone()[0]
 
 def most_climbed_route(cursor):
-    query = """
-        SELECT r.route_name, group_concat(t.note, ' | ') notes, min(t.date) first_climbed, COUNT(*) times_climbed
+    query = f"""
+        {estimated_lengths_cte}
+        SELECT DISTINCT concat(r.route_name, ' ~ ' ,
+            r.specific_location,
+            ' - ', 
+            TRIM(NULLIF(CONCAT_WS(' ', r.yds_rating, r.hueco_rating, r.aid_rating,r.danger_rating, r.commitment_grade), '')), 
+            ' - ',
+            CAST(el.estimated_length AS INT),' ft') routes, 
+        group_concat(t.note, ' | ') notes,
+        min(t.date) first_climbed,
+        COUNT(*) times_climbed
         FROM Ticks t
         JOIN Routes r ON t.route_id = r.id
+        LEFT JOIN estimated_lengths el on el.id = t.route_id 
         WHERE t.date LIKE '%2024%'
         GROUP BY r.route_name
         ORDER BY COUNT(*) DESC
@@ -47,9 +58,18 @@ def most_climbed_route(cursor):
     """
     cursor.execute(query)
     columns = [description[0] for description in cursor.description]
-
     result = cursor.fetchone()
-    return result
+        
+    # Get the route string and split it
+    route_parts = result[0].split(' ~ ')
+    if len(route_parts) == 2:
+        route_name, rest = route_parts
+        # Get everything after the last '>'
+        location_parts = rest.split('>')
+        clean_location = location_parts[-1].strip() if '>' in rest else rest
+        # Reconstruct the route string
+        clean_route = f"{route_name} ~ {clean_location}"
+        return (clean_route,) + result[1:]
 
 def top_rated_routes(cursor):
     query = """
@@ -88,8 +108,9 @@ def biggest_climbing_day(cursor):
     query = f"""
         {estimated_lengths_cte}
         SELECT  t.date,
-                group_concat(r.route_name, ' | ') routes,
-                CAST(round(sum(coalesce(r.length_ft, el.estimated_length)),0) AS INTEGER) total_length
+                group_concat(concat(r.route_name, ' ~ ' ,TRIM(substr(r.specific_location, instr(r.specific_location, '>') + 1)), ' - ', TRIM(NULLIF(CONCAT_WS(' ', r.yds_rating, r.hueco_rating, r.aid_rating,r.danger_rating, r.commitment_grade), '')), ' - ',CAST(el.estimated_length AS INT),' ft'), ' | ') routes,
+                CAST(round(sum(coalesce(r.length_ft, el.estimated_length)),0) AS INTEGER) total_length,
+                group_concat(DISTINCT CONCAT(r.main_area, ', ', r.region) || ' & ') areas
         FROM Ticks t 
         JOIN routes r on r.id = t.route_id 
         LEFT JOIN estimated_lengths el on el.id = t.route_id 
@@ -221,14 +242,6 @@ def regions_sub_areas(cursor):
     return cursor.execute(query).fetchone()[0]
 
 def top_tags(cursor, tag_type):
-    # First, let's see what data exists in TagAnalysisView
-    debug_query = """
-        SELECT DISTINCT mapped_type 
-        FROM TagAnalysisView
-        LIMIT 10;
-    """
-    cursor.execute(debug_query)
-    print("Available mapped_types:", cursor.fetchall())
     
     query = f"""
         WITH deduped_ticks AS(
@@ -244,8 +257,6 @@ def top_tags(cursor, tag_type):
         GROUP BY tav.mapped_type, tav.mapped_tag
         ORDER BY count DESC;
     """
-    print(f"Executing query with tag_type: {tag_type}")
     cursor.execute(query)
     results = cursor.fetchall()
-    print(f"Results for {tag_type}:", results)
     return results

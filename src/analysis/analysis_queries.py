@@ -208,23 +208,18 @@ def get_distinct_styles(cursor):
 def get_bigwall_routes(cursor):
     """Get all bigwall routes"""
     query = '''
-    SELECT 
-        DISTINCT r.route_name,
-        TRIM(NULLIF(CONCAT_WS(' ', 
-            r.yds_rating,
-            r.hueco_rating,
-            r.aid_rating,
-            r.danger_rating), '')) as grade,
-            r.commitment_grade committment,
-        concat(r.region, ' > ', r.main_area, ' > ', r.sub_area, ' > ', r.specific_location) as location,
-        r.length_ft ,
-        r.avg_stars,
-        r.num_votes,
-        GROUP_CONCAT(tav.mapped_tag, ', ') as styles 
-        FROM Routes r
-        LEFT JOIN TagAnalysisView tav on r.id = tav.route_id AND tav.mapped_type = 'style'
-        WHERE commitment_grade IN ('V', 'VI', 'VII')
-        GROUP BY 1,2,3,4,5;
+    SELECT  
+        t.date,
+        group_concat(concat(r.route_name, ' - ', TRIM(NULLIF(CONCAT_WS(' ', r.yds_rating, r.hueco_rating, r.aid_rating,r.danger_rating, r.commitment_grade), ''))), ' | ') routes,
+        CAST(round(sum(coalesce(r.length_ft, el.estimated_length)),0) AS INTEGER) total_length,
+        group_concat(DISTINCT r.main_area || ' | ') areas
+    FROM Ticks t 
+    JOIN routes r on r.id = t.route_id 
+    LEFT JOIN estimated_lengths el on el.id = t.route_id 
+    WHERE t.date LIKE '%2024%' AND r.route_name NOT LIKE 'The Nose'
+    GROUP BY t.date
+    ORDER BY total_length desc
+    LIMIT 1;
     '''
     cursor.execute(query)
     return cursor.fetchall()
