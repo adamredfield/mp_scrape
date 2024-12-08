@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS Routes (
     fa TEXT,
     description TEXT,
     protection TEXT,
+    primary_photo_url TEXT,
     insert_date TEXT,
     UNIQUE(id)
 );

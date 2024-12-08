@@ -391,7 +391,7 @@ def page_most_climbed():
                 if note.strip()
             ])
         
-        main_text = f"Your top route was<br>{route_name}"
+        main_text = f"Your most climbed route was<br>{route_name}"
         subtitle = f"You climbed it {times_climbed} times"
         detail_text = f"starting on {first_date}<br><br>{formatted_notes}"
         
