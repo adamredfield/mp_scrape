@@ -119,6 +119,81 @@ st.markdown("""
         margin-top: 1.5rem;
         z-index: 10;
     }
+    
+    .diamond-pattern {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 25vh;
+        background: linear-gradient(to right, #4B0082, #00BFFF);
+        clip-path: polygon(
+            0 0, 100% 0,              /* Top edge */
+            100% 25%, 80% 25%,        /* Right top step */
+            60% 25%, 40% 25%,         /* Middle space */
+            20% 25%, 0 25%            /* Left top step */
+        );
+    }
+    
+    .diamond-pattern-right {
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 20vw;
+        height: 40vh;
+        background: linear-gradient(to right, #4B0082, #00BFFF);
+        clip-path: polygon(
+            0 0,                      /* Top left */
+            100% 0,                   /* Top right */
+            100% 100%,                /* Bottom right */
+            0 40%                     /* Bottom point */
+        );
+    }
+    
+    .diamond-pattern-left {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 20vw;
+        height: 40vh;
+        background: linear-gradient(to right, #4B0082, #00BFFF);
+        clip-path: polygon(
+            0 0,                      /* Top left */
+            100% 0,                   /* Top right */
+            100% 40%,                 /* Bottom point */
+            0 100%                    /* Bottom left */
+        );
+    }
+    
+    .diamond-bottom-right {
+        position: absolute;
+        bottom: 0;
+        right: 0;
+        width: 20vw;
+        height: 40vh;
+        background: linear-gradient(to right, #4B0082, #00BFFF);
+        clip-path: polygon(
+            0 60%,                    /* Top point */
+            100% 0,                   /* Top right */
+            100% 100%,                /* Bottom right */
+            0 100%                    /* Bottom left */
+        );
+    }
+    
+    .diamond-bottom-left {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 20vw;
+        height: 40vh;
+        background: linear-gradient(to right, #4B0082, #00BFFF);
+        clip-path: polygon(
+            0 0,                      /* Top left */
+            100% 60%,                 /* Top point */
+            100% 100%,                /* Bottom right */
+            0 100%                    /* Bottom left */
+        );
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -128,6 +203,22 @@ def wrapped_template(main_text, subtitle=None, detail_text=None):
         <div class="wrapped-container">
             <div class="top-pattern"></div>
             <div class="bottom-pattern"></div>
+            <div class="big-text">
+                {main_text}
+            </div>
+            {f'<div class="subtitle-text">{subtitle}</div>' if subtitle else ''}
+            {f'<div class="route-list">{detail_text}</div>' if detail_text else ''}
+        </div>
+    """
+
+def diamond_template(main_text, subtitle=None, detail_text=None):
+    """Diamond pattern template for total routes page"""
+    return f"""
+        <div class="wrapped-container">
+            <div class="diamond-pattern-left"></div>
+            <div class="diamond-pattern-right"></div>
+            <div class="diamond-bottom-left"></div>
+            <div class="diamond-bottom-right"></div>
             <div class="big-text">
                 {main_text}
             </div>
@@ -158,7 +249,7 @@ def page_total_routes():
     
     main_text = f"You climbed {total_routes:,} routes<br>this year"
     subtitle = "And one route again, and again, and again..."
-    st.markdown(wrapped_template(main_text, subtitle), unsafe_allow_html=True)
+    st.markdown(diamond_template(main_text, subtitle), unsafe_allow_html=True)
 
 def page_most_climbed():
     """Page showing most repeated route"""
@@ -179,7 +270,7 @@ def page_most_climbed():
         formatted_notes = ""
         if note_list:
             formatted_notes = "Let's relive some memories:<br><br>"
-            formatted_notes += "&NewLine;".join([
+            formatted_notes += "<br>".join([
                 f'<div style="max-width: 1000px;">Ascent #{i+1}: "{note.strip()}"</div>'
                 for i, note in enumerate(note_list)
                 if note.strip()
@@ -189,7 +280,7 @@ def page_most_climbed():
         subtitle = f"You climbed it {times_climbed} times"
         detail_text = f"starting on {first_date}<br><br>{formatted_notes}"
         
-        st.markdown(wrapped_template(main_text, subtitle, detail_text), unsafe_allow_html=True)
+        st.markdown(diamond_template(main_text, subtitle, detail_text), unsafe_allow_html=True)
 
 def page_biggest_day():
     """Biggest climbing day page"""
