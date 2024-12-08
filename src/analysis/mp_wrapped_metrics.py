@@ -168,3 +168,54 @@ def get_grade_distribution(cursor, level):
                    for grade, count in grouped_grades.items()]
     
     return sorted(distribution, key=lambda x: x[1], reverse=True)
+
+def states_climbed(cursor):
+    query = """
+        SELECT region, count(distinct date) days_out, count(*) routes
+        FROM Routes r
+        JOIN ticks t on t.route_id = r.id
+        WHERE date LIKE '%2024%'
+        GROUP BY region
+        ORDER BY days_out desc;
+    """
+    cursor.execute(query)
+    columns = [description[0] for description in cursor.description]
+
+    result = cursor.fetchall()
+    
+    return result
+
+
+def sub_areas_climbed(cursor):
+    query = """
+        SELECT sub_area , count(distinct date) days_out, count(*) routes
+        FROM Routes r
+        JOIN ticks t on t.route_id = r.id
+        WHERE date LIKE '%2024%'
+        GROUP BY sub_area 
+        ORDER BY days_out desc;
+    """
+    cursor.execute(query)
+    columns = [description[0] for description in cursor.description]
+
+    result = cursor.fetchall()
+    
+    return result
+
+def regions_climbed(cursor):
+    query = """
+        SELECT count(distinct region)
+        FROM Routes r
+        JOIN ticks t on t.route_id = r.id
+        WHERE date LIKE '%2024%'
+    """
+    return cursor.execute(query).fetchone()[0]
+
+def regions_sub_areas(cursor):
+    query = """
+        SELECT count(distinct sub_area)
+        FROM Routes r
+        JOIN ticks t on t.route_id = r.id
+        WHERE date LIKE '%2024%'
+    """
+    return cursor.execute(query).fetchone()[0]

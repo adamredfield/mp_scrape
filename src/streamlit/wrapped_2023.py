@@ -9,10 +9,11 @@ from src.database.utils import create_connection
 import src.analysis.mp_wrapped_metrics as metrics
 import src.analysis.analysis_queries as analysis_queries
 import pandas as pd
+import plotly.graph_objects as go
 
 # Page config
 st.set_page_config(
-    page_title="Your 2023 Climbing Wrapped",
+    page_title="Your 2024 Climbing Racked",
     page_icon="🧗‍♂️",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -194,6 +195,75 @@ st.markdown("""
             0 100%                    /* Bottom left */
         );
     }
+    
+    .top-routes-container {
+        background: #ffff00;
+        color: black;
+        padding: 2rem;
+        min-height: 100vh;
+        width: 100vw;
+    }
+    
+    .route-title {
+        font-family: 'Helvetica Neue', sans-serif;
+        font-size: 3rem;
+        font-weight: 700;
+        margin-bottom: 2rem;
+    }
+    
+    .route-row {
+        display: flex;
+        align-items: center;
+        margin-bottom: 1.5rem;
+        gap: 1rem;
+    }
+    
+    .route-number {
+        font-size: 2.5rem;
+        font-weight: 700;
+        min-width: 3rem;
+    }
+    
+    .route-info {
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .route-name {
+        font-size: 1.5rem;
+        font-weight: 600;
+        margin: 0;
+    }
+    
+    .route-rating {
+        font-size: 1.2rem;
+        color: #333;
+        margin: 0;
+    }
+    
+    .big-number {
+        font-size: 3rem;
+        font-weight: 700;
+        color: black;
+    }
+    
+    .area-container {
+        background: transparent;
+        padding: 0.5rem;
+    }
+    
+    .area-name {
+        font-size: 1.5rem;
+        font-weight: 600;
+        margin: 0;
+        color: black;
+    }
+    
+    .length-count {
+        font-size: 1.2rem;
+        color: #333;
+        margin: 0;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -240,6 +310,42 @@ def page_total_length():
     main_text = f"You climbed<br>{formatted_length}<br>feet this year"
     st.markdown(wrapped_template(main_text), unsafe_allow_html=True)
 
+def page_biggest_day():
+    """Biggest climbing day page"""
+    conn = create_connection()
+    cursor = conn.cursor()
+    
+    try:
+        biggest_day = metrics.biggest_climbing_day(cursor)
+        
+        if not biggest_day:
+            st.error("No climbing data found for 2024")
+            return
+            
+        date = biggest_day[0]
+        routes = biggest_day[1]
+        total_length = int(biggest_day[2])
+        
+        # Format routes list
+        route_list = routes.split(" | ")
+        formatted_routes = "<br>".join(route_list)
+        
+        main_text = f"Your biggest climbing day<br>was {date} with<br>{total_length:,d} feet"
+        st.markdown(
+            wrapped_template(
+                main_text=main_text,
+                subtitle="What did you climb?",
+                detail_text=formatted_routes
+            ),
+            unsafe_allow_html=True
+        )
+        
+    except Exception as e:
+        st.error(f"Error: {str(e)}")
+        
+    finally:
+        conn.close()
+
 def page_total_routes():
     """Second page showing total routes"""
     conn = create_connection()
@@ -282,49 +388,259 @@ def page_most_climbed():
         
         st.markdown(diamond_template(main_text, subtitle, detail_text), unsafe_allow_html=True)
 
-def page_biggest_day():
-    """Biggest climbing day page"""
+def get_spotify_style():
+    return """
+        <style>
+        .stApp {
+            background-color: black !important;
+        }
+        
+        .content-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        .spotify-header {
+            color: #1ed760;
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+            text-align: center;
+        }
+        
+        .list-item {
+            margin: 0.25rem 0;
+            text-align: left;
+            padding-left: 40%;
+        }
+        
+        .item-number {
+            color: #1ed760;
+            font-size: 1.2rem;
+        }
+        
+        .item-name {
+            color: white;
+            font-size: 1.2rem;
+        }
+        
+        .item-details {
+            color: #b3b3b3;
+            font-size: 0.9rem;
+            margin-top: -0.2rem;
+        }
+        
+        .total-section {
+            margin-top: 2rem;
+            text-align: center;
+        }
+        
+        .total-label {
+            color: #1ed760;
+            font-size: 1.2rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .total-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: white;
+        }
+        </style>
+    """
+
+def page_top_routes():
+    """Page showing top rated routes"""
+    conn = create_connection()
+    cursor = conn.cursor()
+    top_rated_routes = metrics.top_rated_routes(cursor)
+    conn.close()
+    
+    # Apply Spotify styling
+    st.markdown(get_spotify_style(), unsafe_allow_html=True)
+    
+    # Create a centered layout with three columns
+    left_spacer, content, right_spacer = st.columns([0.5, 2, 0.5])
+    
+    with content:
+        st.markdown("<h2 class='spotify-header'>Your Top Routes</h2>", unsafe_allow_html=True)
+        
+        for i, (route, stars) in enumerate(top_rated_routes[:5], 1):
+            st.markdown(
+                f"""
+                <div class='list-item'>
+                    <div>
+                        <span class='item-number'>{i}. </span>
+                        <span class='item-name'>{route}</span>
+                    </div>
+                    <div class='item-details'>⭐ {stars} stars</div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+def page_areas_breakdown():
+    """Page showing top states and areas"""
+    conn = create_connection()
+    cursor = conn.cursor()
+    states = metrics.states_climbed(cursor)
+    sub_areas = metrics.sub_areas_climbed(cursor)
+    total_states = metrics.regions_climbed(cursor)
+    total_areas = metrics.regions_sub_areas(cursor)
+    conn.close()
+    
+    # Create a centered layout with three columns - adjusted ratios to move everything left
+    left_spacer, col1, middle_spacer, col2, right_spacer = st.columns([0.5, 2, 0.5, 2, 1.5])
+    
+    # Common styles
+    header_style = "color: #1ed760; font-size: 1.5rem; margin-bottom: 0.5rem; text-align: center;"
+    list_style = "margin: 0.25rem 0; text-align: left; padding-left: 40%;"
+    total_style = "margin-top: 2rem; text-align: center;"
+    
+    # States column
+    with col1:
+        st.markdown(f"<h2 style='{header_style}'>Top States</h2>", unsafe_allow_html=True)
+        for i, (state, days, routes) in enumerate(states[:5], 1):
+            st.markdown(
+                f"""
+                <div style='{list_style}'>
+                    <div style='font-size: 1.2rem;'>
+                        <span style='color: #1ed760;'>{i}. </span>
+                        <span style='color: white;'>{state}</span>
+                    </div>
+                    <div style='color: #b3b3b3; font-size: 0.9rem; margin-top: -0.2rem;'>{days} days • {routes} routes</div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+        # Add total states at the bottom
+        st.markdown(
+            f"""
+            <div style='{total_style}'>
+                <div style='color: #1ed760; font-size: 1.2rem; margin-bottom: 0.5rem;'>Total States</div>
+                <div style='font-size: 2.5rem; font-weight: bold; color: white;'>{total_states}</div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+    
+    # Areas column
+    with col2:
+        st.markdown(f"<h2 style='{header_style}'>Top Areas</h2>", unsafe_allow_html=True)
+        for i, (area, days, routes) in enumerate(sub_areas[:5], 1):
+            st.markdown(
+                f"""
+                <div style='{list_style}'>
+                    <div style='font-size: 1.2rem;'>
+                        <span style='color: #1ed760;'>{i}. </span>
+                        <span style='color: white;'>{area}</span>
+                    </div>
+                    <div style='color: #b3b3b3; font-size: 0.9rem; margin-top: -0.2rem;'>{days} days • {routes} routes</div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+        # Add total areas at the bottom
+        st.markdown(
+            f"""
+            <div style='{total_style}'>
+                <div style='color: #1ed760; font-size: 1.2rem; margin-bottom: 0.5rem;'>Total Areas</div>
+                <div style='font-size: 2.5rem; font-weight: bold; color: white;'>{total_areas}</div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+def page_grade_distribution():
+    """Page showing grade distribution and most common grade"""
     conn = create_connection()
     cursor = conn.cursor()
     
-    try:
-        biggest_day = metrics.biggest_climbing_day(cursor)
+    # Get the data
+    grade_dist = analysis_queries.get_grade_distribution(cursor, route_types=None, level="base", year='2024')
+    top_grade = metrics.top_grade(cursor, level="base")  # Assuming this function exists, create if needed
+    conn.close()
+
+    
+    # Apply Spotify styling
+    st.markdown(get_spotify_style(), unsafe_allow_html=True)
+    
+    # Create a centered layout
+    left_spacer, content, right_spacer = st.columns([0.5, 2, 0.5])
+    
+    with content:
+        st.markdown("<h2 class='spotify-header'>Your Grades</h2>", unsafe_allow_html=True)
         
-        if not biggest_day:
-            st.error("No climbing data found for 2024")
-            return
-            
-        date = biggest_day[0]
-        routes = biggest_day[1]
-        total_length = int(biggest_day[2])
-        
-        # Format routes list
-        route_list = routes.split(" | ")
-        formatted_routes = "<br>".join(route_list)
-        
-        main_text = f"Your biggest climbing day<br>was {date} with<br>{total_length:,d} feet"
+        # Display top grade
         st.markdown(
-            wrapped_template(
-                main_text=main_text,
-                subtitle="What did you climb?",
-                detail_text=formatted_routes
-            ),
+            f"""
+            <div class='total-section'>
+                <div class='total-label'>Most Common Grade</div>
+                <div class='total-value'>{top_grade}</div>
+            </div>
+            """,
             unsafe_allow_html=True
         )
         
-    except Exception as e:
-        st.error(f"Error: {str(e)}")
+        # Create DataFrame for plotting
+        df = pd.DataFrame(grade_dist)
         
-    finally:
-        conn.close()
+        # Create bar chart using Graph Objects with dark theme
+        fig = go.Figure(data=[
+            go.Bar(
+                x=df['Grade'],
+                y=df['Percentage'],
+                text=df['Count'],
+                textposition='auto',
+                marker_color='#1ed760'  # Spotify green
+            )
+        ])
+        
+        # Update layout with dark theme
+        fig.update_layout(
+            paper_bgcolor='black',
+            plot_bgcolor='black',
+            title={
+                'text': 'Grade Distribution',
+                'y': 0.9,
+                'x': 0.5,
+                'xanchor': 'center',
+                'yanchor': 'top',
+                'font': {'color': 'white', 'size': 20}
+            },
+            xaxis_title="Grade",
+            yaxis_title="Percentage of Climbs (%)",
+            bargap=0.1,
+            margin=dict(t=50, l=50, r=20, b=50),
+            height=400,
+            xaxis=dict(
+                type='category',
+                categoryorder='array',
+                categoryarray=df['Grade'],
+                color='white',
+                gridcolor='#333333'
+            ),
+            yaxis=dict(
+                color='white',
+                gridcolor='#333333'
+            ),
+            font=dict(
+                color='white'
+            )
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
 
 def main():
     # Page mapping
     pages = {
         0: page_total_length,
+        1: page_biggest_day,
         2: page_total_routes,
         3: page_most_climbed,
-        1: page_biggest_day,
+        4: page_top_routes,
+        5: page_areas_breakdown,
+        6: page_grade_distribution
     }
     
     # Display current page
