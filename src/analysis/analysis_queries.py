@@ -17,7 +17,11 @@ def route_type_filter(route_types):
         type_filter = ''
     return type_filter
 
-def year_filter(year):
+def year_filter(year=None):
+    """Generate SQL WHERE clause for year filtering
+    Args:
+        year: Optional year to filter by. If None, no filter is applied
+    """
     return f"AND t.date LIKE '%{year}%'" if year else ''
 
 
@@ -76,7 +80,6 @@ def get_grade_distribution(cursor, route_types=None, level='base', year=None):
     ORDER BY COUNT(*) DESC;
     """
 
-    print(query)
     cursor.execute(query)
     results = cursor.fetchall()
 
@@ -123,9 +126,15 @@ def get_most_climbed_areas(cursor, route_types=None):
     cursor.execute(query)
     return cursor.fetchall()
 
-def get_highest_rated_climbs(cursor, selected_styles=None, route_types=None):
-    """Get highest rated climbs"""
-
+def get_highest_rated_climbs(cursor, selected_styles=None, route_types=None, year=None, tag_type=None):
+    """Get highest rated climbs
+    Args:
+        cursor: Database cursor
+        selected_styles: Optional list of styles to filter by
+        route_types: Optional list of route types to filter by
+        year: Optional year to filter by
+        tag_type: Type of tag to filter by (default: 'style')
+    """
     style_filter = ""
     if selected_styles:
         style_conditions = [
@@ -150,12 +159,14 @@ def get_highest_rated_climbs(cursor, selected_styles=None, route_types=None):
             r.commitment_grade), '')) as grade,
         r.avg_stars,
         r.num_votes,
-        GROUP_CONCAT(tav.mapped_tag, ', ') as styles
+        GROUP_CONCAT(tav.mapped_tag, ', ') as tags
     FROM Routes r
-    LEFT JOIN TagAnalysisView tav on r.id = tav.route_id AND tav.mapped_type = 'style'
+    LEFT JOIN TagAnalysisView tav on r.id = tav.route_id 
+        AND tav.mapped_type = '{tag_type}'
     JOIN deduped_ticks t ON r.id = t.route_id AND rn = 1
     WHERE r.num_votes >= 10
     {route_type_filter(route_types)}
+    {year_filter(year)}
     GROUP BY r.route_name, r.yds_rating, r.avg_stars, r.num_votes
     {style_filter}
     ORDER BY r.avg_stars DESC, num_votes DESC

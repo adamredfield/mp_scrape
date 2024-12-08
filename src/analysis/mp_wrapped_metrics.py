@@ -219,3 +219,33 @@ def regions_sub_areas(cursor):
         WHERE date LIKE '%2024%'
     """
     return cursor.execute(query).fetchone()[0]
+
+def top_tags(cursor, tag_type):
+    # First, let's see what data exists in TagAnalysisView
+    debug_query = """
+        SELECT DISTINCT mapped_type 
+        FROM TagAnalysisView
+        LIMIT 10;
+    """
+    cursor.execute(debug_query)
+    print("Available mapped_types:", cursor.fetchall())
+    
+    query = f"""
+        WITH deduped_ticks AS(
+            SELECT *,
+            ROW_NUMBER() OVER (PARTITION BY route_id ORDER BY date DESC) as rn
+            FROM Ticks
+            WHERE date LIKE '%2024%'
+        )
+        SELECT tav.mapped_type, tav.mapped_tag tag_value, count(*) as count
+        FROM TagAnalysisView tav 
+        JOIN deduped_ticks dt on dt.route_id = tav.route_id AND dt.rn = 1
+        WHERE tav.mapped_type = '{tag_type}'
+        GROUP BY tav.mapped_type, tav.mapped_tag
+        ORDER BY count DESC;
+    """
+    print(f"Executing query with tag_type: {tag_type}")
+    cursor.execute(query)
+    results = cursor.fetchall()
+    print(f"Results for {tag_type}:", results)
+    return results

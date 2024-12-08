@@ -458,22 +458,51 @@ def get_spotify_style():
     """
 
 def page_top_routes():
-    """Page showing top rated routes"""
+    """Page showing top rated routes and tags"""
     conn = create_connection()
     cursor = conn.cursor()
-    top_rated_routes = metrics.top_rated_routes(cursor)
-    conn.close()
     
-    # Apply Spotify styling
-    st.markdown(get_spotify_style(), unsafe_allow_html=True)
+    st.markdown("<div style='height: 2rem;'></div>", unsafe_allow_html=True)
+    filter_col1, filter_col2, _ = st.columns([1, 1, 2])
     
-    # Create a centered layout with three columns
-    left_spacer, content, right_spacer = st.columns([0.5, 2, 0.5])
+    with filter_col1:
+        tag_type = st.selectbox(
+            "Route Characteristics",
+            options=['style', 'feature', 'descriptor', 'rock_type'],
+            format_func=lambda x: x.replace('_', ' ').title(),
+            key='tag_type_filter'
+        )
     
-    with content:
+    # Get tag data for filter options
+    tag_data = metrics.top_tags(cursor, tag_type)
+    tag_df = pd.DataFrame(tag_data, columns=['Type', 'Tag', 'Count']).head(5)
+    
+    # Calculate max_count from the actual Count column
+    max_count = tag_df['Count'].max() if not tag_df.empty else 1
+    
+    with filter_col2:
+        selected_styles = st.multiselect(
+            f"Filter by {tag_type.replace('_', ' ').title()}",
+            options=tag_df['Tag'].tolist(),
+            key='style_filter'
+        )
+    
+    # Get filtered routes based on selected styles
+    top_rated_routes = analysis_queries.get_highest_rated_climbs(
+        cursor=cursor,
+        selected_styles=selected_styles,
+        route_types=None,  # route_types
+        year='2024', # year
+        tag_type=tag_type
+    )
+    
+    # Create a centered layout with two columns
+    left_col, right_col = st.columns(2)
+    
+    # Top Routes Column
+    with left_col:
         st.markdown("<h2 class='spotify-header'>Your Top Routes</h2>", unsafe_allow_html=True)
-        
-        for i, (route, stars) in enumerate(top_rated_routes[:5], 1):
+        for i, (route, grade, stars, votes, tags) in enumerate(top_rated_routes[:5], 1):
             st.markdown(
                 f"""
                 <div class='list-item'>
@@ -481,7 +510,31 @@ def page_top_routes():
                         <span class='item-number'>{i}. </span>
                         <span class='item-name'>{route}</span>
                     </div>
-                    <div class='item-details'>⭐ {stars} stars</div>
+                    <div class='item-details'>⭐ {stars} stars • {grade}</div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+    
+    # Top Tags Column
+    with right_col:
+        st.markdown(f"<h2 class='spotify-header'>Top {tag_type.replace('_', ' ').title()}</h2>", unsafe_allow_html=True)
+        
+        for i, (_, tag, count) in enumerate(zip(tag_df['Type'], tag_df['Tag'], tag_df['Count']), 1):
+            # Calculate number of bars based on proportion of max count
+            num_bars = min(10, round((count / max_count) * 10))
+            frequency_bars = '|' * num_bars
+            
+            st.markdown(
+                f"""
+                <div class='list-item'>
+                    <div>
+                        <span class='item-number'>{i}. </span>
+                        <span class='item-name'>{tag}</span>
+                    </div>
+                    <div class='item-details'>
+                        <span style="color: #1ed760;">{frequency_bars}</span> {count} routes
+                    </div>
                 </div>
                 """,
                 unsafe_allow_html=True
