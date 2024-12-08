@@ -30,7 +30,28 @@ jobs:
         aws-secret-access-key: "${{ secrets.AWS_SECRET_ACCESS_KEY }}"
         aws-region: us-east-1
         
-    - name: Package and deploy orchestrator
+    - name: Deploy orchestrator
       run: |
         zip -r orchestrator.zip src/
-        aws lambda update-function-code --function-name mp-scraper-orchestrator --zip-file fileb://orchestrator.zip 
+        aws lambda create-function \
+          --function-name mp-scraper-orchestrator \
+          --runtime python3.11 \
+          --handler src.lambda.orchestrator.lambda_handler \
+          --role ${{ secrets.AWS_LAMBDA_ROLE_ARN }} \
+          --zip-file fileb://orchestrator.zip || \
+        aws lambda update-function-code \
+          --function-name mp-scraper-orchestrator \
+          --zip-file fileb://orchestrator.zip
+
+    - name: Deploy worker
+      run: |
+        zip -r worker.zip src/
+        aws lambda create-function \
+          --function-name mp-scraper-worker \
+          --runtime python3.11 \
+          --handler src.lambda.worker.lambda_handler \
+          --role ${{ secrets.AWS_LAMBDA_ROLE_ARN }} \
+          --zip-file fileb://worker.zip || \
+        aws lambda update-function-code \
+          --function-name mp-scraper-worker \
+          --zip-file fileb://worker.zip
