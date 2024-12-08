@@ -622,11 +622,22 @@ def page_grade_distribution():
     conn = create_connection()
     cursor = conn.cursor()
     
-    # Get the data
-    grade_dist = analysis_queries.get_grade_distribution(cursor, route_types=None, level="base", year='2024')
-    top_grade = metrics.top_grade(cursor, level="base")  # Assuming this function exists, create if needed
+    # Add filter above the chart
+    st.markdown("<div style='height: 2rem;'></div>", unsafe_allow_html=True)
+    filter_col1, filter_col2, filter_col3 = st.columns([1, 1, 2])
+    
+    with filter_col1:
+        grade_level = st.selectbox(
+            "Grade Detail Level",
+            options=['base', 'granular', 'original'],
+            format_func=lambda x: x.title(),
+            key='grade_level_filter'
+        )
+    
+    # Get the data based on selected grade level
+    grade_dist = analysis_queries.get_grade_distribution(cursor, route_types=None, level=grade_level, year='2024')
+    top_grade = metrics.top_grade(cursor, level=grade_level)
     conn.close()
-
     
     # Apply Spotify styling
     st.markdown(get_spotify_style(), unsafe_allow_html=True)
@@ -656,8 +667,6 @@ def page_grade_distribution():
             go.Bar(
                 x=df['Grade'],
                 y=df['Percentage'],
-                text=df['Count'],
-                textposition='auto',
                 marker_color='#1ed760'  # Spotify green
             )
         ])
