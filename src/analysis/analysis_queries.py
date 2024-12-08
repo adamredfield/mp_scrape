@@ -218,7 +218,7 @@ def get_bigwall_routes(cursor):
     cursor.execute(query)
     return cursor.fetchall()
 
-def get_length_climbed(cursor, year=None):
+def get_length_climbed(cursor, area_type = "main_area", year=None):
     query = f"""
     WITH estimated_lengths AS (
     SELECT  id,
@@ -238,14 +238,14 @@ def get_length_climbed(cursor, year=None):
     )
     SELECT 
         substr(t.date, -4) as year,
-        r.main_area location,
+        r.{area_type} location,
         sum(coalesce(r.length_ft, el.estimated_length)) length_climbed
     FROM routes r
     JOIN Ticks t ON r.id = t.route_id
     LEFT JOIN estimated_lengths el on el.id = r.id
     WHERE t.date IS NOT NULL AND CAST(year AS INTEGER) >= 1999
     {year_filter(year)}
-    GROUP BY year, r.main_area
+    GROUP BY year, r.{area_type}
     ORDER BY year DESC, length_climbed DESC;
     """
     cursor.execute(query)

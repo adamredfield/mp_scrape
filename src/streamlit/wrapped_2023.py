@@ -16,7 +16,12 @@ st.set_page_config(
     page_title="Your 2024 Climbing Racked",
     page_icon="🧗‍♂️",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="collapsed",
+    menu_items={
+        'Get Help': None,
+        'Report a bug': None,
+        'About': None
+    }
 )
 
 # Initialize session state
@@ -26,8 +31,6 @@ if 'page' not in st.session_state:
 # Styling
 st.markdown("""
     <style>
-    #MainMenu {visibility: hidden;}
-    header {visibility: hidden;}
     footer {visibility: hidden;}
     
     .stApp {
@@ -304,11 +307,16 @@ def page_total_length():
     length_data = analysis_queries.get_length_climbed(cursor, year='2024')
     length_df = pd.DataFrame(length_data, columns=['Year', 'Location', 'Length'])
     total_length = length_df['Length'].sum()
+
+    el_caps = total_length / 3000  # El Cap height in feet
+    # Only show decimal if not a whole number
+    el_caps_str = f"{el_caps:.1f}" if el_caps % 1 != 0 else f"{int(el_caps)}"
     
     formatted_length = f"{int(total_length):,}"
     
     main_text = f"You climbed<br>{formatted_length}<br>feet this year"
-    st.markdown(wrapped_template(main_text), unsafe_allow_html=True)
+    subtitle = f"That's like climbing {el_caps_str} El Caps! 🏔️"
+    st.markdown(wrapped_template(main_text, subtitle), unsafe_allow_html=True)
 
 def page_biggest_day():
     """Biggest climbing day page"""
@@ -487,38 +495,34 @@ def page_areas_breakdown():
     sub_areas = metrics.sub_areas_climbed(cursor)
     total_states = metrics.regions_climbed(cursor)
     total_areas = metrics.regions_sub_areas(cursor)
-    conn.close()
     
-    # Create a centered layout with three columns - adjusted ratios to move everything left
+    # Apply Spotify styling
+    st.markdown(get_spotify_style(), unsafe_allow_html=True)
+    
+    # Create a centered layout with three columns for the top sections
     left_spacer, col1, middle_spacer, col2, right_spacer = st.columns([0.5, 2, 0.5, 2, 1.5])
-    
-    # Common styles
-    header_style = "color: #1ed760; font-size: 1.5rem; margin-bottom: 0.5rem; text-align: center;"
-    list_style = "margin: 0.25rem 0; text-align: left; padding-left: 40%;"
-    total_style = "margin-top: 2rem; text-align: center;"
     
     # States column
     with col1:
-        st.markdown(f"<h2 style='{header_style}'>Top States</h2>", unsafe_allow_html=True)
+        st.markdown("<h2 class='spotify-header'>Top States</h2>", unsafe_allow_html=True)
         for i, (state, days, routes) in enumerate(states[:5], 1):
             st.markdown(
                 f"""
-                <div style='{list_style}'>
-                    <div style='font-size: 1.2rem;'>
-                        <span style='color: #1ed760;'>{i}. </span>
-                        <span style='color: white;'>{state}</span>
+                <div class='list-item'>
+                    <div>
+                        <span class='item-number'>{i}. </span>
+                        <span class='item-name'>{state}</span>
                     </div>
-                    <div style='color: #b3b3b3; font-size: 0.9rem; margin-top: -0.2rem;'>{days} days • {routes} routes</div>
+                    <div class='item-details'>{days} days • {routes} routes</div>
                 </div>
                 """,
                 unsafe_allow_html=True
             )
-        # Add total states at the bottom
         st.markdown(
             f"""
-            <div style='{total_style}'>
-                <div style='color: #1ed760; font-size: 1.2rem; margin-bottom: 0.5rem;'>Total States</div>
-                <div style='font-size: 2.5rem; font-weight: bold; color: white;'>{total_states}</div>
+            <div class='total-section'>
+                <div class='total-label'>Total States</div>
+                <div class='total-value'>{total_states}</div>
             </div>
             """,
             unsafe_allow_html=True
@@ -526,30 +530,92 @@ def page_areas_breakdown():
     
     # Areas column
     with col2:
-        st.markdown(f"<h2 style='{header_style}'>Top Areas</h2>", unsafe_allow_html=True)
+        st.markdown("<h2 class='spotify-header'>Top Areas</h2>", unsafe_allow_html=True)
         for i, (area, days, routes) in enumerate(sub_areas[:5], 1):
             st.markdown(
                 f"""
-                <div style='{list_style}'>
-                    <div style='font-size: 1.2rem;'>
-                        <span style='color: #1ed760;'>{i}. </span>
-                        <span style='color: white;'>{area}</span>
+                <div class='list-item'>
+                    <div>
+                        <span class='item-number'>{i}. </span>
+                        <span class='item-name'>{area}</span>
                     </div>
-                    <div style='color: #b3b3b3; font-size: 0.9rem; margin-top: -0.2rem;'>{days} days • {routes} routes</div>
+                    <div class='item-details'>{days} days • {routes} routes</div>
                 </div>
                 """,
                 unsafe_allow_html=True
             )
-        # Add total areas at the bottom
         st.markdown(
             f"""
-            <div style='{total_style}'>
-                <div style='color: #1ed760; font-size: 1.2rem; margin-bottom: 0.5rem;'>Total Areas</div>
-                <div style='font-size: 2.5rem; font-weight: bold; color: white;'>{total_areas}</div>
+            <div class='total-section'>
+                <div class='total-label'>Total Areas</div>
+                <div class='total-value'>{total_areas}</div>
             </div>
             """,
             unsafe_allow_html=True
         )
+    
+    # Add spacing before the chart section
+    st.markdown("<div style='height: 2rem;'></div>", unsafe_allow_html=True)
+    
+    # Add filter for the length chart
+    filter_col1, filter_col2, _ = st.columns([1, 1, 2])
+    
+    with filter_col1:
+        area_type = st.selectbox(
+            "Group Length By",
+            options=['region', 'main_area'],
+            format_func=lambda x: x.replace('_', ' ').title(),
+            key='length_filter_type'
+        )
+    
+    # Get length data based on selected filter
+    length_data = analysis_queries.get_length_climbed(cursor, area_type=area_type, year='2024')
+    length_df = pd.DataFrame(length_data, columns=['Year', 'Location', 'Length'])
+    conn.close()
+    
+    # Create horizontal bar chart
+    fig = go.Figure(data=[
+        go.Bar(
+            y=length_df['Location'],
+            x=length_df['Length'],
+            orientation='h',
+            marker_color='#1ed760',  # Spotify green
+        )
+    ])
+    
+    # Update layout with dark theme
+    fig.update_layout(
+        paper_bgcolor='black',
+        plot_bgcolor='black',
+        title={
+            'text': f'Length Climbed by {area_type.replace("_", " ").title()}',
+            'y': 0.95,
+            'x': 0.5,
+            'xanchor': 'center',
+            'yanchor': 'top',
+            'font': {'color': 'white', 'size': 20}
+        },
+        xaxis_title="Distance Climbed (Feet)",
+        yaxis_title=area_type.replace("_", " ").title(),
+        margin=dict(l=20, r=20, t=50, b=20),
+        height=400,
+        xaxis=dict(
+            color='white',
+            gridcolor='#333333',
+            showgrid=True
+        ),
+        yaxis=dict(
+            color='white',
+            gridcolor='#333333',
+            showgrid=False,
+            categoryorder='total ascending'  # Sort by length climbed
+        ),
+        font=dict(
+            color='white'
+        )
+    )
+    
+    st.plotly_chart(fig, use_container_width=True)
 
 def page_grade_distribution():
     """Page showing grade distribution and most common grade"""
@@ -647,12 +713,20 @@ def main():
     if st.session_state.page in pages:
         pages[st.session_state.page]()
     
-    # Next button
-    if st.session_state.page < len(pages) - 1:
-        col1, col2 = st.columns([20, 1])
-        with col2:
+    # Navigation buttons
+    col1, col2, col3 = st.columns([1, 18, 1])
+    
+    with col1:
+        if st.session_state.page > 0:
+            if st.button("← Prev"):
+                st.session_state.page -= 1
+                st.rerun()
+    
+    with col3:
+        if st.session_state.page < len(pages) - 1:
             if st.button("Next →"):
                 st.session_state.page += 1
+                st.rerun()
 
 if __name__ == "__main__":
     main() 
