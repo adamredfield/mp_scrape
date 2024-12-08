@@ -11,7 +11,7 @@ from operator import itemgetter
 conn = create_connection()
 cursor = conn.cursor()
 
-estimated_lengths_cte = """
+estimated_lengths_cte = f"""
         WITH estimated_lengths AS (
             SELECT  id,
                     CASE WHEN route_type LIKE '%trad%' AND length_ft IS NULL AND pitches IS NULL -- trad single-pitch
@@ -37,7 +37,7 @@ def total_routes(cursor):
 
 def most_climbed_route(cursor):
     query = """
-        SELECT r.route_name, group_concat(t.note) notes, min(t.date) first_climbed, COUNT(*) times_climbed
+        SELECT r.route_name, group_concat(t.note, ' | ') notes, min(t.date) first_climbed, COUNT(*) times_climbed
         FROM Ticks t
         JOIN Routes r ON t.route_id = r.id
         WHERE t.date LIKE '%2024%'
@@ -45,7 +45,11 @@ def most_climbed_route(cursor):
         ORDER BY COUNT(*) DESC
         LIMIT 1
     """
-    return cursor.execute(query).fetchone()[0]
+    cursor.execute(query)
+    columns = [description[0] for description in cursor.description]
+
+    result = cursor.fetchone()
+    return result
 
 def top_rated_routes(cursor):
     query = """
@@ -85,7 +89,7 @@ def biggest_climbing_day(cursor):
         {estimated_lengths_cte}
         SELECT  t.date,
                 group_concat(r.route_name, ' | ') routes,
-                round(sum(coalesce(r.length_ft, el.estimated_length)),0) total_length
+                CAST(round(sum(coalesce(r.length_ft, el.estimated_length)),0) AS INTEGER) total_length
         FROM Ticks t 
         JOIN routes r on r.id = t.route_id 
         LEFT JOIN estimated_lengths el on el.id = t.route_id 
@@ -94,7 +98,13 @@ def biggest_climbing_day(cursor):
         ORDER BY total_length desc
     LIMIT 1;
     """
-    return cursor.execute(query).fetchone()[0]
+
+    cursor.execute(query)
+    columns = [description[0] for description in cursor.description]
+
+    result = cursor.fetchone()
+    
+    return result
 
 def top_grade(cursor, level):
     query = """
