@@ -1,7 +1,5 @@
 def get_grade_group(grade:str, level:str = 'base') -> str:
 
-    if not grade:
-        return None
     if grade.startswith('V'):
         return grade
     if grade.startswith('A') or grade.startswith('C'):

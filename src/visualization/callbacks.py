@@ -19,6 +19,7 @@ def register_callbacks(app, data):
         results = analysis_queries.get_grade_distribution(cursor, selected_types, level)
         df = pd.DataFrame(results, columns=['Grade', 'Count', 'Percentage'])
 
+        print("Dash DataFrame:", df)
 
         fig = px.bar(df,
                      x='Grade',
@@ -131,7 +132,7 @@ def register_callbacks(app, data):
             hovertemplate="<br>".join([
                 "Area: %{customdata[0]}",
                 "Year: %{y}",
-                "Distance: %{x} feet",
+                "Distance: %{x:,d} feet",
                 "<extra></extra>"
             ])
         )

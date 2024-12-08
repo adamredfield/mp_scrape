@@ -17,6 +17,13 @@ def route_type_filter(route_types):
         type_filter = ''
     return type_filter
 
+def year_filter(year=None):
+    """Generate SQL WHERE clause for year filtering
+    Args:
+        year: Optional year to filter by. If None, no filter is applied
+    """
+    return f"AND t.date LIKE '%{year}%'" if year else ''
+
 
 def get_tick_type_distribution(cursor, route_types=None):
     """Get distribution of tick types (Lead, TR, etc.)"""
@@ -35,28 +42,30 @@ def get_tick_type_distribution(cursor, route_types=None):
     cursor.execute(query)
     return cursor.fetchall()
 
-def get_grade_distribution(cursor, route_types=None, level='base'):
+def get_grade_distribution(cursor, route_types=None, level='base', year=None):
     """Get distribution of sends by grade with configurable grouping and route"""
 
-    grade_column = "CASE "
-    grade_column += "WHEN r.route_type LIKE '%Boulder%' THEN r.hueco_rating "
-    grade_column += "WHEN r.route_type LIKE '%Aid%' THEN r.aid_rating "
-    grade_column += "ELSE r.yds_rating END"
+    grade_column = """
+    CASE 
+        WHEN r.route_type LIKE '%Boulder%' THEN r.hueco_rating 
+        WHEN r.route_type LIKE '%Aid%' THEN r.aid_rating 
+    ELSE r.yds_rating END"""
 
-    query = f'''
+    query = f"""
     SELECT 
-        {grade_column} as grade,
+        {grade_column} AS grade,
         COUNT(*) as count,
         ROUND(COUNT(*) * 100.0 / (
             SELECT COUNT(*)
-            FROM Ticks t2
-            JOIN Routes r2 ON t2.route_id = r2.id
+            FROM Ticks t
+            JOIN Routes r2 ON t.route_id = r2.id
             WHERE r2.route_type IS NOT NULL
             AND (
-                (r2.route_type NOT LIKE '%Aid%' AND t2.type != 'Lead / Fell/Hung')  -- Filter out fell/hung for non-aid
-                OR (r2.route_type LIKE '%Aid%')                                  -- Keep all ticks for aid
+                (r2.route_type NOT LIKE '%Aid%' AND t.type != 'Lead / Fell/Hung')  -- Filter out fell/hung for non-aid
+                OR (r2.route_type LIKE '%Aid%')                                     -- Keep all ticks for aid
             )
             {route_type_filter(route_types)}
+            {year_filter(year)}
         ), 2) as percentage
     FROM Routes r
     JOIN Ticks t ON r.id = t.route_id
@@ -66,9 +75,11 @@ def get_grade_distribution(cursor, route_types=None, level='base'):
         OR (r.route_type LIKE '%Aid%')
     )
     {route_type_filter(route_types)}
+    {year_filter(year)}
     GROUP BY grade
     ORDER BY COUNT(*) DESC;
-    '''
+    """
+
     cursor.execute(query)
     results = cursor.fetchall()
 
@@ -115,9 +126,15 @@ def get_most_climbed_areas(cursor, route_types=None):
     cursor.execute(query)
     return cursor.fetchall()
 
-def get_highest_rated_climbs(cursor, selected_styles=None, route_types=None):
-    """Get highest rated climbs"""
-
+def get_highest_rated_climbs(cursor, selected_styles=None, route_types=None, year=None, tag_type=None):
+    """Get highest rated climbs
+    Args:
+        cursor: Database cursor
+        selected_styles: Optional list of styles to filter by
+        route_types: Optional list of route types to filter by
+        year: Optional year to filter by
+        tag_type: Type of tag to filter by (default: 'style')
+    """
     style_filter = ""
     if selected_styles:
         style_conditions = [
@@ -133,7 +150,8 @@ def get_highest_rated_climbs(cursor, selected_styles=None, route_types=None):
     FROM Ticks
     )
     SELECT 
-        DISTINCT r.route_name,
+        DISTINCT concat(r.route_name, ' ~ ', r.main_area, ' > ', r.specific_location,' - ', 
+        TRIM(NULLIF(CONCAT_WS(' ', r.yds_rating, r.hueco_rating, r.aid_rating,r.danger_rating, r.commitment_grade), ''))) routes,
         TRIM(NULLIF(CONCAT_WS(' ', 
             r.yds_rating,
             r.hueco_rating,
@@ -142,12 +160,14 @@ def get_highest_rated_climbs(cursor, selected_styles=None, route_types=None):
             r.commitment_grade), '')) as grade,
         r.avg_stars,
         r.num_votes,
-        GROUP_CONCAT(tav.mapped_tag, ', ') as styles
+        GROUP_CONCAT(tav.mapped_tag, ', ') as tags
     FROM Routes r
-    LEFT JOIN TagAnalysisView tav on r.id = tav.route_id AND tav.mapped_type = 'style'
+    LEFT JOIN TagAnalysisView tav on r.id = tav.route_id 
+        AND tav.mapped_type = '{tag_type}'
     JOIN deduped_ticks t ON r.id = t.route_id AND rn = 1
     WHERE r.num_votes >= 10
     {route_type_filter(route_types)}
+    {year_filter(year)}
     GROUP BY r.route_name, r.yds_rating, r.avg_stars, r.num_votes
     {style_filter}
     ORDER BY r.avg_stars DESC, num_votes DESC
@@ -189,28 +209,23 @@ def get_distinct_styles(cursor):
 def get_bigwall_routes(cursor):
     """Get all bigwall routes"""
     query = '''
-    SELECT 
-        DISTINCT r.route_name,
-        TRIM(NULLIF(CONCAT_WS(' ', 
-            r.yds_rating,
-            r.hueco_rating,
-            r.aid_rating,
-            r.danger_rating), '')) as grade,
-            r.commitment_grade committment,
-        concat(r.region, ' > ', r.main_area, ' > ', r.sub_area, ' > ', r.specific_location) as location,
-        r.length_ft ,
-        r.avg_stars,
-        r.num_votes,
-        GROUP_CONCAT(tav.mapped_tag, ', ') as styles 
-        FROM Routes r
-        LEFT JOIN TagAnalysisView tav on r.id = tav.route_id AND tav.mapped_type = 'style'
-        WHERE commitment_grade IN ('V', 'VI', 'VII')
-        GROUP BY 1,2,3,4,5;
+    SELECT  
+        t.date,
+        group_concat(concat(r.route_name, ' - ', TRIM(NULLIF(CONCAT_WS(' ', r.yds_rating, r.hueco_rating, r.aid_rating,r.danger_rating, r.commitment_grade), ''))), ' | ') routes,
+        CAST(round(sum(coalesce(r.length_ft, el.estimated_length)),0) AS INTEGER) total_length,
+        group_concat(DISTINCT r.main_area || ' | ') areas
+    FROM Ticks t 
+    JOIN routes r on r.id = t.route_id 
+    LEFT JOIN estimated_lengths el on el.id = t.route_id 
+    WHERE t.date LIKE '%2024%' AND r.route_name NOT LIKE 'The Nose'
+    GROUP BY t.date
+    ORDER BY total_length desc
+    LIMIT 1;
     '''
     cursor.execute(query)
     return cursor.fetchall()
 
-def get_length_climbed(cursor):
+def get_length_climbed(cursor, area_type = "main_area", year=None):
     query = f"""
     WITH estimated_lengths AS (
     SELECT  id,
@@ -220,7 +235,7 @@ def get_length_climbed(cursor):
                 THEN (SELECT avg(length_ft/ pitches) FROM Routes r WHERE route_type LIKE '%trad%' AND length_ft IS NOT NULL and pitches IS NOT NULL) * pitches
                 WHEN route_type LIKE '%sport%' AND length_ft IS NULL AND pitches IS NOT NULL -- sport multipitch
                 THEN (SELECT avg(length_ft) FROM Routes r WHERE route_type LIKE '%sport%'AND length_ft IS NOT NULL and pitches IS NULL AND length_ft < 230) -- avg single-pitch sport pitch length
-                WHEN route_type LIKE '%trad%' AND length_ft IS NULL AND pitches IS NOT NULL -- trad multipitch
+                WHEN route_type LIKE '%sport%' AND length_ft IS NULL AND pitches IS NOT NULL -- sport multipitch
                 THEN (SELECT avg(length_ft/ pitches) FROM Routes r WHERE route_type LIKE '%trad%' AND length_ft IS NOT NULL and pitches IS NOT NULL) * pitches
                 WHEN route_type LIKE '%boulder%' AND length_ft IS NULL
                 THEN (SELECT avg(length_ft) FROM Routes r WHERE route_type LIKE '%boulder%' AND length_ft IS NOT NULL) -- boulder
@@ -230,13 +245,14 @@ def get_length_climbed(cursor):
     )
     SELECT 
         substr(t.date, -4) as year,
-        r.main_area,
+        r.{area_type} location,
         sum(coalesce(r.length_ft, el.estimated_length)) length_climbed
     FROM routes r
     JOIN Ticks t ON r.id = t.route_id
     LEFT JOIN estimated_lengths el on el.id = r.id
     WHERE t.date IS NOT NULL AND CAST(year AS INTEGER) >= 1999
-    GROUP BY year, r.main_area
+    {year_filter(year)}
+    GROUP BY year, r.{area_type}
     ORDER BY year DESC, length_climbed DESC;
     """
     cursor.execute(query)

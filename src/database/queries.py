@@ -5,10 +5,10 @@ def insert_route(cursor, connection, route_data):
     route_sql = '''
     INSERT OR IGNORE INTO Routes (
         id, route_name, route_url, yds_rating, hueco_rating, aid_rating, danger_rating, avg_stars, num_votes,
-    region, main_area, sub_area, specific_location, route_type, length_ft, pitches, commitment_grade, fa, description, protection, insert_date
+    region, main_area, sub_area, specific_location, route_type, length_ft, pitches, commitment_grade, fa, description, protection, primary_photo_url, insert_date
     ) VALUES (     
         :route_id, :route_name, :route_url, :yds_rating, :hueco_rating, :aid_rating, :danger_rating, :avg_stars, :num_votes,
-        :region, :main_area, :sub_area, :specific_location, :route_type, :length_ft, :pitches, :commitment_grade, :fa, :description, :protection, :insert_date)
+        :region, :main_area, :sub_area, :specific_location, :route_type, :length_ft, :pitches, :commitment_grade, :fa, :description, :protection, :primary_photo_url, :insert_date)
     '''
     try:
         cursor.execute(route_sql, route_data)
