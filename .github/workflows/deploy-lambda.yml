@@ -51,7 +51,9 @@ jobs:
           --runtime python3.11 \
           --handler src.lambda.worker.lambda_handler \
           --role ${{ secrets.AWS_LAMBDA_ROLE_ARN }} \
-          --zip-file fileb://worker.zip || \
+          --zip-file fileb://worker.zip \
+          --timeout 900 \
+          --memory-size 512 || \
         aws lambda update-function-code \
           --function-name mp-scraper-worker \
           --zip-file fileb://worker.zip
