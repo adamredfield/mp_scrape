@@ -187,10 +187,21 @@ def lambda_handler(event, context):
                     # Optionally rollback on error
                     conn.rollback()
                     
+            # Close browser before exiting playwright context
+            if context:
+                context.close()
+            if browser:
+                browser.close()
+                
+    except Exception as e:
+        print(f"Error in lambda_handler: {str(e)}")
+        if conn:
+            conn.rollback()
+        raise
+        
     finally:
-        if 'browser' in locals():
-            browser.close()
-        if 'conn' in locals():
+        # Only close DB connection here, browser cleanup moved to try block
+        if conn:
             conn.close()
     
     return {
