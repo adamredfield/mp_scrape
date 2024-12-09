@@ -18,9 +18,14 @@ RUN pip3 install -r requirements.txt \
 # Copy function code
 COPY src/ ${LAMBDA_TASK_ROOT}/src/
 
+# Find Python path and set it correctly
+RUN which python3 > /tmp/python_path && \
+    PYTHON_PATH=$(cat /tmp/python_path) && \
+    echo "Python path is: $PYTHON_PATH"
+
 # Install AWS Lambda Runtime Interface Client
 RUN pip3 install awslambdaric
 
 # Set the handler
-ENTRYPOINT [ "/usr/local/bin/python3", "-m", "awslambdaric" ]
+ENTRYPOINT [ "python3", "-m", "awslambdaric" ]
 CMD [ "src.lambda.worker.lambda_handler" ]
