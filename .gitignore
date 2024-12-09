@@ -4,3 +4,4 @@ storage.json
 venv
 ticklist.db
 .env
+*local*
