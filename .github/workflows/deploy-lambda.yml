@@ -2,7 +2,7 @@ name: Deploy Lambda Functions
 
 on:
   push:
-    branches: [ main, lambda-test ]
+    branches: [ main, lambda-testing ]
   pull_request:
     branches: [ main ]
 
