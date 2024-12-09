@@ -54,10 +54,7 @@ jobs:
           --package-type Image \
           --code ImageUri=${{ steps.login-ecr.outputs.registry }}/mp-scraper:latest \
           --role ${{ secrets.AWS_LAMBDA_ROLE_ARN }} \
-          --environment "Variables={
-            QUEUE_URL=${{ secrets.SQS_URL }},
-            S3_BUCKET_NAME=mp-scraper-db
-          }" \
+          --environment '{"Variables": {"QUEUE_URL": "${{ secrets.SQS_URL }}", "S3_BUCKET_NAME": "mp-scraper-db"}}' \
           --timeout 900 \
           --memory-size 1024
 
@@ -68,7 +65,7 @@ jobs:
           --package-type Image \
           --code ImageUri=${{ steps.login-ecr.outputs.registry }}/mp-scraper:latest \
           --role ${{ secrets.AWS_LAMBDA_ROLE_ARN }} \
-          --environment "Variables={QUEUE_URL=${{ secrets.SQS_URL }}" \
+          --environment '{"Variables": {"QUEUE_URL": "${{ secrets.SQS_URL }}"}}' \
           --timeout 900 \
           --memory-size 1024 \
           --image-config '{"Command": ["src.lambda.orchestrator.lambda_handler"]}'
