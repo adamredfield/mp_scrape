@@ -1,3 +1,9 @@
+import os
+import sys
+
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+sys.path.append(project_root)
+
 import json
 from src.scraping import helper_functions
 from src.database.utils import create_connection
