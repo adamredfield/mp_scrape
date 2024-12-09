@@ -32,7 +32,7 @@ def lambda_handler(event, context):
         cursor = conn.cursor()
         
         with sync_playwright() as playwright:
-            context = helper_functions.login_and_save_session(playwright)
+            browser, context = helper_functions.login_and_save_session(playwright)
             page = context.new_page()
 
             # SQS sends records in batches
@@ -183,10 +183,11 @@ def lambda_handler(event, context):
                     conn.rollback()
                     
     finally:
+        if 'browser' in locals():
+            browser.close()
         if 'conn' in locals():
             conn.close()
     
-    # browser.close() not needed - handled by with block
     return {
         'statusCode': 200,
         'body': json.dumps('Processing complete')
