@@ -42,24 +42,6 @@ def sync_db():
         
         print(f"Successfully updated database at {LOCAL_DB_PATH}")
         
-        # After successful move, verify the data is there
-        print("\nVerifying local database after sync...")
-        conn = sqlite3.connect(LOCAL_DB_PATH)
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            SELECT route_name, id, insert_date 
-            FROM routes 
-            WHERE route_name IN ('Feltonian Physics', 'Poodles are People Too')
-        """)
-        
-        results = cursor.fetchall()
-        print("\nFound routes:")
-        for route in results:
-            print(f"- {route[0]} (ID: {route[1]}, Inserted: {route[2]})")
-            
-        conn.close()
-        
     except Exception as e:
         print(f"Error syncing DB: {str(e)}")
         if os.path.exists(TEMP_DB_PATH):

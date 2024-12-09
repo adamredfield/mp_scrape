@@ -5,3 +5,4 @@ venv
 ticklist.db
 .env
 *local*
+sync_db.py
