@@ -12,10 +12,15 @@ ENV LAMBDA_TASK_ROOT="/var/task"
 
 # Install Python packages
 COPY requirements.txt .
-RUN pip3 install -r requirements.txt
+RUN pip3 install -r requirements.txt \
+    awslambdaric
 
 # Copy function code
 COPY src/ ${LAMBDA_TASK_ROOT}/src/
 
+# Install AWS Lambda Runtime Interface Client
+RUN pip3 install awslambdaric
+
 # Set the handler
-CMD [ "python3", "-m", "awslambdaric", "src.lambda.worker.lambda_handler" ]
+ENTRYPOINT [ "/usr/local/bin/python3", "-m", "awslambdaric" ]
+CMD [ "src.lambda.worker.lambda_handler" ]
