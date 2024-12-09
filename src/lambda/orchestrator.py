@@ -9,7 +9,7 @@ import boto3
 from src.scraping import helper_functions
 
 sqs = boto3.client('sqs')
-QUEUE_URL = os.environ['https://sqs.us-east-1.amazonaws.com/855154218477/mp-scraper-queue']
+QUEUE_URL = os.environ['QUEUE_URL']
 BATCH_SIZE = 2  # 2 pages per batch
 
 def lambda_handler(event, context):
