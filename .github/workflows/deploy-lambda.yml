@@ -1,0 +1,72 @@
+name: Deploy Lambda Functions
+
+on:
+  push:
+    branches: [ main, lambda-testing ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v2
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-1
+
+    - name: Create ECR repository if not exists
+      run: |
+        aws ecr create-repository \
+          --repository-name mp-scraper \
+          --image-scanning-configuration scanOnPush=true || true
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    - name: Build and push image
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        ECR_REPOSITORY: mp-scraper
+        IMAGE_TAG: latest
+      run: |
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+    - name: Delete existing functions
+      run: |
+        aws lambda delete-function --function-name mp-scraper-orchestrator || true
+        aws lambda delete-function --function-name mp-scraper-worker || true
+
+    - name: Create SQS Queue if not exists
+      run: |
+        aws sqs create-queue --queue-name mp-scraper-queue || true
+        
+    - name: Deploy worker function
+      run: |
+        aws lambda create-function \
+          --function-name mp-scraper-worker \
+          --package-type Image \
+          --code ImageUri=${{ steps.login-ecr.outputs.registry }}/mp-scraper:latest \
+          --role ${{ secrets.AWS_LAMBDA_ROLE_ARN }} \
+          --environment '{"Variables": {"QUEUE_URL": "${{ secrets.SQS_URL }}", "S3_BUCKET_NAME": "mp-scraper-db"}}' \
+          --timeout 900 \
+          --memory-size 1024
+
+    - name: Deploy orchestrator function
+      run: |
+        aws lambda create-function \
+          --function-name mp-scraper-orchestrator \
+          --package-type Image \
+          --code ImageUri=${{ steps.login-ecr.outputs.registry }}/mp-scraper:latest \
+          --role ${{ secrets.AWS_LAMBDA_ROLE_ARN }} \
+          --environment '{"Variables": {"QUEUE_URL": "${{ secrets.SQS_URL }}"}}' \
+          --timeout 900 \
+          --memory-size 1024 \
+          --image-config '{"Command": ["src.lambda.orchestrator.lambda_handler"]}'

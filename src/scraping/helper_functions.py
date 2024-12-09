@@ -14,31 +14,54 @@ constructed_url = f'{base_url}{user}'
 ticks_url = f'{constructed_url}/ticks?page='
 
 def login_and_save_session(playwright):
-    browser = playwright.chromium.launch(headless=False)  # Use headless=True for production
-    context = browser.new_context()
-    page = context.new_page()
+    print("Starting browser launch sequence...")
+    try:
+        browser = playwright.chromium.launch(
+            headless=True,
+            args=[
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--single-process',
+                '--no-zygote'
+            ]
+        )
+        print("Browser launched successfully")
 
-    # Go to the homepage to login
-    page.goto(mp_home_url)
-    page.click("a.sign-in")
-    page.wait_for_selector("#login-modal", timeout=5000)
+        context = browser.new_context(
+            viewport={'width': 1280, 'height': 720}
+        )
+        print("Context created successfully")
 
-    page.fill("input[type='email'][name='email']", username)
-    page.fill("input[type='password'][name='pass']", password)
-    page.click("#login-modal button[type='submit']")
+        page = context.new_page()
+        page.goto(mp_home_url)
+        page.wait_for_load_state('networkidle')
+        print("Navigation complete")
 
-    # save cookies and storage_state to keep session open for scraping
-    cookies = context.cookies()
-    with open("cookies.json", "w") as cookie_file:
-        json.dump(cookies, cookie_file)
+        page.click("a.sign-in")
+        page.wait_for_selector("#login-modal", timeout=5000)
+        page.fill("input[type='email'][name='email']", username)
+        page.fill("input[type='password'][name='pass']", password)
+        page.click("#login-modal button[type='submit']")
+        print("Login submitted")
 
-    storage_state = context.storage_state()
-    with open("storage.json", "w") as storage_file:
-        json.dump(storage_state, storage_file)
+        # Save cookies and storage_state to /tmp
+        cookies = context.cookies()
+        with open("/tmp/cookies.json", "w") as cookie_file:
+            json.dump(cookies, cookie_file)
 
-    print("Login successful, session saved!")
+        storage_state = context.storage_state()
+        with open("/tmp/storage.json", "w") as storage_file:
+            json.dump(storage_state, storage_file)
 
-    return browser, context
+        print("Login successful, session saved!")
+        return browser, context
+
+    except Exception as e:
+        print(f"Error in browser setup: {str(e)}")
+        if 'browser' in locals():
+            browser.close()
+        raise
 
 def fetch_dynamic_page_content(page, route_link):
         page.goto(route_link)
@@ -177,7 +200,6 @@ def get_route_attributes(route_soup):
     route_attributes['primary_photo_url'] = (
         photo_link['style'].split('url("')[1].split('")')[0] if photo_link and 'style' in photo_link.attrs else None
     )
-
 
     return route_attributes
 
