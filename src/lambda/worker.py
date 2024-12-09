@@ -16,17 +16,6 @@ BUCKET_NAME = os.environ['S3_BUCKET_NAME']
 DB_NAME = 'ticklist.db'
 LOCAL_DB_PATH = f'/tmp/{DB_NAME}'
 
-def init_db():
-    conn = sqlite3.connect(LOCAL_DB_PATH)
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS ticks
-                 (id INTEGER PRIMARY KEY,
-                  user_id TEXT,
-                  route_name TEXT,
-                  grade TEXT,
-                  style TEXT)''')
-    conn.commit()
-    conn.close()
 
 def get_db():
     # Download DB from S3 if it exists
@@ -34,8 +23,6 @@ def get_db():
         s3.download_file(BUCKET_NAME, DB_NAME, LOCAL_DB_PATH)
     except Exception as e:
         print(f"Could not download DB from S3: {str(e)}")
-        # If file doesn't exist in S3, create new DB
-        init_db()
     return sqlite3.connect(LOCAL_DB_PATH)
 
 def lambda_handler(event, context):

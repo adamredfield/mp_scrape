@@ -1,8 +1,7 @@
-FROM public.ecr.aws/lambda/python:3.11
+FROM public.ecr.aws/amazonlinux/amazonlinux:2023
 
-# Install system dependencies and newer glibc
-RUN yum update -y && \
-    yum install -y \
+# Install Python 3.11 and system dependencies
+RUN dnf install -y python3.11 pip \
     atk \
     cups-libs \
     gtk3 \
@@ -17,19 +16,25 @@ RUN yum update -y && \
     pango \
     xorg-x11-server-Xvfb \
     alsa-lib \
-    glibc \
-    glibc-devel
+    nodejs \
+    npm
 
-# Install Python packages
+# Set Python path
+ENV PYTHONPATH="/var/task"
+ENV LAMBDA_TASK_ROOT="/var/task"
+
+# Install specific version of Playwright
 COPY requirements.txt .
-RUN pip install -r requirements.txt
+RUN pip3.11 install -r requirements.txt
+RUN pip3.11 install playwright==1.30.0
 
-# Install browser with specific version that works with this environment
+# Install browser
 ENV PLAYWRIGHT_BROWSERS_PATH=/tmp/playwright-browsers
-RUN playwright install --with-deps chromium
+RUN python3.11 -m playwright install-deps
+RUN PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 python3.11 -m playwright install chromium
 
 # Copy function code
-COPY src/ ${LAMBDA_TASK_ROOT}/src
+COPY src/ ${LAMBDA_TASK_ROOT}/src/
 
-# Default to worker handler
-CMD [ "src.lambda.worker.lambda_handler" ]
+# Set the handler
+CMD [ "python3.11", "-m", "awslambdaric", "src.lambda.worker.lambda_handler" ]
