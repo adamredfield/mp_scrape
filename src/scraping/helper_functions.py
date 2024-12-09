@@ -14,55 +14,54 @@ constructed_url = f'{base_url}{user}'
 ticks_url = f'{constructed_url}/ticks?page='
 
 def login_and_save_session(playwright):
-    print("1. Starting browser launch...")
-    browser = playwright.chromium.launch(
-        headless=True,
-        args=[
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--single-process',
-            '--no-zygote'
-        ]
-    )
-    print("2. Browser launched")
+    print("Starting browser launch sequence...")
+    try:
+        browser = playwright.chromium.launch(
+            headless=True,
+            args=[
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--single-process',
+                '--no-zygote'
+            ]
+        )
+        print("Browser launched successfully")
 
-    print("3. Creating context...")
-    context = browser.new_context(
-        viewport={'width': 1280, 'height': 720}
-    )
-    print("4. Context created")
+        context = browser.new_context(
+            viewport={'width': 1280, 'height': 720}
+        )
+        print("Context created successfully")
 
-    print("5. Creating page...")
-    page = context.new_page()
-    print("6. Page created")
+        page = context.new_page()
+        page.goto(mp_home_url)
+        page.wait_for_load_state('networkidle')
+        print("Navigation complete")
 
-    print("7. Navigating to MP...")
-    # Use Promise.all equivalent for Python
-    page.goto(mp_home_url)
-    page.wait_for_load_state('networkidle')  # Add this
-    print("8. Navigation complete")
+        page.click("a.sign-in")
+        page.wait_for_selector("#login-modal", timeout=5000)
+        page.fill("input[type='email'][name='email']", username)
+        page.fill("input[type='password'][name='pass']", password)
+        page.click("#login-modal button[type='submit']")
+        print("Login submitted")
 
-    print("9. Logging in...")
-    page.click("a.sign-in")
-    page.wait_for_selector("#login-modal", timeout=5000)
-    page.fill("input[type='email'][name='email']", username)
-    page.fill("input[type='password'][name='pass']", password)
-    page.click("#login-modal button[type='submit']")
-    print("10. Login complete")
+        # Save cookies and storage_state to /tmp
+        cookies = context.cookies()
+        with open("/tmp/cookies.json", "w") as cookie_file:
+            json.dump(cookies, cookie_file)
 
-    # save cookies and storage_state to keep session open for scraping
-    cookies = context.cookies()
-    with open("cookies.json", "w") as cookie_file:
-        json.dump(cookies, cookie_file)
+        storage_state = context.storage_state()
+        with open("/tmp/storage.json", "w") as storage_file:
+            json.dump(storage_state, storage_file)
 
-    storage_state = context.storage_state()
-    with open("storage.json", "w") as storage_file:
-        json.dump(storage_state, storage_file)
+        print("Login successful, session saved!")
+        return browser, context
 
-    print("Login successful, session saved!")
-
-    return browser, context
+    except Exception as e:
+        print(f"Error in browser setup: {str(e)}")
+        if 'browser' in locals():
+            browser.close()
+        raise
 
 def fetch_dynamic_page_content(page, route_link):
         page.goto(route_link)
