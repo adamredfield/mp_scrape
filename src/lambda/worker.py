@@ -27,7 +27,6 @@ def get_db():
 
 def lambda_handler(event, context):
     try:
-        # Get SQLite connection at start
         conn = get_db()
         cursor = conn.cursor()
         

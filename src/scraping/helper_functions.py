@@ -14,9 +14,23 @@ constructed_url = f'{base_url}{user}'
 ticks_url = f'{constructed_url}/ticks?page='
 
 def login_and_save_session(playwright):
-    browser = playwright.chromium.launch(headless=True)  # Run in headless mode for Lambda
+    browser = playwright.chromium.launch(
+        headless=True,
+        args=[
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--disable-software-rasterizer'
+            ]
+        )
+    print("Browser launched successfully")
+
     context = browser.new_context()
+    print("Context created successfully")
+
     page = context.new_page()
+    print("Page created successfully")
 
     # Go to the homepage to login
     page.goto(mp_home_url)
