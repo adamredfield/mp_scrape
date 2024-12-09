@@ -39,9 +39,10 @@ jobs:
         docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
-    - name: Delete existing function
+    - name: Delete existing functions
       run: |
         aws lambda delete-function --function-name mp-scraper-orchestrator || true
+        aws lambda delete-function --function-name mp-scraper-worker || true
 
     - name: Create SQS Queue if not exists
       run: |
