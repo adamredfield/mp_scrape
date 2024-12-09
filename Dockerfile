@@ -1,40 +1,21 @@
-FROM public.ecr.aws/amazonlinux/amazonlinux:2023
+FROM mcr.microsoft.com/playwright:v1.49.0-jammy
 
-# Install Python 3.11 and system dependencies
-RUN dnf install -y python3.11 pip \
-    atk \
-    cups-libs \
-    gtk3 \
-    libXcomposite \
-    libXcursor \
-    libXdamage \
-    libXext \
-    libXi \
-    libXrandr \
-    libXScrnSaver \
-    libXtst \
-    pango \
-    xorg-x11-server-Xvfb \
-    alsa-lib \
-    nodejs \
-    npm
+# Install Python and pip
+RUN apt-get update && apt-get install -y \
+    python3.11 \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
 
-# Set Python path
+# Set Python path for Lambda
 ENV PYTHONPATH="/var/task"
 ENV LAMBDA_TASK_ROOT="/var/task"
 
-# Install specific version of Playwright
+# Install Python packages
 COPY requirements.txt .
-RUN pip3.11 install -r requirements.txt
-RUN pip3.11 install playwright==1.30.0
-
-# Install browser
-ENV PLAYWRIGHT_BROWSERS_PATH=/tmp/playwright-browsers
-RUN python3.11 -m playwright install-deps
-RUN PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 python3.11 -m playwright install chromium
+RUN pip3 install -r requirements.txt
 
 # Copy function code
 COPY src/ ${LAMBDA_TASK_ROOT}/src/
 
 # Set the handler
-CMD [ "python3.11", "-m", "awslambdaric", "src.lambda.worker.lambda_handler" ]
+CMD [ "python3", "-m", "awslambdaric", "src.lambda.worker.lambda_handler" ]
