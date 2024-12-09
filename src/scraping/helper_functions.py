@@ -196,6 +196,10 @@ def get_route_attributes(route_soup):
     route_attributes['avg_stars'] = avg_rating_parts[0].replace('Avg:', '').strip()
     route_attributes['num_ratings'] = avg_rating_parts[1].replace('votes', '').strip() 
     route_attributes['formatted_location'] = ' > '.join(link.text.strip() for link in route_soup.select('.mb-half.small.text-warm a'))
+    photo_link = route_soup.find('div', class_='carousel-item')
+    route_attributes['primary_photo_url'] = (
+        photo_link['style'].split('url("')[1].split('")')[0] if photo_link and 'style' in photo_link.attrs else None
+    )
 
     return route_attributes
 
