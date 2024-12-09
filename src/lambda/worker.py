@@ -7,12 +7,43 @@ from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
 from datetime import datetime
 import re
+import boto3
+import sqlite3
+import os
+
+s3 = boto3.client('s3')
+BUCKET_NAME = os.environ['S3_BUCKET_NAME']
+DB_NAME = 'ticklist.db'
+LOCAL_DB_PATH = f'/tmp/{DB_NAME}'
+
+def init_db():
+    conn = sqlite3.connect(LOCAL_DB_PATH)
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS ticks
+                 (id INTEGER PRIMARY KEY,
+                  user_id TEXT,
+                  route_name TEXT,
+                  grade TEXT,
+                  style TEXT)''')
+    conn.commit()
+    conn.close()
+
+def get_db():
+    # Download DB from S3 if it exists
+    try:
+        s3.download_file(BUCKET_NAME, DB_NAME, LOCAL_DB_PATH)
+    except Exception as e:
+        print(f"Could not download DB from S3: {str(e)}")
+        # If file doesn't exist in S3, create new DB
+        init_db()
+    return sqlite3.connect(LOCAL_DB_PATH)
 
 def lambda_handler(event, context):
-    connection = create_connection()
-    cursor = connection.cursor()
-    
     try:
+        # Get SQLite connection at start
+        conn = get_db()
+        cursor = conn.cursor()
+        
         with sync_playwright() as playwright:
             context = helper_functions.login_and_save_session(playwright)
             page = context.new_page()
@@ -22,6 +53,7 @@ def lambda_handler(event, context):
                 try:
                     # Parse message
                     message = json.loads(record['body'])
+
                     page_number = message['page_number']
                     ticks_url = message['ticks_url']
                     
@@ -91,8 +123,9 @@ def lambda_handler(event, context):
 
                                 comments_dict = [{'route_id': route_id, 'comment': comment, 'insert_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S')} for comment in comments]
 
-                                queries.insert_route(cursor, connection, current_route_data)
-                                queries.insert_comments(cursor, connection, comments_dict)
+                                queries.insert_route(cursor, conn, current_route_data)
+                                queries.insert_comments(cursor, conn, comments_dict)
+                                conn.commit()
 
                                 current_route_data = {
                                     'route_id': route_id,
@@ -148,17 +181,23 @@ def lambda_handler(event, context):
                                 'note': tick_note,
                                 'insert_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                             }
-                            queries.insert_tick(cursor, connection, tick_data)
+                            queries.insert_tick(cursor, conn, tick_data)
+                            conn.commit()
                             current_route_data = None
 
                     print(f'Successfully processed page {page_number}')
+                    # Upload DB to S3 after page is processed
+                    conn.commit()  # Final commit before S3 upload
+                    s3.upload_file(LOCAL_DB_PATH, BUCKET_NAME, DB_NAME)
                 
                 except Exception as e:
                     print(f"Error processing page {page_number}: {str(e)}")
-                    # Don't raise the exception - let SQS handle retries
+                    # Optionally rollback on error
+                    conn.rollback()
+                    
     finally:
-        # Move connection.close() outside the loop but inside the with block
-        connection.close()
+        if 'conn' in locals():
+            conn.close()
     
     # browser.close() not needed - handled by with block
     return {

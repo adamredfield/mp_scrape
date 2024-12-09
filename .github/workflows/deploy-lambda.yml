@@ -47,13 +47,28 @@ jobs:
       run: |
         aws sqs create-queue --queue-name mp-scraper-queue || true
         
-    - name: Deploy Lambda function
+    - name: Deploy worker function
+      run: |
+        aws lambda create-function \
+          --function-name mp-scraper-worker \
+          --package-type Image \
+          --code ImageUri=${{ steps.login-ecr.outputs.registry }}/mp-scraper:latest \
+          --role ${{ secrets.AWS_LAMBDA_ROLE_ARN }} \
+          --environment "Variables={
+            QUEUE_URL=${{ secrets.SQS_URL }},
+            S3_BUCKET_NAME=mp-scraper-db
+          }" \
+          --timeout 900 \
+          --memory-size 1024
+
+    - name: Deploy orchestrator function
       run: |
         aws lambda create-function \
           --function-name mp-scraper-orchestrator \
           --package-type Image \
           --code ImageUri=${{ steps.login-ecr.outputs.registry }}/mp-scraper:latest \
           --role ${{ secrets.AWS_LAMBDA_ROLE_ARN }} \
-          --environment "Variables={QUEUE_URL=${{ secrets.SQS_URL }}}" \
+          --environment "Variables={QUEUE_URL=${{ secrets.SQS_URL }}" \
           --timeout 900 \
-          --memory-size 1024
+          --memory-size 1024 \
+          --image-config '{"Command": ["src.lambda.orchestrator.lambda_handler"]}'
