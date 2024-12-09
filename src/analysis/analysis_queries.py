@@ -150,7 +150,8 @@ def get_highest_rated_climbs(cursor, selected_styles=None, route_types=None, yea
     FROM Ticks
     )
     SELECT 
-        DISTINCT r.route_name,
+        DISTINCT concat(r.route_name, ' ~ ', r.main_area, ' > ', r.specific_location,' - ', 
+        TRIM(NULLIF(CONCAT_WS(' ', r.yds_rating, r.hueco_rating, r.aid_rating,r.danger_rating, r.commitment_grade), ''))) routes,
         TRIM(NULLIF(CONCAT_WS(' ', 
             r.yds_rating,
             r.hueco_rating,
