@@ -2,7 +2,7 @@ name: Deploy Lambda Functions
 
 on:
   push:
-    branches: [ main, lambda-testing ]
+    branches: [ main, lambda-test ]
   pull_request:
     branches: [ main ]
 
@@ -13,49 +13,33 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     
-    - name: Set up Python
-      uses: actions/setup-python@v2
-      with:
-        python-version: '3.13'
-    
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install requests beautifulsoup4 playwright boto3 -t ./package
-
     - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v1
+      uses: aws-actions/configure-aws-credentials@v4
       with:
-        aws-access-key-id: "${{ secrets.AWS_ACCESS_KEY_ID }}"
-        aws-secret-access-key: "${{ secrets.AWS_SECRET_ACCESS_KEY }}"
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: us-east-1
-        
-    - name: Package and deploy orchestrator
-      run: |
-        cp -r src/* package/
-        cd package && zip -r ../orchestrator.zip .
-        cd ..
-        aws lambda create-function \
-          --function-name mp-scraper-orchestrator \
-          --runtime python3.11 \
-          --handler lambda.orchestrator.lambda_handler \
-          --role ${{ secrets.AWS_LAMBDA_ROLE_ARN }} \
-          --zip-file fileb://orchestrator.zip || \
-        aws lambda update-function-code \
-          --function-name mp-scraper-orchestrator \
-          --zip-file fileb://orchestrator.zip
 
-    - name: Deploy worker
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    - name: Build and push image
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        ECR_REPOSITORY: mp-scraper
+        IMAGE_TAG: latest
       run: |
-        zip -r worker.zip src/
-        aws lambda create-function \
-          --function-name mp-scraper-worker \
-          --runtime python3.11 \
-          --handler src.lambda.worker.lambda_handler \
-          --role ${{ secrets.AWS_LAMBDA_ROLE_ARN }} \
-          --zip-file fileb://worker.zip \
-          --timeout 900 \
-          --memory-size 512 || \
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+    - name: Update Lambda functions
+      run: |
         aws lambda update-function-code \
-          --function-name mp-scraper-worker \
-          --zip-file fileb://worker.zip
+          --function-name mp-scraper-orchestrator \
+          --image-uri ${{ steps.login-ecr.outputs.registry }}/mp-scraper:latest || \
+        aws lambda create-function \
+          --function-name mp-scraper-orchestrator \
+          --package-type Image \
+          --code ImageUri=${{ steps.login-ecr.outputs.registry }}/mp-scraper:latest \
+          --role ${{ secrets.AWS_LAMBDA_ROLE_ARN }}
