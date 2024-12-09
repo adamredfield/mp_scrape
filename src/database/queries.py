@@ -2,7 +2,7 @@ import psycopg2
 
 def insert_route(cursor, connection, route_data):
     route_sql = '''
-    INSERT INTO Routes (
+    INSERT INTO routes.Routes (
         id, route_name, route_url, yds_rating, hueco_rating, aid_rating, danger_rating, 
         avg_stars, num_votes, region, main_area, sub_area, specific_location, route_type, 
         length_ft, pitches, commitment_grade, fa, description, protection, primary_photo_url, 
@@ -26,7 +26,7 @@ def insert_route(cursor, connection, route_data):
 def insert_comments(cursor, connection, comments):
     if comments:
         comments_sql = '''
-        INSERT INTO RouteComments (
+        INSERT INTO routes.RouteComments (
             route_id, comment, insert_date
         ) VALUES (
             %(route_id)s, %(comment)s, %(insert_date)s
@@ -42,7 +42,7 @@ def insert_comments(cursor, connection, comments):
 
 def insert_tick(cursor, connection, tick_data):
     tick_sql = '''
-    INSERT INTO Ticks (
+    INSERT INTO routes.Ticks (
         route_id, date, type, note, insert_date
     ) VALUES (
         %(route_id)s, %(date)s, %(type)s, %(note)s, %(insert_date)s
@@ -59,7 +59,7 @@ def insert_tick(cursor, connection, tick_data):
 def check_route_exists(cursor, route_id):
     """Check if route exists in PostgreSQL"""
     cursor.execute(
-        "SELECT EXISTS(SELECT 1 FROM Routes WHERE id = %s)",
+        "SELECT EXISTS(SELECT 1 FROM routes.Routes WHERE id = %s)",
         (route_id,)
     )
     return cursor.fetchone()[0]   

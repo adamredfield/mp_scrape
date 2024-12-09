@@ -15,25 +15,25 @@ estimated_lengths_cte = f"""
         WITH estimated_lengths AS (
             SELECT  id,
                     CASE WHEN route_type ILIKE '%trad%' AND length_ft IS NULL AND pitches IS NULL -- trad single-pitch
-                        THEN (SELECT avg(length_ft) FROM Routes r WHERE route_type ILIKE '%trad%'AND length_ft IS NOT NULL and pitches IS NULL AND length_ft < 230) -- avg single-pitch trad pitch length
+                        THEN (SELECT avg(length_ft) FROM routes.Routes r WHERE route_type ILIKE '%trad%'AND length_ft IS NOT NULL and pitches IS NULL AND length_ft < 230) -- avg single-pitch trad pitch length
                         WHEN route_type ILIKE '%trad%' AND length_ft IS NULL AND pitches IS NOT NULL -- trad multipitch
-                        THEN (SELECT avg(length_ft/ pitches) FROM Routes r WHERE route_type ILIKE '%trad%' AND length_ft IS NOT NULL and pitches IS NOT NULL) * pitches
+                        THEN (SELECT avg(length_ft/ pitches) FROM routes.Routes r WHERE route_type ILIKE '%trad%' AND length_ft IS NOT NULL and pitches IS NOT NULL) * pitches
                         WHEN route_type ILIKE '%sport%' AND length_ft IS NULL AND pitches IS NOT NULL -- sport multipitch
-                        THEN (SELECT avg(length_ft) FROM Routes r WHERE route_type ILIKE '%sport%'AND length_ft IS NOT NULL and pitches IS NULL AND length_ft < 230) -- avg single-pitch sport pitch length
+                        THEN (SELECT avg(length_ft) FROM routes.Routes r WHERE route_type ILIKE '%sport%'AND length_ft IS NOT NULL and pitches IS NULL AND length_ft < 230) -- avg single-pitch sport pitch length
                         WHEN route_type ILIKE '%sport%' AND length_ft IS NULL AND pitches IS NOT NULL -- sport multipitch
-                        THEN (SELECT avg(length_ft/ pitches) FROM Routes r WHERE route_type ILIKE '%trad%' AND length_ft IS NOT NULL and pitches IS NOT NULL) * pitches
+                        THEN (SELECT avg(length_ft/ pitches) FROM routes.Routes r WHERE route_type ILIKE '%trad%' AND length_ft IS NOT NULL and pitches IS NOT NULL) * pitches
                         WHEN route_type ILIKE '%boulder%' AND length_ft IS NULL
-                        THEN (SELECT avg(length_ft) FROM Routes r WHERE route_type ILIKE '%boulder%' AND length_ft IS NOT NULL) -- boulder
+                        THEN (SELECT avg(length_ft) FROM routes.Routes r WHERE route_type ILIKE '%boulder%' AND length_ft IS NOT NULL) -- boulder
                         ELSE length_ft
                     END AS estimated_length
-                FROM routes
+                FROM routes.Routes
             WHERE estimated_length IS NOT NULL
         )
         """
 
 
 def total_routes(cursor):
-    query = "SELECT COUNT(DISTINCT route_id) FROM Ticks WHERE date::text ILIKE '%2024%'"
+    query = "SELECT COUNT(DISTINCT route_id) FROM routes.Ticks WHERE date::text ILIKE '%2024%'"
     return cursor.execute(query).fetchone()[0]
 
 def most_climbed_route(cursor):
@@ -48,8 +48,8 @@ def most_climbed_route(cursor):
         STRING_AGG(t.note, ' | ') notes,
         min(t.date) first_climbed,
         COUNT(*) times_climbed
-        FROM Ticks t
-        JOIN Routes r ON t.route_id = r.id
+        FROM routes.Ticks t
+        JOIN routes.Routes r ON t.route_id = r.id
         LEFT JOIN estimated_lengths el on el.id = t.route_id 
         WHERE t.date ILIKE '%2024%'
         GROUP BY r.route_name
@@ -74,8 +74,8 @@ def most_climbed_route(cursor):
 def top_rated_routes(cursor):
     query = """
         SELECT r.route_name, r.avg_stars
-        FROM Routes r
-        JOIN ticks t ON t.route_id = r.id
+        FROM routes.Routes r
+        JOIN routes.Ticks t ON t.route_id = r.id
         WHERE t.date ILIKE '%2024%'
         ORDER BY r.avg_stars DESC
         LIMIT 5
@@ -85,7 +85,7 @@ def top_rated_routes(cursor):
 def days_climbed(cursor):
     query = """
         SELECT COUNT(DISTINCT date)
-        FROM Ticks
+        FROM routes.Ticks
         WHERE date::text ILIKE '%2024%'
     """
     return cursor.execute(query).fetchone()[0]
@@ -93,10 +93,10 @@ def days_climbed(cursor):
 def top_climbing_style(cursor):
     query = """
         SELECT rat.tag_value, count(*)
-        from RouteAnalysis ra
-        JOIN RouteAnalysisTags rat on rat.analysis_id = ra.id
-        JOIN RouteAnalysisTagsReasoning ratr on ratr.analysis_id = rat.analysis_id AND rat.tag_type = ratr.tag_type
-        JOIN ticks t on t.route_id = ra.route_id 
+        from analysis.RouteAnalysis ra
+        JOIN analysis.RouteAnalysisTags rat on rat.analysis_id = ra.id
+        JOIN analysis.RouteAnalysisTagsReasoning ratr on ratr.analysis_id = rat.analysis_id AND rat.tag_type = ratr.tag_type
+        JOIN routes.Ticks t on t.route_id = ra.route_id 
         WHERE rat.tag_type = 'style' AND t.date ILIKE '%2024%'
         GROUP BY rat.tag_value 
         ORDER BY count(*) desc
@@ -119,8 +119,8 @@ def biggest_climbing_day(cursor):
                 ) routes,
                 CAST(ROUND(SUM(COALESCE(r.length_ft, el.estimated_length)),0) AS INTEGER) total_length,
                 STRING_AGG(DISTINCT CONCAT(r.main_area, ', ', r.region), ' & ') areas
-        FROM Ticks t 
-        JOIN routes r on r.id = t.route_id 
+        FROM routes.Ticks t 
+        JOIN routes.Routes r on r.id = t.route_id 
         LEFT JOIN estimated_lengths el on el.id = t.route_id 
         WHERE t.date ILIKE '%2024%' AND r.route_name NOT ILIKE 'The Nose'
         GROUP BY t.date
@@ -143,8 +143,8 @@ def top_grade(cursor, level):
 	        	WHEN r.route_type ILIKE '%Aid%' THEN r.aid_rating 
 	        	ELSE r.yds_rating END AS primary_rating,
 	        	count(*)
-        FROM routes r
-        join ticks t on t.route_id = r.id
+        FROM routes.Routes r
+        join routes.Ticks t on t.route_id = r.id
         WHERE date::text ILIKE '%2024%'
         GROUP BY primary_rating 
         ORDER BY count(*) desc;
@@ -172,8 +172,8 @@ def get_grade_distribution(cursor, level):
                 WHEN r.route_type LIKE '%Aid%' THEN r.aid_rating 
                 ELSE r.yds_rating END AS primary_rating,
                 count(*) as count
-        FROM routes r
-        join ticks t on t.route_id = r.id
+        FROM routes.Routes r
+        join routes.Ticks t on t.route_id = r.id
         WHERE date::text ILIKE '%2024%'
         GROUP BY primary_rating 
         ORDER BY count desc;
@@ -201,8 +201,8 @@ def get_grade_distribution(cursor, level):
 def states_climbed(cursor):
     query = """
         SELECT region, count(distinct date) days_out, count(*) routes
-        FROM Routes r
-        JOIN ticks t on t.route_id = r.id
+        FROM routes.Routes r
+        JOIN routes.Ticks t on t.route_id = r.id
         WHERE date::text ILIKE '%2024%'
         GROUP BY region
         ORDER BY days_out desc;
@@ -218,8 +218,8 @@ def states_climbed(cursor):
 def sub_areas_climbed(cursor):
     query = """
         SELECT sub_area , count(distinct date) days_out, count(*) routes
-        FROM Routes r
-        JOIN ticks t on t.route_id = r.id
+        FROM routes.Routes r
+        JOIN routes.Ticks t on t.route_id = r.id
         WHERE date::text ILIKE '%2024%'
         GROUP BY sub_area 
         ORDER BY days_out desc;
@@ -234,8 +234,8 @@ def sub_areas_climbed(cursor):
 def regions_climbed(cursor):
     query = """
         SELECT count(distinct region)
-        FROM Routes r
-        JOIN ticks t on t.route_id = r.id
+        FROM routes.Routes r
+        JOIN routes.Ticks t on t.route_id = r.id
         WHERE date::text ILIKE '%2024%'
     """
     return cursor.execute(query).fetchone()[0]
@@ -243,8 +243,8 @@ def regions_climbed(cursor):
 def regions_sub_areas(cursor):
     query = """
         SELECT count(distinct sub_area)
-        FROM Routes r
-        JOIN ticks t on t.route_id = r.id
+        FROM routes.Routes r
+        JOIN routes.Ticks t on t.route_id = r.id
         WHERE date::text ILIKE '%2024%'
     """
     return cursor.execute(query).fetchone()[0]
@@ -255,11 +255,11 @@ def top_tags(cursor, tag_type):
         WITH deduped_ticks AS(
             SELECT *,
             ROW_NUMBER() OVER (PARTITION BY route_id ORDER BY date DESC) as rn
-            FROM Ticks
+            FROM routes.Ticks
             WHERE date::text ILIKE '%2024%'
         )
         SELECT tav.mapped_type, tav.mapped_tag tag_value, count(*) as count
-        FROM TagAnalysisView tav 
+        FROM analysis.TagAnalysisView tav 
         JOIN deduped_ticks dt on dt.route_id = tav.route_id AND dt.rn = 1
         WHERE tav.mapped_type = '{tag_type}'
         GROUP BY tav.mapped_type, tav.mapped_tag

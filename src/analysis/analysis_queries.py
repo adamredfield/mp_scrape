@@ -31,9 +31,9 @@ def get_tick_type_distribution(cursor, route_types=None):
     SELECT 
         type,
         COUNT(*) as count,
-        ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM Ticks WHERE type IS NOT NULL), 2) as percentage
-    FROM Ticks t
-    JOIN Routes r ON t.route_id = r.id
+        ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM routes.Ticks WHERE type IS NOT NULL), 2) as percentage
+    FROM routes.Ticks t
+    JOIN routes.Routes r ON t.route_id = r.id
     WHERE type IS NOT NULL
     {route_type_filter(route_types)}
     GROUP BY type
@@ -57,8 +57,8 @@ def get_grade_distribution(cursor, route_types=None, level='base', year=None):
         COUNT(*) as count,
         ROUND(COUNT(*) * 100.0 / (
             SELECT COUNT(*)
-            FROM Ticks t
-            JOIN Routes r2 ON t.route_id = r2.id
+            FROM routes.Ticks t
+            JOIN routes.Routes r2 ON t.route_id = r2.id
             WHERE r2.route_type IS NOT NULL
             AND (
                 (r2.route_type NOT ILIKE '%Aid%' AND t.type != 'Lead / Fell/Hung')  -- Filter out fell/hung for non-aid
@@ -67,8 +67,8 @@ def get_grade_distribution(cursor, route_types=None, level='base', year=None):
             {route_type_filter(route_types)}
             {year_filter(year)}
         ), 2) as percentage
-    FROM Routes r
-    JOIN Ticks t ON r.id = t.route_id
+    FROM routes.Routes r
+    JOIN routes.Ticks t ON r.id = t.route_id
     WHERE {grade_column} IS NOT NULL
     AND (
         (r.route_type NOT ILIKE '%Aid%' AND t.type != 'Lead / Fell/Hung') -- only include fell / hung for aid routes
@@ -116,8 +116,8 @@ def get_most_climbed_areas(cursor, route_types=None):
         r.sub_area ,
         COUNT(*) as visit_count,
         AVG(r.avg_stars) as avg_rating
-    FROM Routes r
-    JOIN Ticks t ON r.id = t.route_id
+    FROM routes.Routes r
+    JOIN routes.Ticks t ON r.id = t.route_id
     {type_filter}
     GROUP BY r.sub_area
     ORDER BY visit_count DESC
@@ -147,7 +147,7 @@ def get_highest_rated_climbs(cursor, selected_styles=None, route_types=None, yea
     WITH deduped_ticks AS(
     SELECT *,
            ROW_NUMBER() OVER (PARTITION BY route_id ORDER BY date DESC) as rn
-    FROM Ticks
+    FROM routes.Ticks
     )
     SELECT 
         DISTINCT concat(r.route_name, ' ~ ', r.main_area, ' > ', r.specific_location,' - ', 
@@ -161,8 +161,8 @@ def get_highest_rated_climbs(cursor, selected_styles=None, route_types=None, yea
         r.avg_stars,
         r.num_votes,
         STRING_AGG(tav.mapped_tag, ', ') as tags
-    FROM Routes r
-    LEFT JOIN TagAnalysisView tav on r.id = tav.route_id 
+    FROM routes.Routes r
+    LEFT JOIN analysis.TagAnalysisView tav on r.id = tav.route_id 
         AND tav.mapped_type = '{tag_type}'
     JOIN deduped_ticks t ON r.id = t.route_id AND rn = 1
     WHERE r.num_votes >= 10
@@ -183,9 +183,9 @@ def get_route_type_preferences(cursor):
         r.route_type,
         COUNT(*) as count,
         AVG(r.avg_stars) as avg_rating,
-        ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM Ticks), 2) as percentage
-    FROM Routes r
-    JOIN Ticks t ON r.id = t.route_id
+        ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM routes.Ticks), 2) as percentage
+    FROM routes.Routes r
+    JOIN routes.Ticks t ON r.id = t.route_id
     WHERE r.route_type IS NOT NULL
     AND r.route_type IN ('Trad', 'Boulder', 'Sport', 'Aid')
     GROUP BY r.route_type
@@ -198,7 +198,7 @@ def get_distinct_styles(cursor):
     """Get all distinct active styles from TagMapping"""
     query = '''
     SELECT DISTINCT coalesce(clean_tag, raw_tag) as style
-    FROM TagMapping
+    FROM analysis.TagMapping
     WHERE is_active = 1
     AND COALESCE(mapped_tag_type, original_tag_type) = 'style'
     ORDER BY style;
@@ -214,8 +214,8 @@ def get_bigwall_routes(cursor):
         STRING_AGG(concat(r.route_name, ' - ', TRIM(NULLIF(CONCAT_WS(' ', r.yds_rating, r.hueco_rating, r.aid_rating,r.danger_rating, r.commitment_grade), ''))), ' | ') routes,
         CAST(round(sum(coalesce(r.length_ft, el.estimated_length)),0) AS INTEGER) total_length,
         STRING_AGG(DISTINCT r.main_area || ' | ') areas
-    FROM Ticks t 
-    JOIN routes r on r.id = t.route_id 
+    FROM routes.Ticks t 
+    JOIN routes.Routes r on r.id = t.route_id 
     LEFT JOIN estimated_lengths el on el.id = t.route_id 
     WHERE t.date ILIKE '%2024%' AND r.route_name NOT ILIKE 'The Nose'
     GROUP BY t.date
@@ -230,25 +230,25 @@ def get_length_climbed(cursor, area_type = "main_area", year=None):
     WITH estimated_lengths AS (
     SELECT  id,
             CASE WHEN route_type ILIKE '%trad%' AND length_ft IS NULL AND pitches IS NULL -- trad single-pitch
-                THEN (SELECT avg(length_ft) FROM Routes r WHERE route_type ILIKE '%trad%'AND length_ft IS NOT NULL and pitches IS NULL AND length_ft < 230) -- avg single-pitch trad pitch length
+                THEN (SELECT avg(length_ft) FROM routes.Routes r WHERE route_type ILIKE '%trad%'AND length_ft IS NOT NULL and pitches IS NULL AND length_ft < 230) -- avg single-pitch trad pitch length
                 WHEN route_type ILIKE '%trad%' AND length_ft IS NULL AND pitches IS NOT NULL -- trad multipitch
-                THEN (SELECT avg(length_ft/ pitches) FROM Routes r WHERE route_type ILIKE '%trad%' AND length_ft IS NOT NULL and pitches IS NOT NULL) * pitches
+                THEN (SELECT avg(length_ft/ pitches) FROM routes.Routes r WHERE route_type ILIKE '%trad%' AND length_ft IS NOT NULL and pitches IS NOT NULL) * pitches
                 WHEN route_type ILIKE '%sport%' AND length_ft IS NULL AND pitches IS NOT NULL -- sport multipitch
-                THEN (SELECT avg(length_ft) FROM Routes r WHERE route_type ILIKE '%sport%'AND length_ft IS NOT NULL and pitches IS NULL AND length_ft < 230) -- avg single-pitch sport pitch length
+                THEN (SELECT avg(length_ft) FROM routes.Routes r WHERE route_type ILIKE '%sport%'AND length_ft IS NOT NULL and pitches IS NULL AND length_ft < 230) -- avg single-pitch sport pitch length
                 WHEN route_type ILIKE '%sport%' AND length_ft IS NULL AND pitches IS NOT NULL -- sport multipitch
-                THEN (SELECT avg(length_ft/ pitches) FROM Routes r WHERE route_type ILIKE '%trad%' AND length_ft IS NOT NULL and pitches IS NOT NULL) * pitches
+                THEN (SELECT avg(length_ft/ pitches) FROM routes.Routes r WHERE route_type ILIKE '%trad%' AND length_ft IS NOT NULL and pitches IS NOT NULL) * pitches
                 WHEN route_type ILIKE '%boulder%' AND length_ft IS NULL
-                THEN (SELECT avg(length_ft) FROM Routes r WHERE route_type ILIKE '%boulder%' AND length_ft IS NOT NULL) -- boulder
+                THEN (SELECT avg(length_ft) FROM routes.Routes r WHERE route_type ILIKE '%boulder%' AND length_ft IS NOT NULL) -- boulder
             END AS estimated_length
-    FROM routes
+    FROM routes.Routes
     WHERE estimated_length IS NOT NULL
     )
     SELECT 
         substr(t.date, -4) as year,
         r.{area_type} location,
         sum(coalesce(r.length_ft, el.estimated_length)) length_climbed
-    FROM routes r
-    JOIN Ticks t ON r.id = t.route_id
+    FROM routes.Routes r
+    JOIN routes.Ticks t ON r.id = t.route_id
     LEFT JOIN estimated_lengths el on el.id = r.id
     WHERE t.date IS NOT NULL AND CAST(year AS INTEGER) >= 1999
     {year_filter(year)}

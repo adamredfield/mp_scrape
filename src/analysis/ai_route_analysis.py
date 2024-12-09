@@ -32,9 +32,9 @@ def get_next_route(cursor):
         r.description,
         r.protection,
         STRING_AGG(rc.comment, ' | ') as comments
-    FROM Routes r
-    LEFT JOIN RouteComments rc ON r.id = rc.route_id
-    LEFT JOIN RouteAnalysis ra ON r.id = ra.route_id
+    FROM routes.Routes r
+    LEFT JOIN routes.RouteComments rc ON r.id = rc.route_id
+    LEFT JOIN analysis.RouteAnalysis ra ON r.id = ra.route_id
     WHERE ra.id IS NULL  -- Only get routes not yet analyzed
     GROUP BY r.id
     LIMIT 1
@@ -187,7 +187,7 @@ def save_analysis_results(cursor, connection, result):
 
         # Insert RouteAnalysis
         analysis_insert_sql = """
-        INSERT INTO RouteAnalysis (
+        INSERT INTO analysis.RouteAnalysis (
             route_id,
             insert_date
         ) VALUES (%s, %s)
@@ -197,11 +197,11 @@ def save_analysis_results(cursor, connection, result):
             result['route_id'],
             result['insert_date']
         ))
-        analysis_id = cursor.fetchone()[0]  # PostgreSQL way to get inserted id
+        analysis_id = cursor.fetchone()[0]
 
         # Insert RouteAnalysisTags
         tag_insert_sql = """
-        INSERT INTO RouteAnalysisTags (
+        INSERT INTO analysis.RouteAnalysisTags (
             analysis_id,
             tag_type,
             tag_value,
@@ -218,7 +218,7 @@ def save_analysis_results(cursor, connection, result):
 
         # Insert RouteAnalysisTagsReasoning
         reasoning_insert_sql = """
-        INSERT INTO RouteAnalysisTagsReasoning (
+        INSERT INTO analysis.RouteAnalysisTagsReasoning (
             analysis_id,
             tag_type,
             reasoning,
