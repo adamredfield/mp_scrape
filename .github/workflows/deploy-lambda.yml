@@ -43,10 +43,15 @@ jobs:
       run: |
         aws lambda delete-function --function-name mp-scraper-orchestrator || true
 
+    - name: Create SQS Queue if not exists
+      run: |
+        aws sqs create-queue --queue-name mp-scraper-queue || true
+        
     - name: Deploy Lambda function
       run: |
         aws lambda create-function \
           --function-name mp-scraper-orchestrator \
           --package-type Image \
           --code ImageUri=${{ steps.login-ecr.outputs.registry }}/mp-scraper:latest \
-          --role ${{ secrets.AWS_LAMBDA_ROLE_ARN }}
+          --role ${{ secrets.AWS_LAMBDA_ROLE_ARN }} \
+          --environment "Variables={QUEUE_URL=${{ secrets.SQS_URL }}}"
