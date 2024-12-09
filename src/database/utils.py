@@ -7,11 +7,11 @@ def create_connection():
     """Create a PostgreSQL database connection"""
     try:
         connection = psycopg2.connect(
-            dbname="mp_scrape",
-            user="postgres",
-            password=os.getenv('DB_PASSWORD'),
-            host=os.getenv('DB_HOST'),
-            port="5432"
+            dbname=os.getenv('POSTGRES_DB', 'mp_scrape'),
+            user=os.getenv('POSTGRES_USER', 'postgres'),
+            password=os.getenv('POSTGRES_PASSWORD'),
+            host=os.getenv('POSTGRES_HOST'),
+            port=os.getenv('POSTGRES_PORT', '5432')
         )
         return connection
     except Exception as e:
