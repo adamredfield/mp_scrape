@@ -39,11 +39,12 @@ jobs:
         docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
-    - name: Update Lambda functions
+    - name: Delete existing function
       run: |
-        aws lambda update-function-code \
-          --function-name mp-scraper-orchestrator \
-          --image-uri ${{ steps.login-ecr.outputs.registry }}/mp-scraper:latest || \
+        aws lambda delete-function --function-name mp-scraper-orchestrator || true
+
+    - name: Deploy Lambda function
+      run: |
         aws lambda create-function \
           --function-name mp-scraper-orchestrator \
           --package-type Image \
