@@ -85,6 +85,7 @@ with sync_playwright() as playwright:
                         'fa': route_details.get('fa'),
                         'description': route_sections.get('description'),
                         'protection': route_sections.get('protection'),
+                        'primary_photo_url': route_attributes.get('primary_photo_url'),
                         'insert_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                     }
 
