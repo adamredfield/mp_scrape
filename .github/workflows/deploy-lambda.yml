@@ -2,7 +2,7 @@ name: Deploy Lambda Functions
 
 on:
   push:
-    branches: [ main, lambda-testing ]
+    branches: [ main, postgres-migration ]
   pull_request:
     branches: [ main ]
 
@@ -55,7 +55,15 @@ jobs:
           --package-type Image \
           --code ImageUri=${{ steps.login-ecr.outputs.registry }}/mp-scraper:latest \
           --role ${{ secrets.AWS_LAMBDA_ROLE_ARN }} \
-          --environment '{"Variables": {"QUEUE_URL": "${{ secrets.SQS_URL }}", "S3_BUCKET_NAME": "mp-scraper-db"}}' \
+          --vpc-config SubnetIds=${{ secrets.SUBNET_IDS }},SecurityGroupIds=${{ secrets.SECURITY_GROUP_IDS }} \
+          --environment '{"Variables": {
+              "QUEUE_URL": "${{ secrets.SQS_URL }}",
+              "POSTGRES_HOST": "${{ secrets.POSTGRES_HOST }}",
+              "POSTGRES_DB": "${{ secrets.POSTGRES_DB }}",
+              "POSTGRES_USER": "${{ secrets.POSTGRES_USER }}",
+              "POSTGRES_PASSWORD": "${{ secrets.POSTGRES_PASSWORD }}",
+              "POSTGRES_PORT": "${{ secrets.POSTGRES_PORT }}"
+          }}' \
           --timeout 900 \
           --memory-size 1024
 

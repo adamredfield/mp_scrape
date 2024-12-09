@@ -34,68 +34,68 @@ CREATE TABLE IF NOT EXISTS Routes (
     description TEXT,
     protection TEXT,
     primary_photo_url TEXT,
-    insert_date TEXT,
+    insert_date TIMESTAMP WITH TIME ZONE,
     UNIQUE(id)
 );
 
 CREATE TABLE IF NOT EXISTS Ticks (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user TEXT,
+    id SERIAL PRIMARY KEY,
+    user_id TEXT,
     route_id INTEGER,
-    date TEXT,
+    date TIMESTAMP,
     type TEXT,
     note TEXT,
+    insert_date TIMESTAMP,
     FOREIGN KEY (route_id) REFERENCES Routes(id),
-    insert_date TEXT,
     UNIQUE(route_id, date)
 );
 
 CREATE TABLE IF NOT EXISTS RouteComments (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    analysis_id INTEGER,
+    id SERIAL PRIMARY KEY,
+    route_id INTEGER,
     comment TEXT,
+    insert_date TIMESTAMP,
     FOREIGN KEY (route_id) REFERENCES Routes(id),
-    insert_date TEXT,
     UNIQUE(route_id, comment)
 );
 
 CREATE TABLE IF NOT EXISTS RouteAnalysis (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     route_id INTEGER,
-    insert_date TEXT,
+    insert_date TIMESTAMP,
     FOREIGN KEY (route_id) REFERENCES Routes(id)
 );
 
 CREATE TABLE IF NOT EXISTS RouteAnalysisTags (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     analysis_id INTEGER,
     tag_type TEXT,
     tag_value TEXT,
-    insert_date TEXT,
+    insert_date TIMESTAMP,
     FOREIGN KEY (analysis_id) REFERENCES RouteAnalysis(id)
 );
 
 CREATE TABLE IF NOT EXISTS RouteAnalysisTagsReasoning (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     analysis_id INTEGER,
     tag_type TEXT,
     reasoning TEXT,
-    insert_date TEXT,
+    insert_date TIMESTAMP,
     FOREIGN KEY (analysis_id) REFERENCES RouteAnalysis(id)
 );
 
-CREATE TABLE TagMapping (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+CREATE TABLE IF NOT EXISTS TagMapping (
+    id SERIAL PRIMARY KEY,
     raw_tag TEXT,          
     clean_tag TEXT,         
     original_tag_type TEXT,
     mapped_tag_type TEXT,
     is_active BOOLEAN,
-    insert_date TEXT,
+    insert_date TIMESTAMP,
     UNIQUE(raw_tag, original_tag_type) 
 );
 
-CREATE VIEW TagAnalysisView AS
+CREATE OR REPLACE VIEW TagAnalysisView AS
 SELECT DISTINCT 
     r.id route_id,
     r.route_name,
@@ -105,9 +105,11 @@ FROM RouteAnalysisTags rat
 LEFT JOIN TagMapping tm on tm.raw_tag = rat.tag_value 
 JOIN RouteAnalysis ra on rat.analysis_id = ra.id
 JOIN Routes r on r.id = ra.route_id 
-WHERE tm.is_active = 1;
+WHERE tm.is_active = true;
 '''
 
-cursor.executescript(create_table_query)
+for query in create_table_query.split(';'):
+    if query.strip():
+        cursor.execute(query)
 connection.commit()
 connection.close()

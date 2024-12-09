@@ -14,11 +14,10 @@ BATCH_SIZE = 2  # 2 pages per batch
 
 def lambda_handler(event, context):
     try:
-        # 1. Get total pages from Mountain Project
         total_pages = helper_functions.get_total_pages()
         print(f"Found {total_pages} pages to scrape")
         
-        # 2. Break into smaller batches (2 pages each)
+        # Break into batches (2 pages each)
         for i in range(1, total_pages + 1, BATCH_SIZE): # page numbers start at 1
             batch = []
             for page_num in range(i, min(i + BATCH_SIZE, total_pages + 1)): # if total_pages is smaller than stop, use total_pages
@@ -27,7 +26,7 @@ def lambda_handler(event, context):
                     'MessageBody': json.dumps({
                         'page_number': page_num,
                         'ticks_url': f'{helper_functions.ticks_url}{page_num}',
-                        'user': helper_functions.user
+                        'user_id': helper_functions.user_id
                     })
                 })
             

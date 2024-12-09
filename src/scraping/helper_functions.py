@@ -9,8 +9,8 @@ password = "mpscrape"
 mp_home_url = "https://www.mountainproject.com"
 
 base_url = f'{mp_home_url}/user/'
-user = '200362278/doctor-choss'
-constructed_url = f'{base_url}{user}'
+user_id = '200362278/doctor-choss'
+constructed_url = f'{base_url}{user_id}'
 ticks_url = f'{constructed_url}/ticks?page='
 
 def login_and_save_session(playwright):

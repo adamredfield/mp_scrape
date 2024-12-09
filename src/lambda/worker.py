@@ -11,29 +11,14 @@ from src.database import queries
 import requests
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
-from datetime import datetime
+from datetime import datetime, timezone
 import re
-import boto3
-import sqlite3
 import os
-
-s3 = boto3.client('s3')
-BUCKET_NAME = os.environ['S3_BUCKET_NAME']
-DB_NAME = 'ticklist.db'
-LOCAL_DB_PATH = f'/tmp/{DB_NAME}'
-
-
-def get_db():
-    # Download DB from S3 if it exists
-    try:
-        s3.download_file(BUCKET_NAME, DB_NAME, LOCAL_DB_PATH)
-    except Exception as e:
-        print(f"Could not download DB from S3: {str(e)}")
-    return sqlite3.connect(LOCAL_DB_PATH)
+import psycopg2
 
 def lambda_handler(event, context):
     try:
-        conn = get_db()
+        conn = create_connection()
         cursor = conn.cursor()
         
         with sync_playwright() as playwright:
@@ -43,25 +28,21 @@ def lambda_handler(event, context):
             # SQS sends records in batches
             for record in event['Records']:
                 try:
-                    # Parse message
-                    message = json.loads(record['body'])
 
+                    message = json.loads(record['body'])
                     page_number = message['page_number']
                     ticks_url = message['ticks_url']
                     
                     print(f'Processing page: {page_number}')
                     
-                    # Get page content
                     tick_response = requests.get(ticks_url)
                     if tick_response.status_code != 200:
                         raise Exception(f"Failed to retrieve data: {tick_response.status_code}")
 
-                    # Parse page
                     tick_soup = BeautifulSoup(tick_response.text, 'html.parser')
                     tick_table = tick_soup.find('table', class_='table route-table hidden-xs-down')
                     tick_rows = tick_table.find_all('tr', class_='route-row')
 
-                    # Process rows (your existing logic here)
                     for row in tick_rows:
                         tick_details = row.find('td', class_='text-warm small pt-0')
                     
@@ -81,7 +62,7 @@ def lambda_handler(event, context):
                             else:
                                 route_html_content = helper_functions.fetch_dynamic_page_content(page, route_link)
                                 route_soup = BeautifulSoup(route_html_content, 'html.parser')
-                                # Use route_soup to obtain specific route data
+
                                 route_attributes = helper_functions.get_route_attributes(route_soup)
                                 route_location = helper_functions.parse_location(route_attributes.get('formatted_location'))
                                 route_sections = helper_functions.get_route_sections(route_soup)
@@ -110,10 +91,10 @@ def lambda_handler(event, context):
                                     'description': route_sections.get('description'),
                                     'protection': route_sections.get('protection'),
                                     'primary_photo_url': route_attributes.get('primary_photo_url'),
-                                    'insert_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                                    'insert_date': datetime.now(timezone.utc).isoformat()
                                 }
 
-                                comments_dict = [{'route_id': route_id, 'comment': comment, 'insert_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S')} for comment in comments]
+                                comments_dict = [{'route_id': route_id, 'comment': comment, 'insert_date': datetime.now(timezone.utc).isoformat()} for comment in comments]
 
                                 queries.insert_route(cursor, conn, current_route_data)
                                 queries.insert_comments(cursor, conn, comments_dict)
@@ -166,21 +147,19 @@ def lambda_handler(event, context):
                                     tick_note = post_date_text.strip()
                                     
                             tick_data = {
-                                'user': helper_functions.user,
+                                'user_id': helper_functions.user_id,
                                 'route_id': current_route_data['route_id'],
                                 'date': tick_date,
                                 'type': tick_type,
                                 'note': tick_note,
-                                'insert_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                                'insert_date': datetime.now(timezone.utc).isoformat()
                             }
                             queries.insert_tick(cursor, conn, tick_data)
                             conn.commit()
                             current_route_data = None
 
                     print(f'Successfully processed page {page_number}')
-                    # Upload DB to S3 after page is processed
-                    conn.commit()  # Final commit before S3 upload
-                    s3.upload_file(LOCAL_DB_PATH, BUCKET_NAME, DB_NAME)
+                    conn.commit()  
                 
                 except Exception as e:
                     print(f"Error processing page {page_number}: {str(e)}")
@@ -193,6 +172,9 @@ def lambda_handler(event, context):
             if browser:
                 browser.close()
                 
+    except psycopg2.Error as e:
+        print(f"PostgreSQL Error: {e.pgerror}")
+        conn.rollback()
     except Exception as e:
         print(f"Error in lambda_handler: {str(e)}")
         if conn:
