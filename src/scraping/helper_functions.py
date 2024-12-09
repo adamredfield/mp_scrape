@@ -14,32 +14,42 @@ constructed_url = f'{base_url}{user}'
 ticks_url = f'{constructed_url}/ticks?page='
 
 def login_and_save_session(playwright):
+    print("1. Starting browser launch...")
     browser = playwright.chromium.launch(
         headless=True,
         args=[
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
-            '--disable-gpu',
-            '--disable-software-rasterizer'
-            ]
-        )
-    print("Browser launched successfully")
+            '--single-process',
+            '--no-zygote'
+        ]
+    )
+    print("2. Browser launched")
 
-    context = browser.new_context()
-    print("Context created successfully")
+    print("3. Creating context...")
+    context = browser.new_context(
+        viewport={'width': 1280, 'height': 720}
+    )
+    print("4. Context created")
 
+    print("5. Creating page...")
     page = context.new_page()
-    print("Page created successfully")
+    print("6. Page created")
 
-    # Go to the homepage to login
+    print("7. Navigating to MP...")
+    # Use Promise.all equivalent for Python
     page.goto(mp_home_url)
+    page.wait_for_load_state('networkidle')  # Add this
+    print("8. Navigation complete")
+
+    print("9. Logging in...")
     page.click("a.sign-in")
     page.wait_for_selector("#login-modal", timeout=5000)
-
     page.fill("input[type='email'][name='email']", username)
     page.fill("input[type='password'][name='pass']", password)
     page.click("#login-modal button[type='submit']")
+    print("10. Login complete")
 
     # save cookies and storage_state to keep session open for scraping
     cookies = context.cookies()
