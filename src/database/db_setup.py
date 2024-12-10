@@ -10,21 +10,26 @@ connection = create_connection()
 cursor = connection.cursor()
 
 
-create_database_query = 'CREATE DATABASE IF NOT EXISTS mp_scrape;'
+create_database_query = 'CREATE DATABASE mp_scrape;'
 create_routes_schema_query = 'CREATE SCHEMA IF NOT EXISTS routes;'
 create_analysis_schema_query = 'CREATE SCHEMA IF NOT EXISTS analysis;'
 
 def setup_database(cursor, connection):
     try:
-        cursor.execute(create_database_query)
+        cursor.execute("SELECT 1 FROM pg_database WHERE datname = 'mp_scrape'")
+        exists = cursor.fetchone()
+        if not exists:
+            cursor.execute(create_database_query)
     except Exception as e:
         print(f"Skipping database creation: {e}")
+        connection.rollback()
 
     try:
         cursor.execute(create_routes_schema_query)
         cursor.execute(create_analysis_schema_query)    
     except Exception as e:
         print(f"Error creating database or schemas: {e}")
+        connection.rollback()
 
     # Write the SQL command to create the Students table
     create_table_query = '''
