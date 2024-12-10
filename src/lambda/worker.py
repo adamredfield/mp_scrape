@@ -8,7 +8,6 @@ from src.scraping import helper_functions
 import json
 import os
 
-
 def lambda_handler(event, context):
     """Handle batch of SQS messages"""
     try:
