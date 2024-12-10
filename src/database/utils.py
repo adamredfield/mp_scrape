@@ -11,7 +11,8 @@ def create_connection():
             user=os.getenv('POSTGRES_USER', 'postgres'),
             password=os.getenv('POSTGRES_PASSWORD'),
             host=os.getenv('POSTGRES_HOST'),
-            port=os.getenv('POSTGRES_PORT', '5432')
+            port=os.getenv('POSTGRES_PORT', '5432'),
+            sslmode='require'
         )
         return connection
     except Exception as e:

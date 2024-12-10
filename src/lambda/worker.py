@@ -21,8 +21,6 @@ def lambda_handler(event, context):
     try:
         conn = create_connection()
         cursor = conn.cursor()
-
-        db_setup.setup_database(cursor, conn)
         
         with sync_playwright() as playwright:
             browser, context = helper_functions.login_and_save_session(playwright)

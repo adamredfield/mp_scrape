@@ -5,7 +5,6 @@ project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(project_root)
 
 import streamlit as st
-from src.database.utils import create_connection
 import src.analysis.mp_wrapped_metrics as metrics
 import src.analysis.analysis_queries as analysis_queries
 import pandas as pd
@@ -304,8 +303,7 @@ def diamond_template(main_text, subtitle=None, detail_text=None):
 
 def page_total_length():
     """First page showing total length climbed"""
-    cursor = conn.cursor()
-    length_data = analysis_queries.get_length_climbed(cursor, year='2024')
+    length_data = analysis_queries.get_length_climbed(year='2024')
     length_df = pd.DataFrame(length_data, columns=['Year', 'Location', 'Length'])
     total_length = length_df['Length'].sum()
 
@@ -449,9 +447,6 @@ def get_spotify_style():
 
 def page_top_routes():
     """Page showing top rated routes and tags"""
-    conn = create_connection()
-    cursor = conn.cursor()
-    
     st.markdown("<div style='height: 2rem;'></div>", unsafe_allow_html=True)
     filter_col1, filter_col2, _ = st.columns([1, 1, 2])
     
@@ -464,7 +459,7 @@ def page_top_routes():
         )
     
     # Get tag data for filter options
-    tag_data = metrics.top_tags(cursor, tag_type)
+    tag_data = metrics.top_tags(tag_type)
     tag_df = pd.DataFrame(tag_data, columns=['Type', 'Tag', 'Count']).head(5)
     
     # Calculate max_count from the actual Count column
@@ -479,7 +474,6 @@ def page_top_routes():
     
     # Get filtered routes based on selected styles
     top_rated_routes = analysis_queries.get_highest_rated_climbs(
-        cursor=cursor,
         selected_styles=selected_styles,
         route_types=None,  # route_types
         year='2024', # year
@@ -610,9 +604,8 @@ def page_areas_breakdown():
         )
     
     # Get length data based on selected filter
-    length_data = analysis_queries.get_length_climbed(conn, area_type=area_type, year='2024')
+    length_data = analysis_queries.get_length_climbed(area_type=area_type, year='2024')
     length_df = pd.DataFrame(length_data, columns=['Year', 'Location', 'Length'])
-    conn.close()
     
     # Create horizontal bar chart
     fig = go.Figure(data=[
@@ -660,9 +653,6 @@ def page_areas_breakdown():
 
 def page_grade_distribution():
     """Page showing grade distribution and most common grade"""
-    conn = create_connection()
-    cursor = conn.cursor()
-    
     # Add filter above the chart
     st.markdown("<div style='height: 2rem;'></div>", unsafe_allow_html=True)
     filter_col1, filter_col2, filter_col3 = st.columns([1, 1, 2])
@@ -676,9 +666,8 @@ def page_grade_distribution():
         )
     
     # Get the data based on selected grade level
-    grade_dist = analysis_queries.get_grade_distribution(cursor, route_types=None, level=grade_level, year='2024')
-    top_grade = metrics.top_grade(cursor, level=grade_level)
-    conn.close()
+    grade_dist = analysis_queries.get_grade_distribution(route_types=None, level=grade_level, year='2024')
+    top_grade = metrics.top_grade(level=grade_level)
     
     # Apply Spotify styling
     st.markdown(get_spotify_style(), unsafe_allow_html=True)
