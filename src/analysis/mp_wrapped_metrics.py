@@ -4,12 +4,8 @@ import sys
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(project_root)
 
-from src.database.utils import create_connection
 from src.analysis.analysis_utils import get_grade_group
 from operator import itemgetter
-
-conn = create_connection()
-cursor = conn.cursor()
 
 estimated_lengths_cte = f"""
         WITH estimated_lengths AS (

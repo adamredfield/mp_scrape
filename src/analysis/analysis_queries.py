@@ -22,7 +22,7 @@ def year_filter(year=None):
     Args:
         year: Optional year to filter by. If None, no filter is applied
     """
-    return f"AND t.date ILIKE '%{year}%'" if year else ''
+    return f"AND EXTRACT(YEAR FROM t.date) = {year}" if year else ''
 
 
 def get_tick_type_distribution(conn, route_types=None):
@@ -212,7 +212,7 @@ def get_bigwall_routes(cursor):
     cursor.execute(query)
     return cursor.fetchall()
 
-def get_length_climbed(conn, area_type = "main_area", year=None):
+def get_length_climbed(conn, area_type="main_area", year=None):
     query = f"""
     WITH estimated_lengths AS (
     SELECT  id,
@@ -228,16 +228,15 @@ def get_length_climbed(conn, area_type = "main_area", year=None):
                 THEN (SELECT avg(length_ft) FROM routes.Routes r WHERE route_type ILIKE '%boulder%' AND length_ft IS NOT NULL) -- boulder
             END AS estimated_length
     FROM routes.Routes
-    WHERE estimated_length IS NOT NULL
     )
     SELECT 
-        substr(t.date, -4) as year,
+        EXTRACT(YEAR FROM t.date) as year,
         r.{area_type} location,
         sum(coalesce(r.length_ft, el.estimated_length)) length_climbed
     FROM routes.Routes r
     JOIN routes.Ticks t ON r.id = t.route_id
     LEFT JOIN estimated_lengths el on el.id = r.id
-    WHERE t.date IS NOT NULL AND CAST(year AS INTEGER) >= 1999
+    WHERE t.date IS NOT NULL AND EXTRACT(YEAR FROM t.date) >= 1999
     {year_filter(year)}
     GROUP BY year, r.{area_type}
     ORDER BY year DESC, length_climbed DESC;

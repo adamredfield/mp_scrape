@@ -10,8 +10,6 @@ import src.analysis.analysis_queries as analysis_queries
 import pandas as pd
 import plotly.graph_objects as go
 
-conn = st.connection('postgresql', type='sql')
-
 # Page config
 st.set_page_config(
     page_title="Your 2024 Climbing Racked",
@@ -24,6 +22,8 @@ st.set_page_config(
         'About': None
     }
 )
+
+conn = st.connection('postgresql', type='sql')
 
 # Initialize session state
 if 'page' not in st.session_state:
@@ -303,7 +303,7 @@ def diamond_template(main_text, subtitle=None, detail_text=None):
 
 def page_total_length():
     """First page showing total length climbed"""
-    length_data = analysis_queries.get_length_climbed(year='2024')
+    length_data = analysis_queries.get_length_climbed(conn, year='2024')
     length_df = pd.DataFrame(length_data, columns=['Year', 'Location', 'Length'])
     total_length = length_df['Length'].sum()
 
@@ -494,7 +494,7 @@ def page_top_routes():
                         <span class='item-number'>{i}. </span>
                         <span class='item-name'>{route}</span>
                     </div>
-                    <div class='item-details'>⭐ {stars} stars • {grade}</div>
+                    <div class='item-details'>⭐ {stars} stars ��� {grade}</div>
                 </div>
                 """,
                 unsafe_allow_html=True

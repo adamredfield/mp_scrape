@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS routes.Ticks (
     note TEXT,
     insert_date TIMESTAMP,
     FOREIGN KEY (route_id) REFERENCES routes.Routes(id),
-    UNIQUE(route_id, date)
+    UNIQUE(user_id, route_id, date)
 );
 
 CREATE TABLE IF NOT EXISTS routes.RouteComments (
