@@ -27,11 +27,11 @@ def insert_comments(cursor, connection, comments):
     if comments:
         comments_sql = '''
         INSERT INTO routes.RouteComments (
-            route_id, comment, insert_date
+            route_id, comment, comment_hash, insert_date
         ) VALUES (
-            %(route_id)s, %(comment)s, %(insert_date)s
+            %(route_id)s, %(comment)s, encode(digest(%(comment)s, 'sha256'), 'hex'), %(insert_date)s
         )
-        ON CONFLICT (route_id, comment) DO NOTHING
+        ON CONFLICT (route_id, comment_hash) DO NOTHING
         '''
         try:    
             cursor.executemany(comments_sql, comments)
