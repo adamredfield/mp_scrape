@@ -72,9 +72,46 @@ jobs:
           --code ImageUri=${{ steps.login-ecr.outputs.registry }}/mp-scraper:latest \
           --role ${{ secrets.AWS_LAMBDA_ROLE_ARN }} \
           --vpc-config SubnetIds=${{ secrets.SUBNET_IDS }},SecurityGroupIds=${{ secrets.SECURITY_GROUP_IDS }} \
-          --memory-size 2048 \
-          --ephemeral-storage Size=2048 \
-          --no-provisioned-concurrency
+          --environment '{"Variables": {
+              "POSTGRES_HOST": "${{ secrets.POSTGRES_HOST }}",
+              "POSTGRES_DB": "${{ secrets.POSTGRES_DB }}",
+              "POSTGRES_USER": "${{ secrets.POSTGRES_USER }}",
+              "POSTGRES_PASSWORD": "${{ secrets.POSTGRES_PASSWORD }}",
+              "POSTGRES_PORT": "${{ secrets.POSTGRES_PORT }}"
+          }}' \
+          --timeout 900 \
+          --memory-size 2048
+
+    - name: Set worker concurrency
+      run: |
+        aws lambda put-function-concurrency \
+          --function-name mp-scraper-worker \
+          --reserved-concurrent-executions 10
+
+    - name: Deploy retry worker function
+      run: |
+        aws lambda create-function \
+          --function-name mp-scraper-retry-worker \
+          --package-type Image \
+          --code ImageUri=${{ steps.login-ecr.outputs.registry }}/mp-scraper:latest \
+          --role ${{ secrets.AWS_LAMBDA_ROLE_ARN }} \
+          --vpc-config SubnetIds=${{ secrets.SUBNET_IDS }},SecurityGroupIds=${{ secrets.SECURITY_GROUP_IDS }} \
+          --environment '{"Variables": {
+              "DLQ_URL": "${{ secrets.DLQ_URL }}",
+              "POSTGRES_HOST": "${{ secrets.POSTGRES_HOST }}",
+              "POSTGRES_DB": "${{ secrets.POSTGRES_DB }}",
+              "POSTGRES_USER": "${{ secrets.POSTGRES_USER }}",
+              "POSTGRES_PASSWORD": "${{ secrets.POSTGRES_PASSWORD }}",
+              "POSTGRES_PORT": "${{ secrets.POSTGRES_PORT }}"
+          }}' \
+          --timeout 900 \
+          --memory-size 2048
+
+    - name: Set retry worker concurrency
+      run: |
+        aws lambda put-function-concurrency \
+          --function-name mp-scraper-retry-worker \
+          --reserved-concurrent-executions 10
 
     - name: Deploy orchestrator function
       run: |
