@@ -16,11 +16,16 @@ user_id = '200362278/doctor-choss'
 constructed_url = f'{base_url}{user_id}'
 ticks_url = f'{constructed_url}/ticks?page='
 
-def get_proxy_url():
-    """Get IPRoyal proxy URL"""
+def get_proxy_config():
     username = os.getenv('IPROYAL_USERNAME')
     password = os.getenv('IPROYAL_PASSWORD')
-    return f"http://{username}:{password}@proxy.iproyal.com:12321"
+    proxy_auth = f"{username}:{password}"
+    proxy = 'geo.iproyal.com:12321'
+    
+    return {
+        'http': f'http://{proxy_auth}@{proxy}',
+        'https': f'http://{proxy_auth}@{proxy}'
+    }
 
 def login_and_save_session(playwright):
     username = os.getenv('MP_USERNAME')
@@ -322,20 +327,24 @@ def parse_location(location_string):
     return location_data
 
 def process_page(page_number, ticks_url, user_id, retry_count=0):
-    """Process a single page"""
-    proxy_url = get_proxy_url()
-    proxies = {
-        'http': proxy_url,
-        'https': proxy_url
-    }
-    with create_connection() as conn:  # Connection management handled by context manager
+    """Process a single page with working proxy"""
+    proxies = get_proxy_config()
+    
+    with create_connection() as conn:
         cursor = conn.cursor()
         
         with sync_playwright() as playwright:
             browser = None
             context = None
             try:
-                browser, context = login_and_save_session(playwright)
+                # Configure browser with same proxy
+                browser = playwright.chromium.launch(
+                    proxy={
+                        'server': 'http://geo.iproyal.com:12321',
+                        'username': os.getenv('IPROYAL_USERNAME'),
+                        'password': os.getenv('IPROYAL_PASSWORD')
+                    }
+                )
                 page = context.new_page()
 
                 print(f'Processing page: {page_number}. (Retry #{retry_count})')

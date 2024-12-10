@@ -46,7 +46,7 @@ st.markdown("""
         flex-direction: column;
         justify-content: center;
         align-items: center;
-        color: white;
+        color: white;I 
         text-align: center;
         padding: 0;
         margin: 0;
