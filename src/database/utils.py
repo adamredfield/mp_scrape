@@ -2,13 +2,13 @@ import os
 import psycopg2
 import time
 import random
+from contextlib import contextmanager
 
-
+@contextmanager
 def create_connection():
     """Create a PostgreSQL database connection with retries and exponential backoff"""
     max_attempts = 5
     base_delay = 1  # Start with 1 second delay
-    connect_timeout = 10
 
     for attempt in range(max_attempts):
         try:
@@ -20,10 +20,10 @@ def create_connection():
                 host=os.getenv('POSTGRES_HOST'),
                 port=os.getenv('POSTGRES_PORT', '5432'),
                 sslmode='require',
-                connect_timeout=connect_timeout
+                connect_timeout=10
             )
             print("Connected successfully")
-            return connection
+            break
         except psycopg2.OperationalError as e:
             print(f"Connection attempt {attempt + 1} failed: {e}")
             if attempt < max_attempts - 1:
@@ -33,6 +33,12 @@ def create_connection():
             else:
                 print("Max attempts reached. Could not connect to the database.")
                 raise
+    try:
+        yield connection
+    finally:
+        if connection:
+            connection.close()
+            print("Connection closed")
 
 def add_new_tags_to_mapping(cursor):
     """Add any new tags from Tags table to TagMapping with default values"""

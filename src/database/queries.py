@@ -19,6 +19,7 @@ def insert_route(cursor, connection, route_data):
     try:
         cursor.execute(route_sql, route_data)
         connection.commit()
+        print(f"inserted route {route_data['route_name']}")
     except Exception as e:
         print(f"Error inserting {route_data['route_name']}: {e}")
         connection.rollback()
@@ -35,6 +36,7 @@ def insert_comments(cursor, connection, comments):
         '''
         try:    
             cursor.executemany(comments_sql, comments)
+            print(f"inserted {len(comments)} comments for route {comments[0]['route_id']}")
             connection.commit()
         except Exception as e:
             print(f"Error inserting comments: {e}")
@@ -52,6 +54,7 @@ def insert_tick(cursor, connection, tick_data):
     try:
         cursor.execute(tick_sql, tick_data)
         connection.commit()
+        print(f"inserted tick on {tick_data['date']} for route {tick_data['route_id']}")
     except Exception as e:
         print(f"Error inserting tick: {e}")
         connection.rollback()
