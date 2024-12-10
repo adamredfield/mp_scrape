@@ -43,6 +43,7 @@ jobs:
       run: |
         aws lambda delete-function --function-name mp-scraper-orchestrator || true
         aws lambda delete-function --function-name mp-scraper-worker || true
+        aws lambda delete-function --function-name mp-scraper-retry-worker || true
 
     - name: Create SQS Queue if not exists
       run: |
