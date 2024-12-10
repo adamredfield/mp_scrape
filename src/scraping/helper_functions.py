@@ -16,7 +16,7 @@ user_id = '200362278/doctor-choss'
 constructed_url = f'{base_url}{user_id}'
 ticks_url = f'{constructed_url}/ticks?page='
 
-def get_proxy_config():
+def get_proxy_url():
     username = os.getenv('IPROYAL_USERNAME')
     password = os.getenv('IPROYAL_PASSWORD')
     proxy_auth = f"{username}:{password}"
