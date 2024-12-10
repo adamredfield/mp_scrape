@@ -80,7 +80,8 @@ jobs:
               "POSTGRES_PORT": "${{ secrets.POSTGRES_PORT }}"
           }}' \
           --timeout 900 \
-          --memory-size 2048
+          --memory-size 2048 \
+          --image-config '{"Command": ["src.lambda.worker.lambda_handler"]}'
 
     - name: Set worker concurrency
       run: |
@@ -105,7 +106,8 @@ jobs:
               "POSTGRES_PORT": "${{ secrets.POSTGRES_PORT }}"
           }}' \
           --timeout 900 \
-          --memory-size 2048
+          --memory-size 2048 \
+          --image-config '{"Command": ["src.lambda.retry_worker.lambda_handler"]}'
 
     - name: Set retry worker concurrency
       run: |
@@ -123,3 +125,4 @@ jobs:
           --environment '{"Variables": {"QUEUE_URL": "${{ secrets.SQS_URL }}"}}' \
           --timeout 900 \
           --memory-size 1024 \
+          --image-config '{"Command": ["src.lambda.orchestrator.lambda_handler"]}'
