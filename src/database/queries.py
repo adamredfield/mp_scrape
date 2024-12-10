@@ -43,11 +43,11 @@ def insert_comments(cursor, connection, comments):
 def insert_tick(cursor, connection, tick_data):
     tick_sql = '''
     INSERT INTO routes.Ticks (
-        route_id, date, type, note, insert_date
+        user_id, route_id, date, type, note, insert_date
     ) VALUES (
-        %(route_id)s, %(date)s, %(type)s, %(note)s, %(insert_date)s
+        %(user_id)s, %(route_id)s, %(date)s, %(type)s, %(note)s, %(insert_date)s
     )
-    ON CONFLICT (route_id, date) DO NOTHING
+    ON CONFLICT (user_id, route_id, date) DO NOTHING
     '''
     try:
         cursor.execute(tick_sql, tick_data)

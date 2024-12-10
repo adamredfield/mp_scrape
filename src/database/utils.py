@@ -1,23 +1,39 @@
 import os
 import psycopg2
 from pathlib import Path
+import time
+import random
 
 
 def create_connection():
-    """Create a PostgreSQL database connection"""
-    try:
-        connection = psycopg2.connect(
-            dbname=os.getenv('POSTGRES_DB', 'mp_scrape'),
-            user=os.getenv('POSTGRES_USER', 'postgres'),
-            password=os.getenv('POSTGRES_PASSWORD'),
-            host=os.getenv('POSTGRES_HOST'),
-            port=os.getenv('POSTGRES_PORT', '5432'),
-            sslmode='require'
-        )
-        return connection
-    except Exception as e:
-        print(f"Error connecting to PostgreSQL: {e}")
-        raise
+    """Create a PostgreSQL database connection with retries and exponential backoff"""
+    max_attempts = 5
+    base_delay = 1  # Start with 1 second delay
+
+    for attempt in range(max_attempts):
+        try:
+            print(f"Attempt {attempt + 1}: Connecting to {os.getenv('POSTGRES_HOST')}")
+            connection = psycopg2.connect(
+                dbname=os.getenv('POSTGRES_DB', 'mp_scrape'),
+                user=os.getenv('POSTGRES_USER', 'postgres'),
+                password=os.getenv('POSTGRES_PASSWORD'),
+                host=os.getenv('POSTGRES_HOST'),
+                port=os.getenv('POSTGRES_PORT', '5432'),
+                sslmode='require',
+                connect_timeout=10
+            )
+            print("Connected successfully")
+            return connection
+        except psycopg2.OperationalError as e:
+            print(f"Connection attempt {attempt + 1} failed: {e}")
+            if attempt < max_attempts - 1:
+                # Exponential backoff with jitter
+                delay = base_delay * (2 ** attempt) + random.uniform(0, 1)
+                print(f"Retrying in {delay:.2f} seconds...")
+                time.sleep(delay)
+            else:
+                print("Max attempts reached. Could not connect to the database.")
+                raise
 
 def add_new_tags_to_mapping(cursor):
     """Add any new tags from Tags table to TagMapping with default values"""
