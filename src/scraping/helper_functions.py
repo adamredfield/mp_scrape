@@ -17,20 +17,14 @@ constructed_url = f'{base_url}{user_id}'
 ticks_url = f'{constructed_url}/ticks?page='
 
 def get_proxy_url():
-    username = os.getenv('IPROYAL_USERNAME')
-    password = os.getenv('IPROYAL_PASSWORD')
-    proxy_auth = f"{username}:{password}"
-    proxy = 'geo.iproyal.com:12321'
-    
-    return {
-        'http': f'http://{proxy_auth}@{proxy}',
-        'https': f'http://{proxy_auth}@{proxy}'
-    }
+    proxy_username = os.getenv('IPROYAL_USERNAME')
+    proxy_password = os.getenv('IPROYAL_PASSWORD')
+    return f'http://{proxy_username}:{proxy_password}@geo.iproyal.com:12321'
 
 def login_and_save_session(playwright):
     """Initialize browser with proxy and login"""
-    username = os.getenv('MP_USERNAME')
-    password = os.getenv('MP_PASSWORD')
+    mp_username = os.getenv('MP_USERNAME')
+    mp_password = os.getenv('MP_PASSWORD')
     proxy_username = os.getenv('IPROYAL_USERNAME')
     proxy_password = os.getenv('IPROYAL_PASSWORD')
 
@@ -48,11 +42,33 @@ def login_and_save_session(playwright):
 
         context = browser.new_context()
         print("Context created successfully")
+    
+        page = context.new_page()
+        page.goto(mp_home_url)
+        page.wait_for_load_state('networkidle')
+        print("Navigation complete")
 
+        page.click("a.sign-in")
+        page.wait_for_selector("#login-modal", timeout=5000)
+        page.fill("input[type='email'][name='email']", mp_username)
+        page.fill("input[type='password'][name='pass']", mp_password)
+        page.click("#login-modal button[type='submit']")
+        print("Login submitted")
+
+        # Save cookies and storage_state to /tmp
+        cookies = context.cookies()
+        with open("/tmp/cookies.json", "w") as cookie_file:
+            json.dump(cookies, cookie_file)
+
+        storage_state = context.storage_state()
+        with open("/tmp/storage.json", "w") as storage_file:
+            json.dump(storage_state, storage_file)
+
+        print("Login successful, session saved!")
         return browser, context
-
+    
     except Exception as e:
-        print(f"Browser launch failed: {str(e)}")
+        print(f"Browser/login failed: {str(e)}")
         if browser:
             browser.close()
         raise
@@ -300,8 +316,7 @@ def parse_location(location_string):
     return location_data
 
 def process_page(page_number, ticks_url, user_id, retry_count=0):
-    """Process a single page with working proxy"""
-
+    """Process a single page"""
     proxy_url = get_proxy_url()
     proxies = {
         'http': proxy_url,
@@ -315,14 +330,7 @@ def process_page(page_number, ticks_url, user_id, retry_count=0):
             browser = None
             context = None
             try:
-                # Configure browser with same proxy
-                browser = playwright.chromium.launch(
-                    proxy={
-                        'server': 'http://geo.iproyal.com:12321',
-                        'username': os.getenv('IPROYAL_USERNAME'),
-                        'password': os.getenv('IPROYAL_PASSWORD')
-                    }
-                )
+                browser, context = login_and_save_session(playwright)
                 page = context.new_page()
 
                 print(f'Processing page: {page_number}. (Retry #{retry_count})')
