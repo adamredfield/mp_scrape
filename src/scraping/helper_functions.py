@@ -27,9 +27,6 @@ def get_proxy_url():
         'https': f'http://{proxy_username}:{proxy_password}@geo.iproyal.com:12321'
     }
     
-    # Debug output (password masked)
-    print(f"Using proxy URL: http://{username}:****@geo.iproyal.com:12321")
-    
     return proxies
 
 def login_and_save_session(playwright):
