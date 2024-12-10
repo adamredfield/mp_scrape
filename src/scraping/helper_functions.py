@@ -1,19 +1,14 @@
 import json
 import requests
-from bs4 import BeautifulSoup
 import re
 from src.database.utils import create_connection
 from src.database import queries
-import requests
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
 from datetime import datetime, timezone
 import re
-import psycopg2
+import os
 
-# login creds -- can only see full comments if logged in while viewing route pages
-username = "mpscrape2024@gmail.com"
-password = "mpscrape"
 mp_home_url = "https://www.mountainproject.com"
 
 base_url = f'{mp_home_url}/user/'
@@ -21,11 +16,22 @@ user_id = '200362278/doctor-choss'
 constructed_url = f'{base_url}{user_id}'
 ticks_url = f'{constructed_url}/ticks?page='
 
+def get_proxy_url():
+    """Get IPRoyal proxy URL"""
+    username = os.getenv('IPROYAL_USERNAME')
+    password = os.getenv('IPROYAL_PASSWORD')
+    return f"http://{username}:{password}@proxy.iproyal.com:12321"
+
 def login_and_save_session(playwright):
+    username = os.getenv('MP_USERNAME')
+    password = os.getenv('MP_PASSWORD')
     print("Starting browser launch sequence...")
     try:
         browser = playwright.chromium.launch(
             headless=True,
+            proxy={
+                'server': get_proxy_url()
+            },
             args=[
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
@@ -88,8 +94,13 @@ def fetch_dynamic_page_content(page, route_link):
         return html_content
 
 def get_total_pages():
+    proxy_url = get_proxy_url()
+    proxies = {
+        'http': proxy_url,
+        'https': proxy_url
+    }
      # Get total number of rows to paginate through
-    pagination_response = requests.get(ticks_url)
+    pagination_response = requests.get(ticks_url, proxies=proxies)
     if pagination_response.status_code != 200:
         print(f"Failed to retrieve data: {pagination_response.status_code}")
 
@@ -310,6 +321,11 @@ def parse_location(location_string):
 
 def process_page(page_number, ticks_url, user_id, retry_count=0):
     """Process a single page"""
+    proxy_url = get_proxy_url()
+    proxies = {
+        'http': proxy_url,
+        'https': proxy_url
+    }
     with create_connection() as conn:  # Connection management handled by context manager
         cursor = conn.cursor()
         
@@ -322,7 +338,7 @@ def process_page(page_number, ticks_url, user_id, retry_count=0):
 
                 print(f'Processing page: {page_number}. (Retry #{retry_count})')
                 
-                tick_response = requests.get(ticks_url)
+                tick_response = requests.get(ticks_url, proxies=proxies)
                 if tick_response.status_code != 200:
                     raise Exception(f"Failed to retrieve data: {tick_response.status_code}")
                 
