@@ -72,13 +72,14 @@ def setup_database(cursor, connection):
         UNIQUE(route_id, date)
     );
 
-    CREATE TABLE IF NOT EXISTS routes.RouteComments (
+    CREATE OR REPLACE TABLE routes.RouteComments (
         id SERIAL PRIMARY KEY,
         route_id INTEGER,
         comment TEXT,
+        comment_hash TEXT,
         insert_date TIMESTAMP,
         FOREIGN KEY (route_id) REFERENCES routes.Routes(id),
-        UNIQUE(route_id, comment)
+        UNIQUE(route_id, comment_hash)
     );
 
     CREATE TABLE IF NOT EXISTS analysis.RouteAnalysis (

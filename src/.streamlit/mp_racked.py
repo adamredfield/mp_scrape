@@ -11,6 +11,8 @@ import src.analysis.analysis_queries as analysis_queries
 import pandas as pd
 import plotly.graph_objects as go
 
+conn = st.connection('postgresql', type='sql')
+
 # Page config
 st.set_page_config(
     page_title="Your 2024 Climbing Racked",
@@ -302,7 +304,6 @@ def diamond_template(main_text, subtitle=None, detail_text=None):
 
 def page_total_length():
     """First page showing total length climbed"""
-    conn = create_connection()
     cursor = conn.cursor()
     length_data = analysis_queries.get_length_climbed(cursor, year='2024')
     length_df = pd.DataFrame(length_data, columns=['Year', 'Location', 'Length'])
@@ -320,11 +321,8 @@ def page_total_length():
 
 def page_biggest_day():
     """Biggest climbing day page"""
-    conn = create_connection()
-    cursor = conn.cursor()
-    
     try:
-        biggest_day = metrics.biggest_climbing_day(cursor)
+        biggest_day = metrics.biggest_climbing_day(conn)
         
         if not biggest_day:
             st.error("No climbing data found for 2024")
@@ -351,16 +349,10 @@ def page_biggest_day():
         
     except Exception as e:
         st.error(f"Error: {str(e)}")
-        
-    finally:
-        conn.close()
 
 def page_total_routes():
     """Second page showing total routes"""
-    conn = create_connection()
-    cursor = conn.cursor()
-    total_routes = metrics.total_routes(cursor)
-    conn.close()
+    total_routes = metrics.total_routes(conn)
     
     main_text = f"You climbed {total_routes:,} routes<br>this year"
     subtitle = "And one route again, and again, and again..."
@@ -368,10 +360,7 @@ def page_total_routes():
 
 def page_most_climbed():
     """Page showing most repeated route"""
-    conn = create_connection()
-    cursor = conn.cursor()
-    route_data = metrics.most_climbed_route(cursor)
-    conn.close()
+    route_data = metrics.most_climbed_route(conn)
     
     if route_data:
         route_name = route_data[0]
@@ -543,12 +532,10 @@ def page_top_routes():
 
 def page_areas_breakdown():
     """Page showing top states and areas"""
-    conn = create_connection()
-    cursor = conn.cursor()
-    states = metrics.states_climbed(cursor)
-    sub_areas = metrics.sub_areas_climbed(cursor)
-    total_states = metrics.regions_climbed(cursor)
-    total_areas = metrics.regions_sub_areas(cursor)
+    states = metrics.states_climbed(conn)
+    sub_areas = metrics.sub_areas_climbed(conn)
+    total_states = metrics.regions_climbed(conn)
+    total_areas = metrics.regions_sub_areas(conn)
     
     # Apply Spotify styling
     st.markdown(get_spotify_style(), unsafe_allow_html=True)
@@ -623,7 +610,7 @@ def page_areas_breakdown():
         )
     
     # Get length data based on selected filter
-    length_data = analysis_queries.get_length_climbed(cursor, area_type=area_type, year='2024')
+    length_data = analysis_queries.get_length_climbed(conn, area_type=area_type, year='2024')
     length_df = pd.DataFrame(length_data, columns=['Year', 'Location', 'Length'])
     conn.close()
     

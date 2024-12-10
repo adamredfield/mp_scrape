@@ -32,11 +32,11 @@ estimated_lengths_cte = f"""
         """
 
 
-def total_routes(cursor):
+def total_routes(conn):
     query = "SELECT COUNT(DISTINCT route_id) FROM routes.Ticks WHERE date::text ILIKE '%2024%'"
-    return cursor.execute(query).fetchone()[0]
+    return conn.query(query).iloc[0,0]
 
-def most_climbed_route(cursor):
+def most_climbed_route(conn):
     query = f"""
         {estimated_lengths_cte}
         SELECT DISTINCT concat(r.route_name, ' ~ ' ,
@@ -56,22 +56,20 @@ def most_climbed_route(cursor):
         ORDER BY COUNT(*) DESC
         LIMIT 1
     """
-    cursor.execute(query)
-    columns = [description[0] for description in cursor.description]
-    result = cursor.fetchone()
-        
-    # Get the route string and split it
-    route_parts = result[0].split(' ~ ')
+    result = conn.query(query)
+    if result.empty:
+        return None
+    
+    row = result.iloc[0]
+    route_parts = row[0].split(' ~ ')
     if len(route_parts) == 2:
         route_name, rest = route_parts
-        # Get everything after the last '>'
         location_parts = rest.split('>')
         clean_location = location_parts[-1].strip() if '>' in rest else rest
-        # Reconstruct the route string
         clean_route = f"{route_name} ~ {clean_location}"
-        return (clean_route,) + result[1:]
+        return (clean_route,) + tuple(row[1:])
 
-def top_rated_routes(cursor):
+def top_rated_routes(conn):
     query = """
         SELECT r.route_name, r.avg_stars
         FROM routes.Routes r
@@ -80,17 +78,17 @@ def top_rated_routes(cursor):
         ORDER BY r.avg_stars DESC
         LIMIT 5
     """
-    return cursor.execute(query).fetchall()
+    return conn.query(query).fetchall()
 
-def days_climbed(cursor):
+def days_climbed(conn):
     query = """
         SELECT COUNT(DISTINCT date)
         FROM routes.Ticks
         WHERE date::text ILIKE '%2024%'
     """
-    return cursor.execute(query).fetchone()[0]
+    return conn.query(query).iloc[0,0]
 
-def top_climbing_style(cursor):
+def top_climbing_style(conn):
     query = """
         SELECT rat.tag_value, count(*)
         from analysis.RouteAnalysis ra
@@ -102,9 +100,9 @@ def top_climbing_style(cursor):
         ORDER BY count(*) desc
         LIMIT 1;
     """
-    return cursor.execute(query).fetchone()[0]
+    return conn.query(query).iloc[0,0]
 
-def biggest_climbing_day(cursor):
+def biggest_climbing_day(conn):
     query = f"""
         {estimated_lengths_cte}
         SELECT  t.date,
@@ -128,14 +126,13 @@ def biggest_climbing_day(cursor):
     LIMIT 1;
     """
 
-    cursor.execute(query)
-    columns = [description[0] for description in cursor.description]
-
-    result = cursor.fetchone()
+    result = conn.query(query)
+    if result.empty:
+        return None
     
-    return result
+    return result.iloc[0]
 
-def top_grade(cursor, level):
+def top_grade(conn, level):
     query = """
         SELECT
         	CASE
@@ -150,8 +147,7 @@ def top_grade(cursor, level):
         ORDER BY count(*) desc;
     """
 
-    cursor.execute(query)
-    results = cursor.fetchall()
+    results = conn.query(query).fetchall()
 
     grouped_grades = {}
 
@@ -164,7 +160,7 @@ def top_grade(cursor, level):
     
     return max(grouped_grades.items(), key=itemgetter(1))[0]  
 
-def get_grade_distribution(cursor, level):
+def get_grade_distribution(conn, level):
     query = """
         SELECT
             CASE
@@ -179,8 +175,7 @@ def get_grade_distribution(cursor, level):
         ORDER BY count desc;
     """
 
-    cursor.execute(query)
-    results = cursor.fetchall()
+    results = conn.query(query).fetchall()
 
     grouped_grades = {}
     total_climbs = sum(count for _, count in results)
@@ -198,7 +193,7 @@ def get_grade_distribution(cursor, level):
     
     return sorted(distribution, key=lambda x: x[1], reverse=True)
 
-def states_climbed(cursor):
+def states_climbed(conn):
     query = """
         SELECT region, count(distinct date) days_out, count(*) routes
         FROM routes.Routes r
@@ -207,15 +202,12 @@ def states_climbed(cursor):
         GROUP BY region
         ORDER BY days_out desc;
     """
-    cursor.execute(query)
-    columns = [description[0] for description in cursor.description]
-
-    result = cursor.fetchall()
+    result = conn.query(query).fetchall()
     
     return result
 
 
-def sub_areas_climbed(cursor):
+def sub_areas_climbed(conn):
     query = """
         SELECT sub_area , count(distinct date) days_out, count(*) routes
         FROM routes.Routes r
@@ -224,32 +216,29 @@ def sub_areas_climbed(cursor):
         GROUP BY sub_area 
         ORDER BY days_out desc;
     """
-    cursor.execute(query)
-    columns = [description[0] for description in cursor.description]
-
-    result = cursor.fetchall()
+    result = conn.query(query).fetchall()
     
     return result
 
-def regions_climbed(cursor):
+def regions_climbed(conn):
     query = """
         SELECT count(distinct region)
         FROM routes.Routes r
         JOIN routes.Ticks t on t.route_id = r.id
         WHERE date::text ILIKE '%2024%'
     """
-    return cursor.execute(query).fetchone()[0]
+    return conn.query(query).iloc[0,0]
 
-def regions_sub_areas(cursor):
+def regions_sub_areas(conn):
     query = """
         SELECT count(distinct sub_area)
         FROM routes.Routes r
         JOIN routes.Ticks t on t.route_id = r.id
         WHERE date::text ILIKE '%2024%'
     """
-    return cursor.execute(query).fetchone()[0]
+    return conn.query(query).iloc[0,0]
 
-def top_tags(cursor, tag_type):
+def top_tags(conn, tag_type):
     
     query = f"""
         WITH deduped_ticks AS(
@@ -265,6 +254,5 @@ def top_tags(cursor, tag_type):
         GROUP BY tav.mapped_type, tav.mapped_tag
         ORDER BY count DESC;
     """
-    cursor.execute(query)
-    results = cursor.fetchall()
-    return results
+    result = conn.query(query).fetchall()
+    return result

@@ -25,7 +25,7 @@ def year_filter(year=None):
     return f"AND t.date ILIKE '%{year}%'" if year else ''
 
 
-def get_tick_type_distribution(cursor, route_types=None):
+def get_tick_type_distribution(conn, route_types=None):
     """Get distribution of tick types (Lead, TR, etc.)"""
     query = f"""
     SELECT 
@@ -39,10 +39,9 @@ def get_tick_type_distribution(cursor, route_types=None):
     GROUP BY type
     ORDER BY count DESC;
     """
-    cursor.execute(query)
-    return cursor.fetchall()
+    return conn.query(query)
 
-def get_grade_distribution(cursor, route_types=None, level='base', year=None):
+def get_grade_distribution(conn, route_types=None, level='base', year=None):
     """Get distribution of sends by grade with configurable grouping and route"""
 
     grade_column = """
@@ -80,8 +79,7 @@ def get_grade_distribution(cursor, route_types=None, level='base', year=None):
     ORDER BY COUNT(*) DESC;
     """
 
-    cursor.execute(query)
-    results = cursor.fetchall()
+    results =  conn.query(query)
 
     grouped_grades = {}
 
@@ -101,7 +99,7 @@ def get_grade_distribution(cursor, route_types=None, level='base', year=None):
     
     return filtered_results
 
-def get_most_climbed_areas(cursor, route_types=None):
+def get_most_climbed_areas(conn, route_types=None):
 
     if route_types:
         type_conditions = []
@@ -123,18 +121,10 @@ def get_most_climbed_areas(cursor, route_types=None):
     ORDER BY visit_count DESC
     LIMIT 20;
     """
-    cursor.execute(query)
-    return cursor.fetchall()
+    return conn.query(query)
 
-def get_highest_rated_climbs(cursor, selected_styles=None, route_types=None, year=None, tag_type=None):
-    """Get highest rated climbs
-    Args:
-        cursor: Database cursor
-        selected_styles: Optional list of styles to filter by
-        route_types: Optional list of route types to filter by
-        year: Optional year to filter by
-        tag_type: Type of tag to filter by (default: 'style')
-    """
+def get_highest_rated_climbs(conn, selected_styles=None, route_types=None, year=None, tag_type=None):
+    """Get highest rated climbs"""
     style_filter = ""
     if selected_styles:
         style_conditions = [
@@ -173,10 +163,9 @@ def get_highest_rated_climbs(cursor, selected_styles=None, route_types=None, yea
     ORDER BY r.avg_stars DESC, num_votes DESC
     LIMIT 20
     """
-    cursor.execute(query)
-    return cursor.fetchall()
+    return conn.query(query)
 
-def get_route_type_preferences(cursor):
+def get_route_type_preferences(conn):
     """Analyze preferences for different route types"""
     query = '''
     SELECT 
@@ -191,11 +180,10 @@ def get_route_type_preferences(cursor):
     GROUP BY r.route_type
     ORDER BY count DESC
     '''
-    cursor.execute(query)
-    return cursor.fetchall()        
+    return conn.query(query)
 
-def get_distinct_styles(cursor):
-    """Get all distinct active styles from TagMapping"""
+def get_distinct_styles(conn):
+    """Get all distinct active styles"""
     query = '''
     SELECT DISTINCT coalesce(clean_tag, raw_tag) as style
     FROM analysis.TagMapping
@@ -203,8 +191,7 @@ def get_distinct_styles(cursor):
     AND COALESCE(mapped_tag_type, original_tag_type) = 'style'
     ORDER BY style;
     '''
-    cursor.execute(query)
-    return [row[0] for row in cursor.fetchall()]      
+    return conn.query(query)
 
 def get_bigwall_routes(cursor):
     """Get all bigwall routes"""
@@ -225,7 +212,7 @@ def get_bigwall_routes(cursor):
     cursor.execute(query)
     return cursor.fetchall()
 
-def get_length_climbed(cursor, area_type = "main_area", year=None):
+def get_length_climbed(conn, area_type = "main_area", year=None):
     query = f"""
     WITH estimated_lengths AS (
     SELECT  id,
@@ -255,5 +242,4 @@ def get_length_climbed(cursor, area_type = "main_area", year=None):
     GROUP BY year, r.{area_type}
     ORDER BY year DESC, length_climbed DESC;
     """
-    cursor.execute(query)
-    return cursor.fetchall()
+    return conn.query(query).itertuples(index=False)
