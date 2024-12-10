@@ -17,9 +17,20 @@ constructed_url = f'{base_url}{user_id}'
 ticks_url = f'{constructed_url}/ticks?page='
 
 def get_proxy_url():
+    """Get IPRoyal proxy URL using working test configuration"""
     proxy_username = os.getenv('IPROYAL_USERNAME')
     proxy_password = os.getenv('IPROYAL_PASSWORD')
-    return f'http://{proxy_username}:{proxy_password}@geo.iproyal.com:12321'
+    
+    # Use exact same format as our working test
+    proxies = {
+        'http': f'http://{proxy_username}:{proxy_password}@geo.iproyal.com:12321',
+        'https': f'http://{proxy_username}:{proxy_password}@geo.iproyal.com:12321'
+    }
+    
+    # Debug output (password masked)
+    print(f"Using proxy URL: http://{username}:****@geo.iproyal.com:12321")
+    
+    return proxies
 
 def login_and_save_session(playwright):
     """Initialize browser with proxy and login"""
@@ -317,11 +328,7 @@ def parse_location(location_string):
 
 def process_page(page_number, ticks_url, user_id, retry_count=0):
     """Process a single page"""
-    proxy_url = get_proxy_url()
-    proxies = {
-        'http': proxy_url,
-        'https': proxy_url
-    }
+    proxies = get_proxy_url()
     
     with create_connection() as conn:
         cursor = conn.cursor()
