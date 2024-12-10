@@ -30,7 +30,9 @@ def login_and_save_session(playwright):
         browser = playwright.chromium.launch(
             headless=True,
             proxy={
-                'server': get_proxy_url()
+                'server': get_proxy_url(),
+                'username': username,
+                'password': password
             },
             args=[
                 '--no-sandbox',
