@@ -28,59 +28,32 @@ def get_proxy_url():
     }
 
 def login_and_save_session(playwright):
+    """Initialize browser with proxy and login"""
     username = os.getenv('MP_USERNAME')
     password = os.getenv('MP_PASSWORD')
+    proxy_username = os.getenv('IPROYAL_USERNAME')
+    proxy_password = os.getenv('IPROYAL_PASSWORD')
+
     print("Starting browser launch sequence...")
     try:
         browser = playwright.chromium.launch(
             headless=True,
             proxy={
-                'server': get_proxy_url(),
-                'username': username,
-                'password': password
-            },
-            args=[
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--single-process',
-                '--no-zygote'
-            ]
+                'server': 'http://geo.iproyal.com:12321',
+                'username': proxy_username,
+                'password': proxy_password
+            }
         )
         print("Browser launched successfully")
 
-        context = browser.new_context(
-            viewport={'width': 1280, 'height': 720}
-        )
+        context = browser.new_context()
         print("Context created successfully")
 
-        page = context.new_page()
-        page.goto(mp_home_url)
-        page.wait_for_load_state('networkidle')
-        print("Navigation complete")
-
-        page.click("a.sign-in")
-        page.wait_for_selector("#login-modal", timeout=5000)
-        page.fill("input[type='email'][name='email']", username)
-        page.fill("input[type='password'][name='pass']", password)
-        page.click("#login-modal button[type='submit']")
-        print("Login submitted")
-
-        # Save cookies and storage_state to /tmp
-        cookies = context.cookies()
-        with open("/tmp/cookies.json", "w") as cookie_file:
-            json.dump(cookies, cookie_file)
-
-        storage_state = context.storage_state()
-        with open("/tmp/storage.json", "w") as storage_file:
-            json.dump(storage_state, storage_file)
-
-        print("Login successful, session saved!")
         return browser, context
 
     except Exception as e:
-        print(f"Error in browser setup: {str(e)}")
-        if 'browser' in locals():
+        print(f"Browser launch failed: {str(e)}")
+        if browser:
             browser.close()
         raise
 
@@ -328,7 +301,12 @@ def parse_location(location_string):
 
 def process_page(page_number, ticks_url, user_id, retry_count=0):
     """Process a single page with working proxy"""
-    proxies = get_proxy_config()
+
+    proxy_url = get_proxy_url()
+    proxies = {
+        'http': proxy_url,
+        'https': proxy_url
+    }
     
     with create_connection() as conn:
         cursor = conn.cursor()
