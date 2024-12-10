@@ -1,35 +1,34 @@
 import os
-import requests
+import sys
+
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+sys.path.append(project_root)
+
+import os
 from dotenv import load_dotenv
+from src.scraping.helper_functions import get_proxy_url
+import requests
 
 load_dotenv()
 
 def test_proxy():
-    """Test proxy using IPRoyal's exact format"""
+    """Test proxy using exact Lambda configuration"""
     print("\nTesting proxy connection...")
     
-    # Get credentials
-    username = os.getenv('IPROYAL_USERNAME')
-    password = os.getenv('IPROYAL_PASSWORD')
-    
-    # Print masked credentials for verification
-    print(f"Username length: {len(username) if username else 'None'}")
-    print(f"Password length: {len(password) if password else 'None'}")
-    
-    # Use their exact format
-    url = 'https://ipv4.icanhazip.com'
-    proxy = 'http://geo.iproyal.com:12321'
-    proxy_auth = f'{username}:{password}'
-    
+    # Get proxy URL using actual Lambda function
+    proxy_url = get_proxy_url()
     proxies = {
-        'http': f'http://{proxy_auth}@geo.iproyal.com:12321',
-        'https': f'http://{proxy_auth}@geo.iproyal.com:12321'
+        'http': proxy_url,
+        'https': proxy_url
     }
     
+    print(f"Using proxies config:")
+    print(f"HTTP: {proxies['http'].replace(os.getenv('IPROYAL_PASSWORD'), '****')}")
+    print(f"HTTPS: {proxies['https'].replace(os.getenv('IPROYAL_PASSWORD'), '****')}")
+    
     try:
-        print("Making test request...")
-        print(f"Using proxy URL: http://{username}:****@geo.iproyal.com:12321")
-        response = requests.get(url, proxies=proxies)
+        print("\nMaking test request...")
+        response = requests.get('https://ipv4.icanhazip.com', proxies=proxies)
         print(f"Response status: {response.status_code}")
         print(f"Response text: {response.text.strip()}")
         return True

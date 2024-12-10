@@ -17,17 +17,14 @@ constructed_url = f'{base_url}{user_id}'
 ticks_url = f'{constructed_url}/ticks?page='
 
 def get_proxy_url():
-    """Get IPRoyal proxy URL using working test configuration"""
-    proxy_username = os.getenv('IPROYAL_USERNAME')
-    proxy_password = os.getenv('IPROYAL_PASSWORD')
+    """Get IPRoyal proxy URL - returns a string"""
+    username = os.getenv('IPROYAL_USERNAME')
+    password = os.getenv('IPROYAL_PASSWORD')
     
-    # Use exact same format as our working test
-    proxies = {
-        'http': f'http://{proxy_username}:{proxy_password}@geo.iproyal.com:12321',
-        'https': f'http://{proxy_username}:{proxy_password}@geo.iproyal.com:12321'
-    }
+    proxy_url = f'http://{username}:{password}@geo.iproyal.com:12321'
+    print(f"Generated proxy URL: http://{username}:****@geo.iproyal.com:12321")
     
-    return proxies
+    return proxy_url
 
 def login_and_save_session(playwright):
     """Initialize browser with proxy and login"""
@@ -325,7 +322,15 @@ def parse_location(location_string):
 
 def process_page(page_number, ticks_url, user_id, retry_count=0):
     """Process a single page"""
-    proxies = get_proxy_url()
+    proxy_url = get_proxy_url()  # Get string URL
+    proxies = {                  # Create dict where needed
+        'http': proxy_url,
+        'https': proxy_url
+    }
+    
+    print(f"Using proxies config:")
+    print(f"HTTP: {proxies['http'].replace(os.getenv('IPROYAL_PASSWORD'), '****')}")
+    print(f"HTTPS: {proxies['https'].replace(os.getenv('IPROYAL_PASSWORD'), '****')}")
     
     with create_connection() as conn:
         cursor = conn.cursor()
