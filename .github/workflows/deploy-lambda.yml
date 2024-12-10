@@ -48,6 +48,22 @@ jobs:
       run: |
         aws sqs create-queue --queue-name mp-scraper-queue || true
         
+    - name: Create DLQ Queue
+      run: |
+        aws sqs create-queue --queue-name mp-scraper-dlq || true
+        
+    - name: Update main queue with DLQ
+      run: |
+        QUEUE_URL=$(aws sqs get-queue-url --queue-name mp-scraper-queue --output text --query 'QueueUrl')
+        DLQ_URL=$(aws sqs get-queue-url --queue-name mp-scraper-dlq --output text --query 'QueueUrl')
+        DLQ_ARN=$(aws sqs get-queue-attributes --queue-url $DLQ_URL --attribute-names QueueArn --query 'Attributes.QueueArn' --output text)
+        
+        aws sqs set-queue-attributes \
+          --queue-url $QUEUE_URL \
+          --attributes '{
+            "RedrivePolicy": "{\"deadLetterTargetArn\":\"'$DLQ_ARN'\",\"maxReceiveCount\":3}"
+          }'
+
     - name: Deploy worker function
       run: |
         aws lambda create-function \
@@ -56,16 +72,9 @@ jobs:
           --code ImageUri=${{ steps.login-ecr.outputs.registry }}/mp-scraper:latest \
           --role ${{ secrets.AWS_LAMBDA_ROLE_ARN }} \
           --vpc-config SubnetIds=${{ secrets.SUBNET_IDS }},SecurityGroupIds=${{ secrets.SECURITY_GROUP_IDS }} \
-          --environment '{"Variables": {
-              "QUEUE_URL": "${{ secrets.SQS_URL }}",
-              "POSTGRES_HOST": "${{ secrets.POSTGRES_HOST }}",
-              "POSTGRES_DB": "${{ secrets.POSTGRES_DB }}",
-              "POSTGRES_USER": "${{ secrets.POSTGRES_USER }}",
-              "POSTGRES_PASSWORD": "${{ secrets.POSTGRES_PASSWORD }}",
-              "POSTGRES_PORT": "${{ secrets.POSTGRES_PORT }}"
-          }}' \
-          --timeout 900 \
-          --memory-size 1024
+          --memory-size 2048 \
+          --ephemeral-storage Size=2048 \
+          --no-provisioned-concurrency
 
     - name: Deploy orchestrator function
       run: |
@@ -77,4 +86,3 @@ jobs:
           --environment '{"Variables": {"QUEUE_URL": "${{ secrets.SQS_URL }}"}}' \
           --timeout 900 \
           --memory-size 1024 \
-          --image-config '{"Command": ["src.lambda.orchestrator.lambda_handler"]}'

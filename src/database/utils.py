@@ -8,6 +8,7 @@ def create_connection():
     """Create a PostgreSQL database connection with retries and exponential backoff"""
     max_attempts = 5
     base_delay = 1  # Start with 1 second delay
+    connect_timeout = 10
 
     for attempt in range(max_attempts):
         try:
@@ -19,14 +20,13 @@ def create_connection():
                 host=os.getenv('POSTGRES_HOST'),
                 port=os.getenv('POSTGRES_PORT', '5432'),
                 sslmode='require',
-                connect_timeout=10
+                connect_timeout=connect_timeout
             )
             print("Connected successfully")
             return connection
         except psycopg2.OperationalError as e:
             print(f"Connection attempt {attempt + 1} failed: {e}")
             if attempt < max_attempts - 1:
-                # Exponential backoff with jitter
                 delay = base_delay * (2 ** attempt) + random.uniform(0, 1)
                 print(f"Retrying in {delay:.2f} seconds...")
                 time.sleep(delay)

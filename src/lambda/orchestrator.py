@@ -10,14 +10,13 @@ from src.scraping import helper_functions
 
 sqs = boto3.client('sqs')
 QUEUE_URL = os.environ['QUEUE_URL']
-BATCH_SIZE = 2  # 2 pages per batch
+BATCH_SIZE = 1  # pages per batch
 
 def lambda_handler(event, context):
     try:
         total_pages = helper_functions.get_total_pages()
         print(f"Found {total_pages} pages to scrape")
         
-        # Break into batches (2 pages each)
         for i in range(1, total_pages + 1, BATCH_SIZE): # page numbers start at 1
             batch = []
             for page_num in range(i, min(i + BATCH_SIZE, total_pages + 1)): # if total_pages is smaller than stop, use total_pages

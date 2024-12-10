@@ -2,6 +2,14 @@ import json
 import requests
 from bs4 import BeautifulSoup
 import re
+from src.database.utils import create_connection
+from src.database import queries
+import requests
+from bs4 import BeautifulSoup
+from playwright.sync_api import sync_playwright
+from datetime import datetime, timezone
+import re
+import psycopg2
 
 # login creds -- can only see full comments if logged in while viewing route pages
 username = "mpscrape2024@gmail.com"
@@ -70,7 +78,7 @@ def fetch_dynamic_page_content(page, route_link):
         # loads comments
         while True:
             page.evaluate("window.scrollTo(0, document.body.scrollHeight)")  # Scroll down
-            page.wait_for_timeout(1000)  # Wait for 2 seconds
+            page.wait_for_timeout(1000)
             new_height = page.evaluate("document.body.scrollHeight")  # Get new scroll height
             if new_height == last_height:  # Stop if no change in scroll height
                 break
@@ -100,15 +108,11 @@ def get_total_pages():
 def get_comments(route_soup):
         comments = []
 
-        # Find all comment bodies in the route_soup
         comment_elements = route_soup.find_all('div', class_='comment-body')
 
-        # Loop through each comment and extract the text
         for comment in comment_elements:
             # Extract the full comment text from the <span> with id containing '-full'
             comment_text = comment.find('span', id=re.compile(r'.*-full')).get_text(strip=True)
-            
-            # Append the comment text to the list
             comments.append(comment_text)
         return comments
 
@@ -121,7 +125,6 @@ def get_route_details(route_soup):
     'commitment_grade': None,
     'fa': None
 }
-    # desc_rows is where type and FA data is held
     desc_rows = description_details_tbl.find_all('tr') 
     for row in desc_rows:
         cells = row.find_all('td')
@@ -129,7 +132,6 @@ def get_route_details(route_soup):
         label = cells[0].text.strip()
         value = cells[1].text.strip()
 
-        # Check for Type and FA labels
         if label == 'Type:':
             parsed_type = parse_route_type(value)
             route_details.update(parsed_type)
@@ -305,3 +307,168 @@ def parse_location(location_string):
         location_data['specific_location'] = ' > '.join(parts[3:])
 
     return location_data
+
+def process_page(page_number, ticks_url, user_id, retry_count=0):
+    """Process a single page"""
+    try:
+        conn = create_connection()
+        cursor = conn.cursor()
+        
+        with sync_playwright() as playwright:
+            browser, context = login_and_save_session(playwright)
+            page = context.new_page()
+
+            print(f'Processing page: {page_number}. (Retry #{retry_count})')
+            
+            tick_response = requests.get(ticks_url)
+            if tick_response.status_code != 200:
+                raise Exception(f"Failed to retrieve data: {tick_response.status_code}")
+            
+            try:
+                tick_soup = BeautifulSoup(tick_response.text, 'html.parser')
+                tick_table = tick_soup.find('table', class_='table route-table hidden-xs-down')
+                tick_rows = tick_table.find_all('tr', class_='route-row')
+
+                for row in tick_rows:
+                    tick_details = row.find('td', class_='text-warm small pt-0')
+                
+                    if not tick_details:
+                        cells = row.find_all('td')
+                        route_name = ' '.join(cells[0].text.strip().replace('●', '').split())
+                        print(f'Retrieving data for {route_name}')
+                        route_link = row.find('a', href=True)['href']
+                        route_id = route_link.split('/route/')[1].split('/')[0]
+                        route_exists = queries.check_route_exists(cursor, route_id)
+                        if route_exists:
+                            print(f"Route {route_name} already exists in the database.")
+                            current_route_data = {
+                            'route_id': route_id,
+                            'route_name': route_name
+                        }
+                        else:
+                            route_html_content = fetch_dynamic_page_content(page, route_link)
+                            route_soup = BeautifulSoup(route_html_content, 'html.parser')
+
+                            route_attributes = get_route_attributes(route_soup)
+                            route_location = parse_location(route_attributes.get('formatted_location'))
+                            route_sections = get_route_sections(route_soup)
+                            route_details = get_route_details(route_soup)
+                            comments = get_comments(route_soup)
+
+                            current_route_data = {
+                                'route_id': route_id,
+                                'route_name': route_name,
+                                'route_url': route_link,
+                                'yds_rating': route_attributes.get('yds_rating'),  
+                                'hueco_rating': route_attributes.get('hueco_rating'),
+                                'aid_rating': route_attributes.get('aid_rating'),
+                                'danger_rating': route_attributes.get('danger_rating'),
+                                'avg_stars': route_attributes.get('avg_stars'),
+                                'num_votes': route_attributes.get('num_ratings'),
+                                'region': route_location.get('region'),
+                                'main_area': route_location.get('main_area'),
+                                'sub_area': route_location.get('sub_area'),
+                                'specific_location': route_location.get('specific_location'),
+                                'route_type': route_details.get('route_type'),
+                                'length_ft': route_details.get('length_ft'),
+                                'pitches': route_details.get('pitches'),
+                                'commitment_grade': route_details.get('commitment_grade'),
+                                'fa': route_details.get('fa'),
+                                'description': route_sections.get('description'),
+                                'protection': route_sections.get('protection'),
+                                'primary_photo_url': route_attributes.get('primary_photo_url'),
+                                'insert_date': datetime.now(timezone.utc).isoformat()
+                            }
+
+                            comments_dict = [{'route_id': route_id, 'comment': comment, 'insert_date': datetime.now(timezone.utc).isoformat()} for comment in comments]
+
+                            queries.insert_route(cursor, conn, current_route_data)
+                            queries.insert_comments(cursor, conn, comments_dict)
+                            conn.commit()
+
+                            current_route_data = {
+                                'route_id': route_id,
+                                'route_name': route_name
+                            }
+                    
+                    # Check if tick details row rather than a route row. 
+                    if tick_details and current_route_data:
+                        # Append the additional info to the previous row's data
+                        tick_details_text = tick_details.text.strip()
+
+                        date_pattern = r'[A-Z][a-z]{2}\s+\d{1,2},\s+\d{4}'
+                        date_match = re.search(date_pattern, tick_details_text)
+                        tick_date = date_match.group() if date_match else None
+
+                        tick_type = None
+                        tick_note = None
+
+                        valid_tick_types = [
+                            'Solo', 'TR', 'Follow', 'Lead',
+                            'Lead / Onsight', 'Lead / Flash',
+                            'Lead / Redpoint', 'Lead / Pinkpoint',
+                            'Lead / Fell/Hung'
+                        ]
+
+                        if ' · ' in tick_details_text:
+                            post_date_text = tick_details_text.split(' · ')[1]  # Get everything after the bullet, following date
+                            if '.' in post_date_text:
+                                parts = post_date_text.split('.', 1)
+                                if "pitches" in parts[0].lower():
+                                    next_parts = parts[1].split('.', 1)
+                                    potential_type = next_parts[0].strip()
+                                    if potential_type in valid_tick_types:
+                                        tick_type = potential_type
+                                        tick_note = next_parts[1].strip() if len(next_parts) > 1 else None
+                                    else:
+                                        tick_note = parts[1].strip()
+                                else:
+                                    potential_type = parts[0].strip()
+                                    if potential_type in valid_tick_types:
+                                        tick_type = potential_type
+                                        tick_note = parts[1].strip() if len(parts) > 1 else None
+                                    else:
+                                        tick_note = parts[1].strip()
+                            else:
+                                tick_note = post_date_text.strip()
+                                
+                        tick_data = {
+                            'user_id': user_id,
+                            'route_id': current_route_data['route_id'],
+                            'date': tick_date,
+                            'type': tick_type,
+                            'note': tick_note,
+                            'insert_date': datetime.now(timezone.utc).isoformat()
+                        }
+                        queries.insert_tick(cursor, conn, tick_data)
+                        conn.commit()
+                        current_route_data = None
+
+                print(f'Successfully processed page {page_number}')
+                conn.commit()  
+                
+            except Exception as e:
+                print(f"Error processing page {page_number}: {str(e)}")
+                # Optionally rollback on error
+                conn.rollback()
+                    
+            # Close browser before exiting playwright context
+            if context:
+                context.close()
+            if browser:
+                browser.close()
+                
+    except psycopg2.Error as e:
+        print(f"PostgreSQL Error: {e.pgerror}")
+        conn.rollback()
+    except Exception as e:
+        print(f"Error in lambda_handler: {str(e)}")
+        if conn:
+            conn.rollback()
+        raise
+        
+    finally:
+        # Only close DB connection here, browser cleanup moved to try block
+        if conn:
+            print("Closing database connection...")
+            conn.close()

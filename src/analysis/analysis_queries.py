@@ -204,7 +204,7 @@ def get_bigwall_routes(cursor):
     FROM routes.Ticks t 
     JOIN routes.Routes r on r.id = t.route_id 
     LEFT JOIN estimated_lengths el on el.id = t.route_id 
-    WHERE t.date ILIKE '%2024%' AND r.route_name NOT ILIKE 'The Nose'
+    WHERE TO_CHAR(t.date, 'YYYY') ILIKE '2024' AND r.route_name NOT ILIKE 'The Nose'
     GROUP BY t.date
     ORDER BY total_length desc
     LIMIT 1;

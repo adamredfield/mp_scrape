@@ -9,23 +9,23 @@ from operator import itemgetter
 
 estimated_lengths_cte = f"""
         WITH estimated_lengths AS (
-            SELECT  id,
-                    CASE WHEN route_type ILIKE '%trad%' AND length_ft IS NULL AND pitches IS NULL -- trad single-pitch
-                        THEN (SELECT avg(length_ft) FROM routes.Routes r WHERE route_type ILIKE '%trad%'AND length_ft IS NOT NULL and pitches IS NULL AND length_ft < 230) -- avg single-pitch trad pitch length
-                        WHEN route_type ILIKE '%trad%' AND length_ft IS NULL AND pitches IS NOT NULL -- trad multipitch
-                        THEN (SELECT avg(length_ft/ pitches) FROM routes.Routes r WHERE route_type ILIKE '%trad%' AND length_ft IS NOT NULL and pitches IS NOT NULL) * pitches
-                        WHEN route_type ILIKE '%sport%' AND length_ft IS NULL AND pitches IS NOT NULL -- sport multipitch
-                        THEN (SELECT avg(length_ft) FROM routes.Routes r WHERE route_type ILIKE '%sport%'AND length_ft IS NOT NULL and pitches IS NULL AND length_ft < 230) -- avg single-pitch sport pitch length
-                        WHEN route_type ILIKE '%sport%' AND length_ft IS NULL AND pitches IS NOT NULL -- sport multipitch
-                        THEN (SELECT avg(length_ft/ pitches) FROM routes.Routes r WHERE route_type ILIKE '%trad%' AND length_ft IS NOT NULL and pitches IS NOT NULL) * pitches
-                        WHEN route_type ILIKE '%boulder%' AND length_ft IS NULL
-                        THEN (SELECT avg(length_ft) FROM routes.Routes r WHERE route_type ILIKE '%boulder%' AND length_ft IS NOT NULL) -- boulder
-                        ELSE length_ft
-                    END AS estimated_length
-                FROM routes.Routes
-            WHERE estimated_length IS NOT NULL
+        SELECT  id,
+                CASE WHEN route_type ILIKE '%trad%' AND length_ft IS NULL AND pitches IS NULL -- trad single-pitch
+                    THEN (SELECT avg(length_ft) FROM routes.Routes r WHERE route_type ILIKE '%trad%'AND length_ft IS NOT NULL and pitches IS NULL AND length_ft < 230) -- avg single-pitch trad pitch length
+                    WHEN route_type ILIKE '%trad%' AND length_ft IS NULL AND pitches IS NOT NULL -- trad multipitch
+                    THEN (SELECT avg(length_ft/ pitches) FROM routes.Routes r WHERE route_type ILIKE '%trad%' AND length_ft IS NOT NULL and pitches IS NOT NULL) * pitches
+                    WHEN route_type ILIKE '%sport%' AND length_ft IS NULL AND pitches IS NOT NULL -- sport multipitch
+                    THEN (SELECT avg(length_ft) FROM routes.Routes r WHERE route_type ILIKE '%sport%'AND length_ft IS NOT NULL and pitches IS NULL AND length_ft < 230) -- avg single-pitch sport pitch length
+                    WHEN route_type ILIKE '%sport%' AND length_ft IS NULL AND pitches IS NOT NULL -- sport multipitch
+                    THEN (SELECT avg(length_ft/ pitches) FROM routes.Routes r WHERE route_type ILIKE '%trad%' AND length_ft IS NOT NULL and pitches IS NOT NULL) * pitches
+                    WHEN route_type ILIKE '%boulder%' AND length_ft IS NULL
+                    THEN (SELECT avg(length_ft) FROM routes.Routes r WHERE route_type ILIKE '%boulder%' AND length_ft IS NOT NULL) -- boulder
+                END AS estimated_length
+        FROM routes.Routes
         )
         """
+
+
 
 
 def total_routes(conn):
@@ -47,7 +47,7 @@ def most_climbed_route(conn):
         FROM routes.Ticks t
         JOIN routes.Routes r ON t.route_id = r.id
         LEFT JOIN estimated_lengths el on el.id = t.route_id 
-        WHERE t.date ILIKE '%2024%'
+        WHERE EXTRACT(YEAR FROM t.date) = 2024
         GROUP BY r.route_name
         ORDER BY COUNT(*) DESC
         LIMIT 1
@@ -70,7 +70,7 @@ def top_rated_routes(conn):
         SELECT r.route_name, r.avg_stars
         FROM routes.Routes r
         JOIN routes.Ticks t ON t.route_id = r.id
-        WHERE t.date ILIKE '%2024%'
+        WHERE EXTRACT(YEAR FROM t.date) = 2024
         ORDER BY r.avg_stars DESC
         LIMIT 5
     """
@@ -116,17 +116,25 @@ def biggest_climbing_day(conn):
         FROM routes.Ticks t 
         JOIN routes.Routes r on r.id = t.route_id 
         LEFT JOIN estimated_lengths el on el.id = t.route_id 
-        WHERE t.date ILIKE '%2024%' AND r.route_name NOT ILIKE 'The Nose'
+        WHERE EXTRACT(YEAR FROM t.date) = 2024 AND r.route_name NOT ILIKE 'The Nose'
         GROUP BY t.date
         ORDER BY total_length desc
     LIMIT 1;
     """
 
     result = conn.query(query)
+    
     if result.empty:
         return None
     
-    return result.iloc[0]
+    row = result.iloc[0]
+    
+    return (
+        row['date'],
+        row['routes'],
+        row['total_length'],
+        row['areas']
+    )
 
 def top_grade(conn, level):
     query = """
