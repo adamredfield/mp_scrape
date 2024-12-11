@@ -427,8 +427,6 @@ def process_page(page_number, ticks_url, user_id, retry_count=0):
     except Exception as e:
         print(f"Error processing page {page_number}: {str(e)}")
         raise
-        
- 
     
 def check_routes_exist(cursor, route_ids):
     """Check multiple routes at once"""
