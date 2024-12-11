@@ -2,7 +2,7 @@ name: Deploy Lambda Functions
 
 on:
   push:
-    branches: [ main, lambda-testing ]
+    branches: [ main, postgres-migration ]
   pull_request:
     branches: [ main ]
 
@@ -43,11 +43,32 @@ jobs:
       run: |
         aws lambda delete-function --function-name mp-scraper-orchestrator || true
         aws lambda delete-function --function-name mp-scraper-worker || true
+        aws lambda delete-function --function-name mp-scraper-retry-worker || true
 
     - name: Create SQS Queue if not exists
       run: |
         aws sqs create-queue --queue-name mp-scraper-queue || true
         
+    - name: Create DLQ Queue
+      run: |
+        aws sqs set-queue-attributes \
+          --queue-url https://sqs.us-east-1.amazonaws.com/855154218477/mp-scraper-dlq \
+          --attributes '{
+            "VisibilityTimeout": "900"
+          }'
+        
+    - name: Update main queue with DLQ
+      run: |
+        QUEUE_URL=$(aws sqs get-queue-url --queue-name mp-scraper-queue --output text --query 'QueueUrl')
+        DLQ_URL=$(aws sqs get-queue-url --queue-name mp-scraper-dlq --output text --query 'QueueUrl')
+        DLQ_ARN=$(aws sqs get-queue-attributes --queue-url $DLQ_URL --attribute-names QueueArn --query 'Attributes.QueueArn' --output text)
+        
+        aws sqs set-queue-attributes \
+          --queue-url $QUEUE_URL \
+          --attributes '{
+            "RedrivePolicy": "{\"deadLetterTargetArn\":\"'$DLQ_ARN'\",\"maxReceiveCount\":3}"
+          }'
+
     - name: Deploy worker function
       run: |
         aws lambda create-function \
@@ -55,9 +76,52 @@ jobs:
           --package-type Image \
           --code ImageUri=${{ steps.login-ecr.outputs.registry }}/mp-scraper:latest \
           --role ${{ secrets.AWS_LAMBDA_ROLE_ARN }} \
-          --environment '{"Variables": {"QUEUE_URL": "${{ secrets.SQS_URL }}", "S3_BUCKET_NAME": "mp-scraper-db"}}' \
+          --vpc-config SubnetIds=${{ secrets.SUBNET_IDS }},SecurityGroupIds=${{ secrets.SECURITY_GROUP_IDS }} \
+          --environment '{"Variables": {
+              "POSTGRES_HOST": "${{ secrets.POSTGRES_HOST }}",
+              "POSTGRES_DB": "${{ secrets.POSTGRES_DB }}",
+              "POSTGRES_USER": "${{ secrets.POSTGRES_USER }}",
+              "POSTGRES_PASSWORD": "${{ secrets.POSTGRES_PASSWORD }}",
+              "POSTGRES_PORT": "${{ secrets.POSTGRES_PORT }}",
+              "IPROYAL_USERNAME": "${{ secrets.IPROYAL_USERNAME }}",
+              "IPROYAL_PASSWORD": "${{ secrets.IPROYAL_PASSWORD }}",
+              "MP_USERNAME": "${{ secrets.MP_USERNAME }}",
+              "MP_PASSWORD": "${{ secrets.MP_PASSWORD }}"
+          }}' \
           --timeout 900 \
-          --memory-size 1024
+          --memory-size 2048 \
+          --image-config '{"Command": ["src.lambda.worker.lambda_handler"]}'
+
+    - name: Set worker concurrency
+      run: |
+        aws lambda put-function-concurrency \
+          --function-name mp-scraper-worker \
+          --reserved-concurrent-executions 10
+
+    - name: Deploy retry worker function
+      run: |
+        aws lambda create-function \
+          --function-name mp-scraper-retry-worker \
+          --package-type Image \
+          --code ImageUri=${{ steps.login-ecr.outputs.registry }}/mp-scraper:latest \
+          --role ${{ secrets.AWS_LAMBDA_ROLE_ARN }} \
+          --vpc-config SubnetIds=${{ secrets.SUBNET_IDS }},SecurityGroupIds=${{ secrets.SECURITY_GROUP_IDS }} \
+          --environment '{
+            "Variables": {
+              "MP_USERNAME": "${{ secrets.MP_USERNAME }}",
+              "MP_PASSWORD": "${{ secrets.MP_PASSWORD }}",
+              "IPROYAL_USERNAME": "${{ secrets.IPROYAL_USERNAME }}",
+              "IPROYAL_PASSWORD": "${{ secrets.IPROYAL_PASSWORD }}",
+              "POSTGRES_HOST": "${{ secrets.POSTGRES_HOST }}",
+              "POSTGRES_DB": "${{ secrets.POSTGRES_DB }}",
+              "POSTGRES_USER": "${{ secrets.POSTGRES_USER }}",
+              "POSTGRES_PASSWORD": "${{ secrets.POSTGRES_PASSWORD }}",
+              "POSTGRES_PORT": "${{ secrets.POSTGRES_PORT }}"
+            }
+          }' \
+          --timeout 900 \
+          --memory-size 2048 \
+          --image-config '{"Command": ["src.lambda.retry_worker.lambda_handler"]}'
 
     - name: Deploy orchestrator function
       run: |
@@ -66,7 +130,11 @@ jobs:
           --package-type Image \
           --code ImageUri=${{ steps.login-ecr.outputs.registry }}/mp-scraper:latest \
           --role ${{ secrets.AWS_LAMBDA_ROLE_ARN }} \
-          --environment '{"Variables": {"QUEUE_URL": "${{ secrets.SQS_URL }}"}}' \
+          --environment '{"Variables": {
+              "QUEUE_URL": "${{ secrets.SQS_URL }}",
+              "IPROYAL_USERNAME": "${{ secrets.IPROYAL_USERNAME }}",
+              "IPROYAL_PASSWORD": "${{ secrets.IPROYAL_PASSWORD }}"
+          }}' \
           --timeout 900 \
           --memory-size 1024 \
           --image-config '{"Command": ["src.lambda.orchestrator.lambda_handler"]}'

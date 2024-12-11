@@ -6,19 +6,26 @@ sys.path.append(project_root)
 
 import json
 import boto3
-from src.scraping import helper_functions
 
 sqs = boto3.client('sqs')
 QUEUE_URL = os.environ['QUEUE_URL']
-BATCH_SIZE = 2  # 2 pages per batch
+BATCH_SIZE = 1  # pages per batch
 
 def lambda_handler(event, context):
+
+    user_id = event.get('user_id', '200362278/doctor-choss')  # Default if not provided
+    base_url = f'https://www.mountainproject.com/user/{user_id}'
+    ticks_url = f'{base_url}/ticks?page='
+
+    print(f"Starting scrape for user: {user_id}")
+    print(f"Queue URL: {QUEUE_URL}")
+    from src.scraping import helper_functions
+    print("Initialized helper functions")
+
     try:
-        # 1. Get total pages from Mountain Project
-        total_pages = helper_functions.get_total_pages()
+        total_pages = helper_functions.get_total_pages(ticks_url)
         print(f"Found {total_pages} pages to scrape")
         
-        # 2. Break into smaller batches (2 pages each)
         for i in range(1, total_pages + 1, BATCH_SIZE): # page numbers start at 1
             batch = []
             for page_num in range(i, min(i + BATCH_SIZE, total_pages + 1)): # if total_pages is smaller than stop, use total_pages
@@ -26,8 +33,8 @@ def lambda_handler(event, context):
                     'Id': str(page_num),
                     'MessageBody': json.dumps({
                         'page_number': page_num,
-                        'ticks_url': f'{helper_functions.ticks_url}{page_num}',
-                        'user': helper_functions.user
+                        'ticks_url': ticks_url,
+                        'user_id': user_id
                     })
                 })
             

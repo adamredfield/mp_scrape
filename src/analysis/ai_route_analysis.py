@@ -31,10 +31,10 @@ def get_next_route(cursor):
         r.fa,
         r.description,
         r.protection,
-        GROUP_CONCAT(rc.comment, ' | ') as comments
-    FROM Routes r
-    LEFT JOIN RouteComments rc ON r.id = rc.route_id
-    LEFT JOIN RouteAnalysis ra ON r.id = ra.route_id
+        STRING_AGG(rc.comment, ' | ') as comments
+    FROM routes.Routes r
+    LEFT JOIN routes.RouteComments rc ON r.id = rc.route_id
+    LEFT JOIN analysis.RouteAnalysis ra ON r.id = ra.route_id
     WHERE ra.id IS NULL  -- Only get routes not yet analyzed
     GROUP BY r.id
     LIMIT 1
@@ -181,55 +181,57 @@ def process_route_response(ai_response: dict) -> dict:
         return None
 
 def save_analysis_results(cursor, connection, result):
-
     try:
         ai_response = json.loads(result['tags'])
         processed_response = process_route_response(ai_response)
 
-        """Save analysis results to database"""
-        analysis_insert_sql = f"""
-        INSERT INTO RouteAnalysis (
+        # Insert RouteAnalysis
+        analysis_insert_sql = """
+        INSERT INTO analysis.RouteAnalysis (
             route_id,
             insert_date
-        ) VALUES (
-            {result['route_id']},
-            "{result['insert_date']}"
-        )
+        ) VALUES (%s, %s)
+        RETURNING id
         """
-        cursor.execute(analysis_insert_sql)
-        analysis_id = cursor.lastrowid
+        cursor.execute(analysis_insert_sql, (
+            result['route_id'],
+            result['insert_date']
+        ))
+        analysis_id = cursor.fetchone()[0]
 
+        # Insert RouteAnalysisTags
+        tag_insert_sql = """
+        INSERT INTO analysis.RouteAnalysisTags (
+            analysis_id,
+            tag_type,
+            tag_value,
+            insert_date
+        ) VALUES (%s, %s, %s, %s)
+        """
         for tag_type, tag_value in processed_response['tags']:
-            tag_insert_sql = f"""
-            INSERT INTO RouteAnalysisTags (
+            cursor.execute(tag_insert_sql, (
                 analysis_id,
                 tag_type,
                 tag_value,
-                insert_date
-            ) VALUES (
-                {analysis_id},
-                "{tag_type}",
-                "{tag_value}",
-                "{result['insert_date']}"
-            )
-            """
-            cursor.execute(tag_insert_sql)
+                result['insert_date']
+            ))
 
+        # Insert RouteAnalysisTagsReasoning
+        reasoning_insert_sql = """
+        INSERT INTO analysis.RouteAnalysisTagsReasoning (
+            analysis_id,
+            tag_type,
+            reasoning,
+            insert_date
+        ) VALUES (%s, %s, %s, %s)
+        """
         for tag_type, reasoning in processed_response['reasoning']:
-            reasoning_insert_sql = f"""
-            INSERT INTO RouteAnalysisTagsReasoning (
+            cursor.execute(reasoning_insert_sql, (
                 analysis_id,
                 tag_type,
                 reasoning,
-                insert_date
-            ) VALUES (
-                {analysis_id},
-                "{tag_type}",
-                "{reasoning}",
-                "{result['insert_date']}"
-            )
-            """
-            cursor.execute(reasoning_insert_sql)
+                result['insert_date']
+            ))
 
         connection.commit()
     except Exception as e:
