@@ -20,7 +20,7 @@ def create_connection():
                 host=os.getenv('POSTGRES_HOST'),
                 port=os.getenv('POSTGRES_PORT', '5432'),
                 sslmode='require',
-                connect_timeout=10
+                connect_timeout=30
             )
             print("Connected successfully")
             break
