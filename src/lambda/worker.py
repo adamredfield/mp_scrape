@@ -21,7 +21,7 @@ def lambda_handler(event, context):
                 helper_functions.process_page(
                     page_number=message['page_number'],
                     ticks_url=message['ticks_url'],
-                    user_id='200362278/doctor-choss',
+                    user_id=['user_id'],
                     retry_count=message.get('retry_count', 0)
                 )
                 

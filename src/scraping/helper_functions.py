@@ -11,11 +11,6 @@ from playwright.sync_api import sync_playwright
 
 mp_home_url = "https://www.mountainproject.com"
 
-base_url = f'{mp_home_url}/user/'
-user_id = '200362278/doctor-choss'
-constructed_url = f'{base_url}{user_id}'
-ticks_url = f'{constructed_url}/ticks?page='
-
 def get_proxy_url():
     """Get IPRoyal proxy URL - returns a string"""
     username = os.getenv('IPROYAL_USERNAME')
@@ -106,7 +101,7 @@ def fetch_dynamic_page_content(page, route_link):
         html_content = page.content()
         return html_content
 
-def get_total_pages():
+def get_total_pages(ticks_url):
     proxy_url = get_proxy_url()
     proxies = {
         'http': proxy_url,
@@ -116,9 +111,13 @@ def get_total_pages():
     pagination_response = requests.get(ticks_url, proxies=proxies)
     if pagination_response.status_code != 200:
         print(f"Failed to retrieve data: {pagination_response.status_code}")
+        raise Exception(f"Failed to get total pages: {pagination_response.status_code}")
 
     pagination_soup = BeautifulSoup(pagination_response.text, 'html.parser')
     pagination_div = pagination_soup.find('div', class_='pagination')
+    if not pagination_div:
+        return 1  # Return 1 if no pagination found
+        
     no_click_links = pagination_div.find_all('a', class_='no-click')
 
     # Loop through the links to find the one containing text (pagination data)
@@ -126,7 +125,6 @@ def get_total_pages():
         pagination_text = link.get_text(strip=True)
 
     total_pages = int(pagination_text.split()[-1])
-
     return total_pages
 
 def get_comments(route_soup):
@@ -334,19 +332,14 @@ def parse_location(location_string):
 
 def process_page(page_number, ticks_url, user_id, retry_count=0):
     """Process a single page"""
-    proxy_url = get_proxy_url()  # Get string URL
-    proxies = {                  # Create dict where needed
+    proxy_url = get_proxy_url()
+    proxies = {
         'http': proxy_url,
         'https': proxy_url
     }
     
-    print(f"Using proxies config:")
-    print(f"HTTP: {proxies['http'].replace(os.getenv('IPROYAL_PASSWORD'), '****')}")
-    print(f"HTTPS: {proxies['https'].replace(os.getenv('IPROYAL_PASSWORD'), '****')}")
-    
     with create_connection() as conn:
         cursor = conn.cursor()
-        
         with sync_playwright() as playwright:
             browser = None
             context = None
@@ -356,7 +349,8 @@ def process_page(page_number, ticks_url, user_id, retry_count=0):
 
                 print(f'Processing page: {page_number}. (Retry #{retry_count})')
                 
-                tick_response = requests.get(ticks_url, proxies=proxies)
+                current_page_url = f"{ticks_url}{page_number}"
+                tick_response = requests.get(current_page_url, proxies=proxies)
                 if tick_response.status_code != 200:
                     raise Exception(f"Failed to retrieve data: {tick_response.status_code}")
                 
@@ -426,70 +420,68 @@ def process_page(page_number, ticks_url, user_id, retry_count=0):
                                     'route_id': route_id,
                                     'route_name': route_name
                                 }
-                        
-                        # Check if tick details row rather than a route row. 
-                        if tick_details and current_route_data:
-                            # Append the additional info to the previous row's data
-                            tick_details_text = tick_details.text.strip()
+                            
+                            # Check if tick details row rather than a route row. 
+                            if tick_details and current_route_data:
+                                # Append the additional info to the previous row's data
+                                tick_details_text = tick_details.text.strip()
 
-                            date_pattern = r'[A-Z][a-z]{2}\s+\d{1,2},\s+\d{4}'
-                            date_match = re.search(date_pattern, tick_details_text)
-                            tick_date = date_match.group() if date_match else None
+                                date_pattern = r'[A-Z][a-z]{2}\s+\d{1,2},\s+\d{4}'
+                                date_match = re.search(date_pattern, tick_details_text)
+                                tick_date = date_match.group() if date_match else None
 
-                            tick_type = None
-                            tick_note = None
+                                tick_type = None
+                                tick_note = None
 
-                            valid_tick_types = [
-                                'Solo', 'TR', 'Follow', 'Lead',
-                                'Lead / Onsight', 'Lead / Flash',
-                                'Lead / Redpoint', 'Lead / Pinkpoint',
-                                'Lead / Fell/Hung'
-                            ]
+                                valid_tick_types = [
+                                    'Solo', 'TR', 'Follow', 'Lead',
+                                    'Lead / Onsight', 'Lead / Flash',
+                                    'Lead / Redpoint', 'Lead / Pinkpoint',
+                                    'Lead / Fell/Hung'
+                                ]
 
-                            if ' · ' in tick_details_text:
-                                post_date_text = tick_details_text.split(' · ')[1]  # Get everything after the bullet, following date
-                                if '.' in post_date_text:
-                                    parts = post_date_text.split('.', 1)
-                                    if "pitches" in parts[0].lower():
-                                        next_parts = parts[1].split('.', 1)
-                                        potential_type = next_parts[0].strip()
-                                        if potential_type in valid_tick_types:
-                                            tick_type = potential_type
-                                            tick_note = next_parts[1].strip() if len(next_parts) > 1 else None
+                                if ' · ' in tick_details_text:
+                                    post_date_text = tick_details_text.split(' · ')[1]  # Get everything after the bullet, following date
+                                    if '.' in post_date_text:
+                                        parts = post_date_text.split('.', 1)
+                                        if "pitches" in parts[0].lower():
+                                            next_parts = parts[1].split('.', 1)
+                                            potential_type = next_parts[0].strip()
+                                            if potential_type in valid_tick_types:
+                                                tick_type = potential_type
+                                                tick_note = next_parts[1].strip() if len(next_parts) > 1 else None
+                                            else:
+                                                tick_note = parts[1].strip()
                                         else:
-                                            tick_note = parts[1].strip()
+                                            potential_type = parts[0].strip()
+                                            if potential_type in valid_tick_types:
+                                                tick_type = potential_type
+                                                tick_note = parts[1].strip() if len(parts) > 1 else None
+                                            else:
+                                                tick_note = parts[1].strip()
                                     else:
-                                        potential_type = parts[0].strip()
-                                        if potential_type in valid_tick_types:
-                                            tick_type = potential_type
-                                            tick_note = parts[1].strip() if len(parts) > 1 else None
-                                        else:
-                                            tick_note = parts[1].strip()
-                                else:
-                                    tick_note = post_date_text.strip()
-                                    
-                            tick_data = {
-                                'user_id': user_id,
-                                'route_id': current_route_data['route_id'],
-                                'date': tick_date,
-                                'type': tick_type,
-                                'note': tick_note,
-                                'insert_date': datetime.now(timezone.utc).isoformat()
-                            }
-                            queries.insert_tick(cursor, conn, tick_data)
-                            conn.commit()
-                            current_route_data = None
+                                        tick_note = post_date_text.strip()
+                                        
+                                tick_data = {
+                                    'user_id': user_id,
+                                    'route_id': current_route_data['route_id'],
+                                    'date': tick_date,
+                                    'type': tick_type,
+                                    'note': tick_note,
+                                    'insert_date': datetime.now(timezone.utc).isoformat()
+                                }
+                                queries.insert_tick(cursor, conn, tick_data)
+                                conn.commit()
+                                current_route_data = None
 
                     except Exception as e:
-                        conn.rollback()
                         print(f"Error processing row: {str(e)}")
                         continue  
                 
                 print(f'Successfully processed page {page_number}')
-                
+            
             except Exception as e:
                 print(f"Error processing page {page_number}: {str(e)}")
-                conn.rollback()
                 raise
                 
             finally:

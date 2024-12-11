@@ -12,6 +12,13 @@ QUEUE_URL = os.environ['QUEUE_URL']
 BATCH_SIZE = 1  # pages per batch
 
 def lambda_handler(event, context):
+
+    user_id = event.get('user_id', '200362278/doctor-choss')  # Default if not provided
+    base_url = f'https://www.mountainproject.com/user/{user_id}'
+    ticks_url = f'{base_url}/ticks?page='
+
+    print(f"Starting scrape for user: {user_id}")
+    print(f"Queue URL: {QUEUE_URL}")
     from src.scraping import helper_functions
     print("Initialized helper functions")
 
@@ -26,8 +33,8 @@ def lambda_handler(event, context):
                     'Id': str(page_num),
                     'MessageBody': json.dumps({
                         'page_number': page_num,
-                        'ticks_url': f'{helper_functions.ticks_url}{page_num}',
-                        'user_id': helper_functions.user_id
+                        'ticks_url': f'{ticks_url}{page_num}',
+                        'user_id': user_id
                     })
                 })
             

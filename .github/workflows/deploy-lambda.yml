@@ -108,6 +108,7 @@ jobs:
           --vpc-config SubnetIds=${{ secrets.SUBNET_IDS }},SecurityGroupIds=${{ secrets.SECURITY_GROUP_IDS }} \
           --environment '{"Variables": {
               "DLQ_URL": "${{ secrets.DLQ_URL }}",
+              "QUEUE_URL": "${{ secrets.QUEUE_URL }}",
               "POSTGRES_HOST": "${{ secrets.POSTGRES_HOST }}",
               "POSTGRES_DB": "${{ secrets.POSTGRES_DB }}",
               "POSTGRES_USER": "${{ secrets.POSTGRES_USER }}",
