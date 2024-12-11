@@ -358,10 +358,12 @@ def process_page(page_number, ticks_url, user_id, retry_count=0):
                 tick_soup = BeautifulSoup(tick_response.text, 'html.parser')
                 tick_table = tick_soup.find('table', class_='table route-table hidden-xs-down')
                 tick_rows = tick_table.find_all('tr', class_='route-row')
+                print(f"Found {len(tick_rows)} rows to process")
 
                 for row in tick_rows:
                     try:
                         tick_details = row.find('td', class_='text-warm small pt-0')
+                        print(f"Found tick details: {tick_details}")
                     
                         if not tick_details:
                             cells = row.find_all('td')
