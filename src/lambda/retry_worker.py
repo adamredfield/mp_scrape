@@ -7,11 +7,7 @@ sys.path.append(project_root)
 
 from src.scraping import helper_functions
 import json
-import boto3
 
-sqs = boto3.client('sqs')
-DLQ_URL = os.environ['DLQ_URL']
-MAIN_QUEUE_URL = os.environ['QUEUE_URL']
 
 def lambda_handler(event, context):
     """Handle batch of SQS messages from DLQ"""

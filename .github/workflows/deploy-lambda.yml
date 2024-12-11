@@ -107,13 +107,15 @@ jobs:
           --role ${{ secrets.AWS_LAMBDA_ROLE_ARN }} \
           --vpc-config SubnetIds=${{ secrets.SUBNET_IDS }},SecurityGroupIds=${{ secrets.SECURITY_GROUP_IDS }} \
           --environment '{"Variables": {
-              "DLQ_URL": "${{ secrets.DLQ_URL }}",
-              "QUEUE_URL": "${{ secrets.QUEUE_URL }}",
-              "POSTGRES_HOST": "${{ secrets.POSTGRES_HOST }}",
-              "POSTGRES_DB": "${{ secrets.POSTGRES_DB }}",
-              "POSTGRES_USER": "${{ secrets.POSTGRES_USER }}",
-              "POSTGRES_PASSWORD": "${{ secrets.POSTGRES_PASSWORD }}",
-              "POSTGRES_PORT": "${{ secrets.POSTGRES_PORT }}"
+              MP_USERNAME='$MP_USERNAME',
+              MP_PASSWORD='$MP_PASSWORD',
+              IPROYAL_USERNAME='$IPROYAL_USERNAME',
+              IPROYAL_PASSWORD='$IPROYAL_PASSWORD',
+              POSTGRES_HOST='$POSTGRES_HOST',
+              POSTGRES_DB='$POSTGRES_DB',
+              POSTGRES_USER='$POSTGRES_USER',
+              POSTGRES_PASSWORD='$POSTGRES_PASSWORD',
+              POSTGRES_PORT='$POSTGRES_PORT'
           }}' \
           --timeout 900 \
           --memory-size 2048 \
