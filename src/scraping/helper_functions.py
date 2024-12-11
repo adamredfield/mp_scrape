@@ -350,6 +350,7 @@ def process_page(page_number, ticks_url, user_id, retry_count=0):
                 print(f'Processing page: {page_number}. (Retry #{retry_count})')
                 
                 current_page_url = f"{ticks_url}{page_number}"
+                print(f"Fetching page: {current_page_url}")
                 tick_response = requests.get(current_page_url, proxies=proxies)
                 print(f"Response status code: {tick_response.status_code}")
                 if tick_response.status_code != 200:
