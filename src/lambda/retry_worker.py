@@ -14,64 +14,29 @@ DLQ_URL = os.environ['DLQ_URL']
 MAIN_QUEUE_URL = os.environ['QUEUE_URL']
 
 def lambda_handler(event, context):
+    """Handle batch of SQS messages from DLQ"""
     try:
-        response = sqs.receive_message(
-            QueueUrl=DLQ_URL,
-            MaxNumberOfMessages=10,
-            VisibilityTimeout=900
-        )
-        
-        if 'Messages' not in response:
-            print("No failed messages to process")
-            return
-            
-        for message in response['Messages']:
+        for record in event['Records']:
             try:
-                original_body = json.loads(message['Body'])
-                retry_count = original_body.get('retry_count', 0) + 1
-                
-                # Always delete the message we just received
-                sqs.delete_message(
-                    QueueUrl=DLQ_URL,
-                    ReceiptHandle=message['ReceiptHandle']
-                )
+                message = json.loads(record['body'])
+                retry_count = message.get('retry_count', 0) + 1
                 
                 if retry_count <= 3:
-                    try:
-                        helper_functions.process_page(
-                            page_number=original_body['page_number'],
-                            ticks_url=original_body['ticks_url'],
-                            user_id=original_body['user_id'],
-                            retry_count=retry_count
-                        )
-                        print(f"Successfully processed failed page {original_body['page_number']}")
-                        
-                    except Exception as e:
-                        print(f"Processing failed, sending back to DLQ with retry count {retry_count}")
-                        # Send new message with updated retry count
-                        new_message = {
-                            'MessageBody': json.dumps({
-                                'page_number': original_body['page_number'],
-                                'ticks_url': original_body['ticks_url'],
-                                'user_id': original_body['user_id'],
-                                'retry_count': retry_count,
-                                'last_error_time': datetime.now(timezone.utc).isoformat()
-                            })
-                        }
-                        
-                        sqs.send_message(
-                            QueueUrl=DLQ_URL,
-                            MessageBody=new_message['MessageBody']
-                        )
-                        
+                    helper_functions.process_page(
+                        page_number=message['page_number'],
+                        ticks_url=message['ticks_url'],
+                        user_id=message['user_id'],
+                        retry_count=retry_count
+                    )
+                    print(f"Successfully processed failed page {message['page_number']}")
                 else:
-                    print(f"Page {original_body['page_number']} exceeded max retries")
+                    print(f"Page {message['page_number']} exceeded max retries")
                     
             except Exception as e:
-                print(f"Error in message processing loop: {str(e)}")
-                continue
+                print(f"Error processing record: {str(e)}")
+                raise  # Let Lambda handle the retry
                 
     except Exception as e:
-        print(f"Error in retry worker: {str(e)}")
+        print(f"Error in handler: {str(e)}")
         raise
 
