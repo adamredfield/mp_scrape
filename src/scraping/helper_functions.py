@@ -47,32 +47,20 @@ def login_and_save_session(playwright):
 
         context = browser.new_context()
         print("Context created successfully")
-        
+    
         page = context.new_page()
-        page.set_default_navigation_timeout(60000)  # 60s for page loads
-        page.set_default_timeout(30000)  # 30s for most operations
-
+        page.set_default_navigation_timeout(60000)
+        page.set_default_timeout(30000)
         page.goto(mp_home_url)
-
         page.wait_for_load_state('networkidle')
         print("Navigation complete")
 
-        sign_in = page.wait_for_selector("a.sign-in", timeout=10000)
-        sign_in.click()
-        print("Clicked sign-in")
-
-        page.wait_for_selector("#login-modal", timeout=10000)
-
-        email = page.wait_for_selector("input[type='email'][name='email']", timeout=5000)
-        password = page.wait_for_selector("input[type='password'][name='pass']", timeout=5000)
-        
-        email.fill(mp_username)
-        password.fill(mp_password)
-        print("Filled credentials")
-
-        submit = page.wait_for_selector("#login-modal button[type='submit']", timeout=5000)
-        submit.click()
-        print("Clicked submit")
+        page.click("a.sign-in")
+        page.wait_for_selector("#login-modal", timeout=5000)
+        page.fill("input[type='email'][name='email']", mp_username)
+        page.fill("input[type='password'][name='pass']", mp_password)
+        page.click("#login-modal button[type='submit']")
+        print("Login submitted")
 
         # Save cookies and storage_state to /tmp
         cookies = context.cookies()
