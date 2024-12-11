@@ -37,6 +37,13 @@ def login_and_save_session(playwright):
     try:
         browser = playwright.chromium.launch(
             headless=True,
+            args=[
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--single-process',
+                '--no-zygote'
+            ]
             proxy={
                 'server': 'http://geo.iproyal.com:12321',
                 'username': proxy_username,
@@ -45,7 +52,9 @@ def login_and_save_session(playwright):
         )
         print("Browser launched successfully")
 
-        context = browser.new_context()
+        context = browser.new_context(
+            viewport={'width': 1280, 'height': 720}
+        )
         print("Context created successfully")
     
         page = context.new_page()
