@@ -129,7 +129,6 @@ jobs:
         if [ "$MAPPING_UUID" != "None" ]; then
           aws lambda delete-event-source-mapping --uuid $MAPPING_UUID
         fi
-      continue-on-error: true  # Don't fail if mapping doesn't exist
 
     - name: Create DLQ trigger for retry worker
       run: |
