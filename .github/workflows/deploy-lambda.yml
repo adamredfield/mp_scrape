@@ -118,7 +118,7 @@ jobs:
               "POSTGRES_PASSWORD": "${{ secrets.POSTGRES_PASSWORD }}",
               "POSTGRES_PORT": "${{ secrets.POSTGRES_PORT }}"
             }
-          }'
+          }' \
           --timeout 900 \
           --memory-size 2048 \
           --image-config '{"Command": ["src.lambda.retry_worker.lambda_handler"]}'
