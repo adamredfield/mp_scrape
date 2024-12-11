@@ -51,7 +51,11 @@ jobs:
         
     - name: Create DLQ Queue
       run: |
-        aws sqs create-queue --queue-name mp-scraper-dlq || true
+        aws sqs set-queue-attributes \
+          --queue-url https://sqs.us-east-1.amazonaws.com/855154218477/mp-scraper-dlq \
+          --attributes '{
+            "VisibilityTimeout": "900"
+          }'
         
     - name: Update main queue with DLQ
       run: |
