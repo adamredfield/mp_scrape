@@ -33,7 +33,8 @@ def create_connection():
                 host=host,
                 port=os.getenv('POSTGRES_PORT', '5432'),
                 sslmode='require',
-                connect_timeout=10  # Shorter timeout
+                connect_timeout=30
+
             )
             print("Connected successfully")
             break
@@ -47,12 +48,14 @@ def create_connection():
             else:
                 print(f"All {max_attempts} attempts failed. Last error: {last_exception}")
                 raise last_exception
+
     try:
         yield connection
     finally:
-        if 'connection' in locals() and connection:
+        # Only close if explicitly requested or on error
+        if 'connection' in locals() and connection and connection.closed:
             connection.close()
-            print("Connection closed")
+            print("Connection closed due to error or explicit request")
 
 def add_new_tags_to_mapping(cursor):
     """Add any new tags from Tags table to TagMapping with default values"""

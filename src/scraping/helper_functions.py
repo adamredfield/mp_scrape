@@ -7,6 +7,7 @@ from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 import re
 import os
+from playwright.sync_api import sync_playwright
 
 mp_home_url = "https://www.mountainproject.com"
 
@@ -26,7 +27,6 @@ def get_proxy_url():
     return proxy_url
 
 def login_and_save_session(playwright):
-    from playwright.sync_api import sync_playwright
 
     """Initialize browser with proxy and login"""
     mp_username = os.getenv('MP_USERNAME')
