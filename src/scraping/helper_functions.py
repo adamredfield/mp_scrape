@@ -61,9 +61,8 @@ def login_and_save_session(playwright):
         page.set_default_navigation_timeout(60000)
         page.set_default_timeout(30000)
         page.goto(mp_home_url)
-        page.wait_for_load_state('networkidle')
         print("Navigation complete")
-
+        page.wait_for_selector("a.sign-in", timeout=10000)
         page.click("a.sign-in")
         page.wait_for_selector("#login-modal", timeout=5000)
         page.fill("input[type='email'][name='email']", mp_username)
