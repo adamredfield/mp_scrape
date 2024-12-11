@@ -351,6 +351,7 @@ def process_page(page_number, ticks_url, user_id, retry_count=0):
                 
                 current_page_url = f"{ticks_url}{page_number}"
                 tick_response = requests.get(current_page_url, proxies=proxies)
+                print(f"Response status code: {tick_response.status_code}")
                 if tick_response.status_code != 200:
                     raise Exception(f"Failed to retrieve data: {tick_response.status_code}")
                 

@@ -1,5 +1,6 @@
 import os
 import sys
+import json
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -9,30 +10,26 @@ load_dotenv()
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(project_root)
 
-from src.scraping import helper_functions
-from playwright.sync_api import sync_playwright
+from src.lambda_test.worker import lambda_handler
 
-def test_login_and_session():
-    with sync_playwright() as playwright:
-        try:
-            browser, context = helper_functions.login_and_save_session(playwright)
-            print("Login successful!")
-            
-            # Test creating a new page
-            page = context.new_page()
-            print("New page created successfully")
-            
-            # Try to fetch a simple page
-            page.goto('https://www.mountainproject.com')
-            print("Navigation successful")
-            
-        except Exception as e:
-            print(f"Test failed: {str(e)}")
-        finally:
-            if 'context' in locals():
-                context.close()
-            if 'browser' in locals():
-                browser.close()
+def test_worker():
+    # Simulate SQS event with JSON-encoded body
+    test_event = {
+        'Records': [{
+            'body': json.dumps({
+                'page_number': 1,
+                'ticks_url': 'https://www.mountainproject.com/user/200362278/doctor-choss/ticks?page=',
+                'user_id': '200362278/doctor-choss'
+            })
+        }]
+    }
+    
+    try:
+        print("Testing worker with simulated SQS message...")
+        lambda_handler(test_event, None)
+        
+    except Exception as e:
+        print(f"Test failed: {str(e)}")
 
 if __name__ == "__main__":
-    test_login_and_session() 
+    test_worker()
