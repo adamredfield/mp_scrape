@@ -1,5 +1,3 @@
-import psycopg2
-
 def insert_route(cursor, connection, route_data):
     route_sql = '''
     INSERT INTO routes.Routes (

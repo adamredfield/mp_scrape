@@ -4,11 +4,13 @@ import sys
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(project_root)
 
-from src.scraping import helper_functions
 import json
 import os
 
 def lambda_handler(event, context):
+    from src.scraping import helper_functions
+    print("Initialized helper functions")
+
     """Handle batch of SQS messages"""
     try:
         for record in event['Records']:

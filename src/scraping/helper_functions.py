@@ -4,7 +4,6 @@ import re
 from src.database.utils import create_connection
 from src.database import queries
 from bs4 import BeautifulSoup
-from playwright.sync_api import sync_playwright
 from datetime import datetime, timezone
 import re
 import os
@@ -27,6 +26,8 @@ def get_proxy_url():
     return proxy_url
 
 def login_and_save_session(playwright):
+    from playwright.sync_api import sync_playwright
+
     """Initialize browser with proxy and login"""
     mp_username = os.getenv('MP_USERNAME')
     mp_password = os.getenv('MP_PASSWORD')
@@ -63,6 +64,7 @@ def login_and_save_session(playwright):
         page.goto(mp_home_url)
         print("Navigation complete")
         page.wait_for_selector("a.sign-in", timeout=10000)
+        print("Sign in button found")
         page.click("a.sign-in")
         page.wait_for_selector("#login-modal", timeout=5000)
         page.fill("input[type='email'][name='email']", mp_username)

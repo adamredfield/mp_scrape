@@ -6,13 +6,15 @@ sys.path.append(project_root)
 
 import json
 import boto3
-from src.scraping import helper_functions
 
 sqs = boto3.client('sqs')
 QUEUE_URL = os.environ['QUEUE_URL']
 BATCH_SIZE = 1  # pages per batch
 
 def lambda_handler(event, context):
+    from src.scraping import helper_functions
+    print("Initialized helper functions")
+
     try:
         total_pages = helper_functions.get_total_pages()
         print(f"Found {total_pages} pages to scrape")

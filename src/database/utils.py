@@ -1,42 +1,56 @@
 import os
-import psycopg2
-import time
-import random
 from contextlib import contextmanager
 
 @contextmanager
 def create_connection():
     """Create a PostgreSQL database connection with retries and exponential backoff"""
-    max_attempts = 5
-    base_delay = 1  # Start with 1 second delay
+    import psycopg2
+    import random
+    import time
+    import socket
+    print("Initialized DB dependencies")
 
+    max_attempts = 5
+    base_delay = 1
+
+    last_exception = None
     for attempt in range(max_attempts):
         try:
-            print(f"Attempt {attempt + 1}: Connecting to {os.getenv('POSTGRES_HOST')}")
+            # Test network first
+            host = os.getenv('POSTGRES_HOST')
+            try:
+                socket.getaddrinfo(host, 5432)
+                print(f"DNS resolution successful for {host}")
+            except socket.gaierror as e:
+                print(f"DNS resolution failed: {e}")
+                raise
+
+            print(f"Attempt {attempt + 1}: Connecting to {host}")
             connection = psycopg2.connect(
                 dbname=os.getenv('POSTGRES_DB', 'mp_scrape'),
                 user=os.getenv('POSTGRES_USER', 'postgres'),
                 password=os.getenv('POSTGRES_PASSWORD'),
-                host=os.getenv('POSTGRES_HOST'),
+                host=host,
                 port=os.getenv('POSTGRES_PORT', '5432'),
                 sslmode='require',
-                connect_timeout=30
+                connect_timeout=10  # Shorter timeout
             )
             print("Connected successfully")
             break
-        except psycopg2.OperationalError as e:
+        except (psycopg2.OperationalError, socket.gaierror) as e:
+            last_exception = e
             print(f"Connection attempt {attempt + 1} failed: {e}")
             if attempt < max_attempts - 1:
                 delay = base_delay * (2 ** attempt) + random.uniform(0, 1)
                 print(f"Retrying in {delay:.2f} seconds...")
                 time.sleep(delay)
             else:
-                print("Max attempts reached. Could not connect to the database.")
-                raise
+                print(f"All {max_attempts} attempts failed. Last error: {last_exception}")
+                raise last_exception
     try:
         yield connection
     finally:
-        if connection:
+        if 'connection' in locals() and connection:
             connection.close()
             print("Connection closed")
 
