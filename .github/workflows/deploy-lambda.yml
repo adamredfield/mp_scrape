@@ -2,7 +2,7 @@ name: Deploy Lambda Functions
 
 on:
   push:
-    branches: [ main, postgres-migration ]
+    branches: [ main, bulk-insert ]
   pull_request:
     branches: [ main ]
 
