@@ -33,7 +33,7 @@ def lambda_handler(event, context):
                     'Id': str(page_num),
                     'MessageBody': json.dumps({
                         'page_number': page_num,
-                        'ticks_url': f'{ticks_url}{page_num}',
+                        'ticks_url': ticks_url,
                         'user_id': user_id
                     })
                 })
