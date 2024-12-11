@@ -12,8 +12,13 @@ QUEUE_URL = os.environ['QUEUE_URL']
 BATCH_SIZE = 1  # pages per batch
 
 def lambda_handler(event, context):
+    if 'user_id' not in event:
+        return {
+            'statusCode': 400,
+            'body': json.dumps('Error: user_id is required')
+        }
 
-    user_id = event.get('user_id', '200362278/doctor-choss')  # Default if not provided
+    user_id = event['user_id']
     base_url = f'https://www.mountainproject.com/user/{user_id}'
     ticks_url = f'{base_url}/ticks?page='
 
@@ -48,6 +53,7 @@ def lambda_handler(event, context):
         return {
             'statusCode': 200,
             'body': json.dumps({
+                'user_id': user_id,
                 'total_pages': total_pages,
                 'total_batches': (total_pages + BATCH_SIZE - 1) // BATCH_SIZE,
                 'pages_per_batch': BATCH_SIZE
