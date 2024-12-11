@@ -23,7 +23,7 @@ def lambda_handler(event, context):
     print("Initialized helper functions")
 
     try:
-        total_pages = helper_functions.get_total_pages()
+        total_pages = helper_functions.get_total_pages(ticks_url)
         print(f"Found {total_pages} pages to scrape")
         
         for i in range(1, total_pages + 1, BATCH_SIZE): # page numbers start at 1
