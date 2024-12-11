@@ -106,17 +106,19 @@ jobs:
           --code ImageUri=${{ steps.login-ecr.outputs.registry }}/mp-scraper:latest \
           --role ${{ secrets.AWS_LAMBDA_ROLE_ARN }} \
           --vpc-config SubnetIds=${{ secrets.SUBNET_IDS }},SecurityGroupIds=${{ secrets.SECURITY_GROUP_IDS }} \
-          --environment '{"Variables": {
-              MP_USERNAME='$MP_USERNAME',
-              MP_PASSWORD='$MP_PASSWORD',
-              IPROYAL_USERNAME='$IPROYAL_USERNAME',
-              IPROYAL_PASSWORD='$IPROYAL_PASSWORD',
-              POSTGRES_HOST='$POSTGRES_HOST',
-              POSTGRES_DB='$POSTGRES_DB',
-              POSTGRES_USER='$POSTGRES_USER',
-              POSTGRES_PASSWORD='$POSTGRES_PASSWORD',
-              POSTGRES_PORT='$POSTGRES_PORT'
-          }}' \
+          --environment '{
+            "Variables": {
+              "MP_USERNAME": "${{ secrets.MP_USERNAME }}",
+              "MP_PASSWORD": "${{ secrets.MP_PASSWORD }}",
+              "IPROYAL_USERNAME": "${{ secrets.IPROYAL_USERNAME }}",
+              "IPROYAL_PASSWORD": "${{ secrets.IPROYAL_PASSWORD }}",
+              "POSTGRES_HOST": "${{ secrets.POSTGRES_HOST }}",
+              "POSTGRES_DB": "${{ secrets.POSTGRES_DB }}",
+              "POSTGRES_USER": "${{ secrets.POSTGRES_USER }}",
+              "POSTGRES_PASSWORD": "${{ secrets.POSTGRES_PASSWORD }}",
+              "POSTGRES_PORT": "${{ secrets.POSTGRES_PORT }}"
+            }
+          }'
           --timeout 900 \
           --memory-size 2048 \
           --image-config '{"Command": ["src.lambda.retry_worker.lambda_handler"]}'
