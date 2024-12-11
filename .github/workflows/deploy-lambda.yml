@@ -113,6 +113,14 @@ jobs:
           --timeout 900 \
           --memory-size 2048 \
           --image-config '{"Command": ["src.lambda.retry_worker.lambda_handler"]}'
+    
+    - name: Create DLQ trigger for retry worker
+      run: |
+        aws lambda create-event-source-mapping \
+          --function-name mp-scraper-retry-worker \
+          --event-source-arn arn:aws:sqs:us-east-1:855154218477:mp-scraper-dlq \
+          --batch-size 10 \
+          --maximum-batching-window-in-seconds 5
 
     - name: Set retry worker concurrency
       run: |
