@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(project_root)
@@ -10,6 +11,9 @@ import os
 def lambda_handler(event, context):
     from src.scraping import helper_functions
     print("Initialized helper functions")
+
+    print("Worker starting, waiting 20 seconds for initialization...")
+    time.sleep(20)
 
     """Handle batch of SQS messages"""
     try:
