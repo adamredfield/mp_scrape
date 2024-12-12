@@ -7,3 +7,7 @@ ticklist.db
 *local*
 sync_db.py
 .streamlit/secrets.toml
+test_worker.py
+test_orchestrator.py
+test_lambda.py
+test_proxy.py
