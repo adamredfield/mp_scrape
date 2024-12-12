@@ -23,6 +23,10 @@ def get_proxy_url():
 
 def login_and_save_session(playwright):
 
+    browser = None
+    context = None
+    page = None
+
     """Initialize browser with proxy and login"""
     mp_username = os.getenv('MP_USERNAME')
     mp_password = os.getenv('MP_PASSWORD')
@@ -48,14 +52,13 @@ def login_and_save_session(playwright):
         )
         print("Browser launched successfully")
 
-        context = browser.new_context(
-            viewport={'width': 1280, 'height': 720}
-        )
+        context = browser.new_context()
+        page = context.new_page()
         print("Context created successfully")
     
-        page = context.new_page()
-        page.set_default_navigation_timeout(60000)
-        page.set_default_timeout(30000)
+  
+        page.set_default_navigation_timeout(90000)
+        page.set_default_timeout(90000)
         page.goto(mp_home_url)
         print("Navigation complete")
         page.wait_for_selector("a.sign-in", timeout=10000)
