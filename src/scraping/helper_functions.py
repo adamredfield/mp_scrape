@@ -491,7 +491,7 @@ def process_page(page_number, ticks_url, user_id, retry_count=0):
                         if int(route_id) in existing_routes:
                             print(f"Route {route_name} already exists in the database.")
                             
-                        if route_id not in existing_routes:
+                        if int(route_id) not in existing_routes:
                             route_html_content = fetch_dynamic_page_content(page, route_link)
                             route_soup = BeautifulSoup(route_html_content, 'html.parser')
                             route_data.append(parse_route_data(route_soup, route_id, route_name, route_link))
