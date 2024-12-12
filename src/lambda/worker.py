@@ -12,15 +12,6 @@ def lambda_handler(event, context):
     from src.scraping import helper_functions
     print("Initialized helper functions")
 
-    print("Worker starting, waiting 20 seconds for initialization...")
-    time.sleep(10)
-
-
-    #proxy = helper_functions.get_proxy_url()
-    # if not proxy:
-    #    raise Exception("Could not get a valid proxy")
-    #print(f"Worker starting with proxy: {proxy}")
-
     """Handle batch of SQS messages"""
     try:
         for record in event['Records']:

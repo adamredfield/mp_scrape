@@ -8,7 +8,6 @@ from datetime import datetime, timezone
 import re
 import os
 from playwright.sync_api import sync_playwright
-import time
 
 mp_home_url = "https://www.mountainproject.com"
 
@@ -49,7 +48,6 @@ def login_and_save_session(playwright):
         page = context.new_page()
         print("Context created successfully")
     
-  
         page.set_default_navigation_timeout(90000)
         page.set_default_timeout(90000)
         page.goto(mp_home_url)
@@ -224,7 +222,6 @@ def get_route_attributes(route_soup):
     route_attributes['primary_photo_url'] = (
         photo_link['style'].split('url("')[1].split('")')[0] if photo_link and 'style' in photo_link.attrs else None
     )
-
     return route_attributes
 
 def parse_route_type(route_details_string):
@@ -329,96 +326,6 @@ def parse_location(location_string):
         location_data['specific_location'] = ' > '.join(parts[3:])
 
     return location_data
-
-def process_page(page_number, ticks_url, user_id, retry_count=0):
-    """Process a single page"""
-
-    tick_data = []
-    route_data = []
-    route_comments_data = []
-    route_ids_to_check = {}
-    tick_details_map = {}
-    current_route_data = None
-
-    browser = None
-    context = None
-    page = None
-
-    try:
-        with sync_playwright() as playwright:
-            try:
-                browser, context = login_and_save_session(playwright)
-                page = context.new_page()
-
-                print(f'Processing page: {page_number}. (Retry #{retry_count})')
-                
-                current_page_url = f"{ticks_url}{page_number}"
-                page.goto(current_page_url, timeout=90000)
-                tick_html = page.content()
-                tick_soup = BeautifulSoup(tick_html, 'html.parser')
-                tick_table = tick_soup.find('table', class_='table route-table hidden-xs-down')
-                tick_rows = tick_table.find_all('tr', class_='route-row')
-                print(f"Found {len(tick_rows) / 2} routes to process")
-
-                for i in range(0, len(tick_rows), 2):  # Step by 2 since routes and ticks alternate
-
-                    route_row = tick_rows[i]
-                    tick_row = tick_rows[i + 1] if i + 1 < len(tick_rows) else None
-                    cells = route_row.find_all('td')
-                    route_name = ' '.join(cells[0].text.strip().replace('●', '').split())
-                    route_link = route_row.find('a', href=True)['href']
-                    route_id = route_link.split('/route/')[1].split('/')[0]
-
-                    tick_details = tick_row.find('td', class_='text-warm small pt-0') if tick_row else None
-
-                    route_ids_to_check[route_id] = (route_name, route_link)
-                    tick_details_map[route_id] = tick_details
-
-                with create_connection() as conn:
-                    cursor = conn.cursor()
-                    existing_routes = queries.check_routes_exists(cursor, route_ids_to_check.keys())
-
-                    for route_id, (route_name, route_link) in route_ids_to_check.items():
-                        print(f'Retrieving data for {route_name}')
-
-                        current_route_data = {
-                            'route_id': route_id,
-                            'route_name': route_name
-                        }
-                        if route_id in existing_routes:
-                            print(f"Route {route_name} already exists in the database.")
-                            
-                        if route_id not in existing_routes:
-                            route_html_content = fetch_dynamic_page_content(page, route_link)
-                            route_soup = BeautifulSoup(route_html_content, 'html.parser')
-                            route_data.append(parse_route_data(route_soup, route_id, route_name, route_link))
-                            route_comments_data.extend(parse_route_comments_data(route_soup, route_id))
-
-                        if tick_details_map[route_id]:
-                            tick_data.append(parse_tick_details(tick_details_map[route_id], current_route_data, user_id))
-
-                    if route_data:
-                        print(f"Attempting to insert {len(route_data)} routes")
-                        queries.insert_routes_batch(cursor, route_data)
-                    if route_comments_data:
-                        print(f"Attempting to insert {len(route_comments_data)} comments")
-                        queries.insert_comments_batch(cursor, route_comments_data)
-                    if tick_data:
-                        print(f"Attempting to insert {len(tick_data)} ticks")
-                        cursor = conn.cursor()
-                        queries.insert_ticks_batch(cursor, tick_data)
-                    
-                    conn.commit()
-                    print(f'Successfully processed page {page_number}')
-            finally:
-                if context:
-                    context.close()
-                if browser:
-                    browser.close()
-        
-    except Exception as e:
-        print(f"Error processing page {page_number}: {str(e)}")
-        raise
     
 def check_routes_exist(cursor, route_ids):
     """Check multiple routes at once"""
@@ -518,3 +425,93 @@ def parse_tick_details(tick_details, current_route_data, user_id):
         'insert_date': datetime.now(timezone.utc).isoformat()
     }
     return tick_data
+
+def process_page(page_number, ticks_url, user_id, retry_count=0):
+    """Process a single page"""
+
+    tick_data = []
+    route_data = []
+    route_comments_data = []
+    route_ids_to_check = {}
+    tick_details_map = {}
+    current_route_data = None
+
+    browser = None
+    context = None
+    page = None
+
+    try:
+        with sync_playwright() as playwright:
+            try:
+                browser, context = login_and_save_session(playwright)
+                page = context.new_page()
+
+                print(f'Processing page: {page_number} for user {user_id}. (Retry #{retry_count})')
+                
+                current_page_url = f"{ticks_url}{page_number}"
+                page.goto(current_page_url, timeout=90000)
+                tick_html = page.content()
+                tick_soup = BeautifulSoup(tick_html, 'html.parser')
+                tick_table = tick_soup.find('table', class_='table route-table hidden-xs-down')
+                tick_rows = tick_table.find_all('tr', class_='route-row')
+                print(f"Found {len(tick_rows) / 2} routes to process")
+
+                for i in range(0, len(tick_rows), 2):  # Step by 2 since routes and ticks alternate
+
+                    route_row = tick_rows[i]
+                    tick_row = tick_rows[i + 1] if i + 1 < len(tick_rows) else None
+                    cells = route_row.find_all('td')
+                    route_name = ' '.join(cells[0].text.strip().replace('●', '').split())
+                    route_link = route_row.find('a', href=True)['href']
+                    route_id = route_link.split('/route/')[1].split('/')[0]
+
+                    tick_details = tick_row.find('td', class_='text-warm small pt-0') if tick_row else None
+
+                    route_ids_to_check[route_id] = (route_name, route_link)
+                    tick_details_map[route_id] = tick_details
+
+                with create_connection() as conn:
+                    cursor = conn.cursor()
+                    existing_routes = queries.check_routes_exists(cursor, route_ids_to_check.keys())
+
+                    for route_id, (route_name, route_link) in route_ids_to_check.items():
+                        print(f'Retrieving data for {route_name}')
+
+                        current_route_data = {
+                            'route_id': route_id,
+                            'route_name': route_name
+                        }
+                        if route_id in existing_routes:
+                            print(f"Route {route_name} already exists in the database.")
+                            
+                        if route_id not in existing_routes:
+                            route_html_content = fetch_dynamic_page_content(page, route_link)
+                            route_soup = BeautifulSoup(route_html_content, 'html.parser')
+                            route_data.append(parse_route_data(route_soup, route_id, route_name, route_link))
+                            route_comments_data.extend(parse_route_comments_data(route_soup, route_id))
+
+                        if tick_details_map[route_id]:
+                            tick_data.append(parse_tick_details(tick_details_map[route_id], current_route_data, user_id))
+
+                    if route_data:
+                        print(f"Attempting to insert {len(route_data)} routes")
+                        queries.insert_routes_batch(cursor, route_data)
+                    if route_comments_data:
+                        print(f"Attempting to insert {len(route_comments_data)} comments")
+                        queries.insert_comments_batch(cursor, route_comments_data)
+                    if tick_data:
+                        print(f"Attempting to insert {len(tick_data)} ticks")
+                        cursor = conn.cursor()
+                        queries.insert_ticks_batch(cursor, tick_data)
+                    
+                    conn.commit() # commit all transactions together
+                    print(f'Successfully processed page {page_number}')
+            finally:
+                if context:
+                    context.close()
+                if browser:
+                    browser.close()
+        
+    except Exception as e:
+        print(f"Error processing page {page_number}: {str(e)}")
+        raise

@@ -31,7 +31,6 @@ def create_connection():
 
 def add_new_tags_to_mapping(cursor):
     """Add any new tags from Tags table to TagMapping with default values"""
-    
     # Insert new tags with themselves as clean_tag
     cursor.execute('''
         INSERT INTO TagMapping (raw_tag, original_tag_type, is_active, insert_date)

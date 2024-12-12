@@ -9,13 +9,11 @@ from src.database.utils import create_connection
 connection = create_connection()
 cursor = connection.cursor()
 
-
 create_routes_schema_query = 'CREATE SCHEMA IF NOT EXISTS routes;'
 create_analysis_schema_query = 'CREATE SCHEMA IF NOT EXISTS analysis;'
 
 # Write the SQL command to create the Students table
 create_table_query = '''
-
 CREATE TABLE IF NOT EXISTS routes.Routes (
     id INTEGER PRIMARY KEY,
     route_name TEXT NOT NULL,

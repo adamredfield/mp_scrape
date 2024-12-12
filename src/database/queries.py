@@ -1,20 +1,27 @@
+def check_routes_exists(cursor, route_ids):
+    """Check if routes exist in database"""
+    route_id_list = ','.join(['%s'] * len(route_ids))
+    cursor.execute(
+        f"SELECT id FROM routes.Routes WHERE id IN ({route_id_list})",
+        tuple(route_ids)
+    )
+    return {row[0] for row in cursor.fetchall()} # return set of route ids that exist
+
 def insert_comments_batch(cursor, comments):  
     try:
         args_str = ','.join(
-            cursor.mogrify(
+cursor.mogrify(
                 "(%(route_id)s, %(comment)s, encode(digest(%(comment)s, 'sha256'), 'hex'), %(insert_date)s)",
                 comment
             ).decode('utf-8')
             for comment in comments
         )
-
         comments_sql = f"""
         INSERT INTO routes.RouteComments (
             route_id, comment, comment_hash, insert_date
         ) VALUES {args_str}
         ON CONFLICT (route_id, comment_hash) DO NOTHING
         """
-        
         cursor.execute(comments_sql)
         print(f"Successfully inserted {len(comments)} comments")
         
@@ -30,7 +37,6 @@ def insert_ticks_batch(cursor, tick_data):
         ).decode('utf-8') 
         for tick in tick_data
     )
-
     tick_sql = f"""
         INSERT INTO routes.Ticks (user_id, route_id, date, type, note, insert_date)
         VALUES {args_str}
@@ -42,16 +48,6 @@ def insert_ticks_batch(cursor, tick_data):
     except Exception as e:
         print(f"Error inserting tick batch: {str(e)}")
         raise
-
-def check_routes_exists(cursor, route_ids):
-    """Check if routes exist in database"""
-
-    route_id_list = ','.join(['%s'] * len(route_ids))
-    cursor.execute(
-        f"SELECT id FROM routes.Routes WHERE id IN ({route_id_list})",
-        tuple(route_ids)
-    )
-    return {row[0] for row in cursor.fetchall()} # return set of route ids that exist
 
 def insert_routes_batch(cursor, routes_data):
     try:
@@ -78,8 +74,7 @@ def insert_routes_batch(cursor, routes_data):
             fa, description, protection, primary_photo_url, insert_date
         ) VALUES {args_str}
         ON CONFLICT (id) DO NOTHING
-        """
-        
+        """ 
         cursor.execute(route_sql)
         print(f"Successfully inserted {len(routes_data)} routes")
         
