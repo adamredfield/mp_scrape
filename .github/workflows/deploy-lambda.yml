@@ -95,7 +95,7 @@ jobs:
       run: |
         aws lambda put-function-concurrency \
           --function-name mp-scraper-worker \
-          --reserved-concurrent-executions 10
+          --reserved-concurrent-executions 100
 
     - name: Deploy retry worker function
       run: |
@@ -120,6 +120,12 @@ jobs:
           --timeout 900 \
           --memory-size 8192 \
           --image-config '{"Command": ["src.lambda.retry_worker.lambda_handler"]}'
+        
+    - name: Set retry worker concurrency
+      run: |
+        aws lambda put-function-concurrency \
+          --function-name mp-scraper-retry-worker \
+          --reserved-concurrent-executions 100
 
     - name: Deploy orchestrator function
       run: |
