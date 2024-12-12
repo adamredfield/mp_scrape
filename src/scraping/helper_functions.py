@@ -28,11 +28,8 @@ def login_and_save_session(playwright):
     context = None
     page = None
 
-    """Initialize browser with proxy and login"""
     mp_username = os.getenv('MP_USERNAME')
     mp_password = os.getenv('MP_PASSWORD')
-    proxy_username = os.getenv('IPROYAL_USERNAME')
-    proxy_password = os.getenv('IPROYAL_PASSWORD')
 
     print("Starting browser launch sequence...")
     try:
@@ -44,12 +41,7 @@ def login_and_save_session(playwright):
                 '--disable-dev-shm-usage',
                 '--single-process',
                 '--no-zygote'
-            ],
-            proxy={
-                'server': 'http://geo.iproyal.com:12321',
-                'username': proxy_username,
-                'password': proxy_password
-            }
+            ]
         )
         print("Browser launched successfully")
 
@@ -116,13 +108,7 @@ def fetch_dynamic_page_content(page, route_link, max_retries=3):
                     raise
 
 def get_total_pages(ticks_url):
-    proxy_url = get_proxy_url()
-    proxies = {
-        'http': proxy_url,
-        'https': proxy_url
-    }
-     # Get total number of rows to paginate through
-    pagination_response = requests.get(ticks_url, proxies=proxies)
+    pagination_response = requests.get(ticks_url)
     if pagination_response.status_code != 200:
         print(f"Failed to retrieve data: {pagination_response.status_code}")
         raise Exception(f"Failed to get total pages: {pagination_response.status_code}")
@@ -351,6 +337,7 @@ def process_page(page_number, ticks_url, user_id, retry_count=0):
     route_data = []
     route_comments_data = []
     route_ids_to_check = {}
+    tick_details_map = {}
     current_route_data = None
 
     browser = None
@@ -368,20 +355,24 @@ def process_page(page_number, ticks_url, user_id, retry_count=0):
                 current_page_url = f"{ticks_url}{page_number}"
                 page.goto(current_page_url, timeout=90000)
                 tick_html = page.content()
-                tick_soup = BeautifulSoup(tick_html.text, 'html.parser')
+                tick_soup = BeautifulSoup(tick_html, 'html.parser')
                 tick_table = tick_soup.find('table', class_='table route-table hidden-xs-down')
                 tick_rows = tick_table.find_all('tr', class_='route-row')
                 print(f"Found {len(tick_rows) / 2} routes to process")
 
-                for row in tick_rows:
-                    tick_details = row.find('td', class_='text-warm small pt-0')
-                
-                    if not tick_details:
-                        cells = row.find_all('td')
-                        route_name = ' '.join(cells[0].text.strip().replace('●', '').split())
-                        route_link = row.find('a', href=True)['href']
-                        route_id = route_link.split('/route/')[1].split('/')[0]
-                        route_ids_to_check[route_id] = (route_name, route_link)
+                for i in range(0, len(tick_rows), 2):  # Step by 2 since routes and ticks alternate
+
+                    route_row = tick_rows[i]
+                    tick_row = tick_rows[i + 1] if i + 1 < len(tick_rows) else None
+                    cells = route_row.find_all('td')
+                    route_name = ' '.join(cells[0].text.strip().replace('●', '').split())
+                    route_link = route_row.find('a', href=True)['href']
+                    route_id = route_link.split('/route/')[1].split('/')[0]
+
+                    tick_details = tick_row.find('td', class_='text-warm small pt-0') if tick_row else None
+
+                    route_ids_to_check[route_id] = (route_name, route_link)
+                    tick_details_map[route_id] = tick_details
 
                 with create_connection() as conn:
                     cursor = conn.cursor()
@@ -389,12 +380,13 @@ def process_page(page_number, ticks_url, user_id, retry_count=0):
 
                     for route_id, (route_name, route_link) in route_ids_to_check.items():
                         print(f'Retrieving data for {route_name}')
-                        if route_id in existing_routes:
-                            print(f"Route {route_name} already exists in the database.")
-                            current_route_data = {
+
+                        current_route_data = {
                             'route_id': route_id,
                             'route_name': route_name
                         }
+                        if route_id in existing_routes:
+                            print(f"Route {route_name} already exists in the database.")
                             
                         if route_id not in existing_routes:
                             route_html_content = fetch_dynamic_page_content(page, route_link)
@@ -402,14 +394,8 @@ def process_page(page_number, ticks_url, user_id, retry_count=0):
                             route_data.append(parse_route_data(route_soup, route_id, route_name, route_link))
                             route_comments_data.extend(parse_route_comments_data(route_soup, route_id))
 
-                            if tick_details and current_route_data:
-                                tick_data.append(parse_tick_details(tick_details, current_route_data, user_id))
-                                current_route_data = None
-
-                            current_route_data = {
-                                'route_id': route_id,
-                                'route_name': route_name
-                            }
+                        if tick_details_map[route_id]:
+                            tick_data.append(parse_tick_details(tick_details_map[route_id], current_route_data, user_id))
 
                     if route_data:
                         print(f"Attempting to insert {len(route_data)} routes")
