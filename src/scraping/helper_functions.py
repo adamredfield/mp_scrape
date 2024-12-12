@@ -455,20 +455,27 @@ def process_page(page_number, ticks_url, user_id, retry_count=0):
                 tick_table = tick_soup.find('table', class_='table route-table hidden-xs-down')
                 tick_rows = tick_table.find_all('tr', class_='route-row')
                 print(f"Found {len(tick_rows) / 2} routes to process")
-
+                
                 for i in range(0, len(tick_rows), 2):  # Step by 2 since routes and ticks alternate
 
-                    route_row = tick_rows[i]
-                    tick_row = tick_rows[i + 1] if i + 1 < len(tick_rows) else None
-                    cells = route_row.find_all('td')
-                    route_name = ' '.join(cells[0].text.strip().replace('●', '').split())
-                    route_link = route_row.find('a', href=True)['href']
-                    route_id = route_link.split('/route/')[1].split('/')[0]
+                    try:
+                        route_row = tick_rows[i]
+                        tick_row = tick_rows[i + 1] if i + 1 < len(tick_rows) else None
+                        cells = route_row.find_all('td')
+                        route_name = ' '.join(cells[0].text.strip().replace('●', '').split())
+                        route_link = route_row.find('a', href=True)['href']
+                        route_id = route_link.split('/route/')[1].split('/')[0]
 
-                    tick_details = tick_row.find('td', class_='text-warm small pt-0') if tick_row else None
+                        tick_details = tick_row.find('td', class_='text-warm small pt-0') if tick_row else None
 
-                    route_ids_to_check[route_id] = (route_name, route_link)
-                    tick_details_map[route_id] = tick_details
+                        route_ids_to_check[route_id] = (route_name, route_link)
+                        tick_details_map[route_id] = tick_details
+                    except IndexError as e:
+                        print(f"Error processing row {i}: {str(e)}")
+                        continue  # Skip this row and continue with next
+                    except Exception as e:
+                        print(f"Unexpected error processing row {i}: {str(e)}")
+                        continue
 
                 with create_connection() as conn:
                     cursor = conn.cursor()
