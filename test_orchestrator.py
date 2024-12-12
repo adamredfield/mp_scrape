@@ -1,8 +1,14 @@
 import os
+import sys
+
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(project_root)
+
+from src.test_lambda.orchestrator import lambda_handler
 from dotenv import load_dotenv
 load_dotenv()
 
-from src.lambda_test.orchestrator import lambda_handler
+
 
 def test_orchestrator():
     # Use the exact event we just tried in Lambda

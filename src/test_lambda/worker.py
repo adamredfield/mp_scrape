@@ -13,7 +13,12 @@ def lambda_handler(event, context):
     print("Initialized helper functions")
 
     print("Worker starting, waiting 20 seconds for initialization...")
-    time.sleep(20)
+    time.sleep(10)
+
+    proxy = helper_functions.get_us_proxy()
+    if not proxy:
+        raise Exception("Could not get a valid proxy")
+    print(f"Worker starting with proxy: {proxy}")
 
     """Handle batch of SQS messages"""
     try:
@@ -31,6 +36,7 @@ def lambda_handler(event, context):
                     page_number=page_number,
                     ticks_url=ticks_url,
                     user_id=user_id,
+                    proxy=proxy,
                     retry_count=message.get('retry_count', 0)
                 )
                 

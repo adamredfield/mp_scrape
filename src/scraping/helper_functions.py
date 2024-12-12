@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 import re
 import os
 from playwright.sync_api import sync_playwright
+import time
 
 mp_home_url = "https://www.mountainproject.com"
 
@@ -88,21 +89,31 @@ def login_and_save_session(playwright):
             browser.close()
         raise
 
-def fetch_dynamic_page_content(page, route_link):
-        page.goto(route_link)
-        last_height = None
+def fetch_dynamic_page_content(page, route_link, max_retries=3):
+        for attempt in range(max_retries):
+            try:
+                page.goto(route_link, timeout=90000)
+                last_height = None
 
-        # loads comments
-        while True:
-            page.evaluate("window.scrollTo(0, document.body.scrollHeight)")  # Scroll down
-            page.wait_for_timeout(1000)
-            new_height = page.evaluate("document.body.scrollHeight")  # Get new scroll height
-            if new_height == last_height:  # Stop if no change in scroll height
-                break
-            last_height = new_height
-            
-        html_content = page.content()
-        return html_content
+                # loads comments
+                while True:
+                    page.evaluate("window.scrollTo(0, document.body.scrollHeight)")  # Scroll down
+                    page.wait_for_timeout(1000)
+                    new_height = page.evaluate("document.body.scrollHeight")  # Get new scroll height
+                    if new_height == last_height:  # Stop if no change in scroll height
+                        break
+                    last_height = new_height
+                    
+                html_content = page.content()
+                return html_content
+            except Exception as e:
+                print(f"Error fetching {route_link} (Attempt {attempt + 1}): {str(e)}")
+                
+                if attempt < max_retries - 1:
+                    continue
+                else:
+                    print(f"Failed to fetch {route_link} after {max_retries} attempts")
+                    raise
 
 def get_total_pages(ticks_url):
     proxy_url = get_proxy_url()
@@ -335,11 +346,6 @@ def parse_location(location_string):
 
 def process_page(page_number, ticks_url, user_id, retry_count=0):
     """Process a single page"""
-    proxy_url = get_proxy_url()
-    proxies = {
-        'http': proxy_url,
-        'https': proxy_url
-    }
 
     tick_data = []
     route_data = []
@@ -360,12 +366,9 @@ def process_page(page_number, ticks_url, user_id, retry_count=0):
                 print(f'Processing page: {page_number}. (Retry #{retry_count})')
                 
                 current_page_url = f"{ticks_url}{page_number}"
-                tick_response = requests.get(current_page_url, proxies=proxies)
-
-                if tick_response.status_code != 200:
-                    raise Exception(f"Failed to retrieve data: {tick_response.status_code}")
-                
-                tick_soup = BeautifulSoup(tick_response.text, 'html.parser')
+                page.goto(current_page_url, timeout=90000)
+                tick_html = page.content()
+                tick_soup = BeautifulSoup(tick_html.text, 'html.parser')
                 tick_table = tick_soup.find('table', class_='table route-table hidden-xs-down')
                 tick_rows = tick_table.find_all('tr', class_='route-row')
                 print(f"Found {len(tick_rows) / 2} routes to process")
