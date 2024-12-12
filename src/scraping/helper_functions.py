@@ -488,7 +488,7 @@ def process_page(page_number, ticks_url, user_id, retry_count=0):
                             'route_id': route_id,
                             'route_name': route_name
                         }
-                        if route_id in existing_routes:
+                        if int(route_id) in existing_routes:
                             print(f"Route {route_name} already exists in the database.")
                             
                         if route_id not in existing_routes:

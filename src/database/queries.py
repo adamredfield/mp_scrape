@@ -1,9 +1,10 @@
 def check_routes_exists(cursor, route_ids):
     """Check if routes exist in database"""
-    route_id_list = ','.join(['%s'] * len(route_ids))
+    route_id_list = [int(id) for id in route_ids]
+    placeholders = ','.join(['%s' for _ in route_id_list])
     cursor.execute(
-        f"SELECT id FROM routes.Routes WHERE id IN ({route_id_list})",
-        tuple(route_ids)
+        f"SELECT id FROM routes.Routes WHERE id IN ({placeholders})",
+        tuple(route_id_list)
     )
     return {row[0] for row in cursor.fetchall()} # return set of route ids that exist
 

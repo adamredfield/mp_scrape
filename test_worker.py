@@ -20,8 +20,8 @@ def test_worker():
         'Records': [{
             'body': json.dumps({
                 'page_number': 1,
-                'ticks_url': 'https://www.mountainproject.com/user/201956982/choss-choss/ticks?page=',
-                'user_id': '201956982/choss-choss'
+                'ticks_url': 'https://www.mountainproject.com/user/200780729/choss-pirate/ticks?page=',
+                'user_id': '201956982/choss-pirate'
             })
         }]
     }
