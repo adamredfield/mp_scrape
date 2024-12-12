@@ -88,7 +88,7 @@ jobs:
               "MP_PASSWORD": "${{ secrets.MP_PASSWORD }}"
           }}' \
           --timeout 900 \
-          --memory-size 8192 \
+          --memory-size 2048 \
           --image-config '{"Command": ["src.lambda.worker.lambda_handler"]}'
 
     - name: Set worker concurrency
@@ -118,7 +118,7 @@ jobs:
             }
           }' \
           --timeout 900 \
-          --memory-size 8192 \
+          --memory-size 2048 \
           --image-config '{"Command": ["src.lambda.retry_worker.lambda_handler"]}'
         
     - name: Set retry worker concurrency
