@@ -32,15 +32,15 @@ cursor.mogrify(
 def insert_ticks_batch(cursor, tick_data):
     args_str = ','.join(
         cursor.mogrify(
-            "(%(user_id)s, %(route_id)s, %(date)s, %(type)s, %(note)s, %(insert_date)s)",
+            "(%(user_id)s, %(route_id)s, %(date)s, %(type)s, %(note)s, encode(digest(%(note)s, 'sha256'), 'hex'), %(insert_date)s)",
             tick
         ).decode('utf-8') 
         for tick in tick_data
     )
     tick_sql = f"""
-        INSERT INTO routes.Ticks (user_id, route_id, date, type, note, insert_date)
+        INSERT INTO routes.Ticks (user_id, route_id, date, type, note, note_hash, insert_date)
         VALUES {args_str}
-        ON CONFLICT (user_id, route_id, date) DO NOTHING
+        ON CONFLICT (user_id, route_id, date, note_hash) DO NOTHING
     """
     try:
         cursor.execute(tick_sql)
