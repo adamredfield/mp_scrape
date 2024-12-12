@@ -76,7 +76,6 @@ jobs:
           --package-type Image \
           --code ImageUri=${{ steps.login-ecr.outputs.registry }}/mp-scraper:latest \
           --role ${{ secrets.AWS_LAMBDA_ROLE_ARN }} \
-          --vpc-config SubnetIds=${{ secrets.SUBNET_IDS }},SecurityGroupIds=${{ secrets.SECURITY_GROUP_IDS }} \
           --environment '{"Variables": {
               "POSTGRES_HOST": "${{ secrets.POSTGRES_HOST }}",
               "POSTGRES_DB": "${{ secrets.POSTGRES_DB }}",
@@ -105,7 +104,6 @@ jobs:
           --package-type Image \
           --code ImageUri=${{ steps.login-ecr.outputs.registry }}/mp-scraper:latest \
           --role ${{ secrets.AWS_LAMBDA_ROLE_ARN }} \
-          --vpc-config SubnetIds=${{ secrets.SUBNET_IDS }},SecurityGroupIds=${{ secrets.SECURITY_GROUP_IDS }} \
           --environment '{
             "Variables": {
               "MP_USERNAME": "${{ secrets.MP_USERNAME }}",
