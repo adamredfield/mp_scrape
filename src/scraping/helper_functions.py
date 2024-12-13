@@ -1,3 +1,11 @@
+import os
+import sys
+
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+sys.path.append(project_root)
+
+from src.analysis.ai_route_analysis import process_route, process_route_response, save_analysis_results
+
 import json
 import requests
 import re
@@ -6,7 +14,6 @@ from src.database import queries
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 import re
-import os
 from playwright.sync_api import sync_playwright
 
 mp_home_url = "https://www.mountainproject.com"
@@ -435,6 +442,7 @@ def process_page(page_number, ticks_url, user_id, retry_count=0):
     route_ids_to_check = {}
     tick_details_map = {}
     current_route_data = None
+    ai_route_analysis_data = []
 
     browser = None
     context = None
@@ -494,9 +502,44 @@ def process_page(page_number, ticks_url, user_id, retry_count=0):
                         if int(route_id) not in existing_routes:
                             route_html_content = fetch_dynamic_page_content(page, route_link)
                             route_soup = BeautifulSoup(route_html_content, 'html.parser')
-                            route_data.append(parse_route_data(route_soup, route_id, route_name, route_link))
-                            route_comments_data.extend(parse_route_comments_data(route_soup, route_id))
+                            current_route_data = parse_route_data(route_soup, route_id, route_name, route_link)
+                            current_route_comments_data = parse_route_comments_data(route_soup, route_id)
 
+                            route_data.append(current_route_data)
+                            route_comments_data.extend(current_route_comments_data)
+
+                            combined_grade = ' '.join(filter(None, [
+                                current_route_data.get('yds_rating') or '',
+                                current_route_data.get('hueco_rating') or '',
+                                current_route_data.get('aid_rating') or '',
+                                current_route_data.get('danger_rating') or '',
+                                current_route_data.get('commitment_grade') or ''
+                            ])).strip() or None
+
+                            combined_location = ' > '.join(filter(None, [
+                                current_route_data.get('region') or '',
+                                current_route_data.get('main_area') or '',
+                                current_route_data.get('sub_area') or '',
+                                current_route_data.get('specific_location') or ''
+                            ])).strip() or None
+                        
+                            route_for_analysis = {
+                                'route_id': current_route_data['route_id'],
+                                'route_name': current_route_data['route_name'],
+                                'combined_grade': combined_grade,
+                                'avg_stars': current_route_data['avg_stars'],
+                                'num_votes': current_route_data['num_votes'],
+                                'location': combined_location,
+                                'route_type': current_route_data['route_type'],
+                                'fa': current_route_data['fa'],
+                                'description': current_route_data['description'],
+                                'protection': current_route_data['protection'],
+                                'comments': ' | '.join(c['comment'] for c in current_route_comments_data)
+                        }
+                            ai_route_response = process_route(route_for_analysis)
+                            if ai_route_response:
+                                ai_route_analysis_data.append(process_route_response(ai_route_response))
+                                
                         if tick_details_map[route_id]:
                             tick_data.append(parse_tick_details(tick_details_map[route_id], current_route_data, user_id))
 
@@ -510,6 +553,9 @@ def process_page(page_number, ticks_url, user_id, retry_count=0):
                         print(f"Attempting to insert {len(tick_data)} ticks")
                         cursor = conn.cursor()
                         queries.insert_ticks_batch(cursor, tick_data)
+                    if ai_route_analysis_data:
+                        print(f"Attempting to insert AI results")
+                        save_analysis_results(cursor, ai_route_analysis_data)
                     
                     conn.commit() # commit all transactions together
                     print(f'Successfully processed page {page_number}')

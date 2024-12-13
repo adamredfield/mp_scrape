@@ -42,10 +42,12 @@ def insert_ticks_batch(cursor, tick_data):
         INSERT INTO routes.Ticks (user_id, route_id, date, type, note, note_hash, insert_date)
         VALUES {args_str}
         ON CONFLICT (user_id, route_id, date, note_hash) DO NOTHING
+        RETURNING id
     """
     try:
         cursor.execute(tick_sql)
-        print(f"Successfully inserted {len(tick_data)} ticks")
+        inserted_count = cursor.rowcount
+        print(f"Successfully inserted {inserted_count} ticks")
     except Exception as e:
         print(f"Error inserting tick batch: {str(e)}")
         raise
