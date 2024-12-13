@@ -77,18 +77,24 @@ def process_route(route: dict, max_retries = 2) -> dict:
     messages = [
         {"role": "system",
         "content": (
-            "You are an experienced climbing route analyst. Your task is to analyze routes and categorize their characteristics.\n\n"
+            "You are an experienced climbing route analyst. Your task is to analyze routes and categorize their core characteristics.\n\n"
             "Tag Categories:\n"
-            "1. styles: General climbing styles (e.g., crack, face, slab, overhang, chimney). "
+            "1. styles: Identify the primary climbing styles that define the route."
+            "Note: Focus on the dominant style(s) that are most representative of the route's character. "
             "Note: This should NOT include climb types like trad/sport - only the physical style. "
-            "Examples: (crack, chimney, face, overhang, slab, scramble, ridge)"
-            "Examples that should be features, not styles: (offwidth, corner, roof, dihedral, flake, arete, traverse, lieback, undercling, pinch)"
-            "Multiple styles are allowed if they are defining characteristics.\n"
-            "2. features: Specific route features (e.g., hand-crack, finger-crack, fist-crack, off-fingers, offwidth, dihedral, corner, seam, squeeze).\n"
-            "Note: ideally these should act as sub-tags of the style. (e.g. style: crack, features: hand-crack)\n"
-            "Note: We want to keep these specific but relatively general. (e.g. hand-crack vs. double-hand crack)\n"
-            "3. descriptors: Characteristics about difficulty or experience (e.g., technical, burly, runout, polished, chossy, adventurous, scary, mellow).\n"
+            "Examples: (crack, chimney, face, overhang, slab, scramble, ridge). "
+            "Examples that should be features, not styles: (offwidth, corner, roof, dihedral, flake, arete, traverse, lieback, undercling, pinch). "
+            "We want to capture the style(s) that defines the route. We can have more than one style but we really want to capture the primary style(s). No more than 2 styles.\n"
+            "2. features: Highlight specific route features that are essential to the route's identity (e.g., hand-crack, finger-crack, offwidth, dihedral, squeeze). \n"
+            "Note: ideally these should act as sub-tags of the style. (e.g. style: crack, features: hand-crack). \n"
+            "Note: We want to keep these specific but relatively general. (e.g. hand-crack vs. double-hand crack).\n"
+            "These should complement the primary style(s) identified.\n"
+            "Note: Please no more than 3 features. Only include features that are most defining of the route. If only one feature is most defining, then only include one feature.\n"
+            "3. descriptors: Capture key characteristics about difficulty or experience that are central to the route (e.g., technical, burly, runout, polished, chossy, adventurous, scary, mellow).\n"
+            "Note: Please no more than 3 descriptors. Only include descriptors that are most defining of the route. If only one descriptor is most defining, then only include one descriptor.\n"
             "4. rock_type: Type of rock only (e.g., granite, limestone, sandstone, gneiss). Do not include characteristics here.\n\n"
+            "Note: Only one rock type per route.\n"
+            "Note: The rock type should be mainly derived from the route's location.\n"
             "CRITICAL: You must return a valid JSON object exactly matching this format:\n"
             '{'
             '"styles": {"tags": [], "reasoning": "brief explanation of why these styles were chosen"}, '
@@ -97,6 +103,7 @@ def process_route(route: dict, max_retries = 2) -> dict:
             '"rock_type": {"tags": [], "reasoning": "brief explanation of rock type determination"}'
             '}}\n\n'
             "Important Rules:\n"
+            "- Prioritize styles and features that are most defining of the route\n"
             "- Include ONLY features explicitly mentioned or clearly implied in the route's data\n"
             "- Provide concise but specific reasoning for each category\n"
             "- Do not add any extra text or formatting"
@@ -124,9 +131,6 @@ def process_route(route: dict, max_retries = 2) -> dict:
 
             # Remove code block markers
             response_text = response_text.replace('```json', '').replace('```', '')
-
-
-
 
             parsed_tags = json.loads(response_text)
 
