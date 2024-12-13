@@ -117,10 +117,10 @@ def process_route(route: dict, max_retries = 2) -> dict:
         try:    
             # Make API call
             response = openai.chat.completions.create(
-            model="gpt-4o-mini",  
+            model="gpt-4o",  
             messages=messages,
             max_tokens=500,
-                temperature=0.3
+                temperature=0.2
             )
 
             # Process responses
