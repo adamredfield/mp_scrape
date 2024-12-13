@@ -90,7 +90,7 @@ jobs:
           }}' \
           --timeout 900 \
           --memory-size 900 \
-          --image-config '{"Command": ["src.lambda.worker.lambda_handler"]}'
+          --image-config '{"Command": ["src.lambdas.worker.lambda_handler"]}'
 
     - name: Set worker concurrency
       run: |

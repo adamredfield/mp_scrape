@@ -11,8 +11,7 @@ load_dotenv()
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(project_root)
 
-from src.lambda_test.worker import lambda_handler
-
+from src.lambdas.worker import lambda_handler
 
 def test_worker():
     # Simulate SQS event with JSON-encoded body
