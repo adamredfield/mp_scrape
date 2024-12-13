@@ -2,11 +2,11 @@ def check_routes_exists(cursor, route_ids):
     """Check if routes exist in database"""
     route_id_list = [int(id) for id in route_ids]
     placeholders = ','.join(['%s' for _ in route_id_list])
-    cursor.execute(
-        f"SELECT id FROM routes.Routes WHERE id IN ({placeholders})",
-        tuple(route_id_list)
-    )
-    return {row[0] for row in cursor.fetchall()} # return set of route ids that exist
+    query = f"SELECT id FROM routes.Routes WHERE id IN ({placeholders})"
+    cursor.execute(query, tuple(route_id_list))
+    results = {row[0] for row in cursor.fetchall()} # return set of route ids that exist
+    print(f"Found existing routes: {results}")
+    return results
 
 def insert_comments_batch(cursor, comments):  
     try:
