@@ -25,9 +25,6 @@ estimated_lengths_cte = f"""
         )
         """
 
-
-
-
 def total_routes(conn):
     query = "SELECT COUNT(DISTINCT route_id) FROM routes.Ticks WHERE date::text ILIKE '%2024%'"
     return conn.query(query).iloc[0,0]

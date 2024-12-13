@@ -9,13 +9,11 @@ from src.database.utils import create_connection
 connection = create_connection()
 cursor = connection.cursor()
 
-
 create_routes_schema_query = 'CREATE SCHEMA IF NOT EXISTS routes;'
 create_analysis_schema_query = 'CREATE SCHEMA IF NOT EXISTS analysis;'
 
 # Write the SQL command to create the Students table
 create_table_query = '''
-
 CREATE TABLE IF NOT EXISTS routes.Routes (
     id INTEGER PRIMARY KEY,
     route_name TEXT NOT NULL,
@@ -49,9 +47,10 @@ CREATE TABLE IF NOT EXISTS routes.Ticks (
     date TIMESTAMP,
     type TEXT,
     note TEXT,
+    note_hash TEXT,
     insert_date TIMESTAMP,
     FOREIGN KEY (route_id) REFERENCES routes.Routes(id),
-    UNIQUE(user_id, route_id, date)
+    UNIQUE(user_id, route_id, type, note_hash, date)
 );
 
 CREATE TABLE IF NOT EXISTS routes.RouteComments (
@@ -111,6 +110,30 @@ LEFT JOIN analysis.TagMapping tm on tm.raw_tag = rat.tag_value
 JOIN analysis.RouteAnalysis ra on rat.analysis_id = ra.id
 JOIN routes.Routes r on r.id = ra.route_id 
 WHERE tm.is_active = true;
+
+CREATE TABLE IF NOT EXISTS analysis.tagMapping (
+    id SERIAL PRIMARY KEY,
+    raw_tag TEXT NOT NULL,          
+    clean_tag TEXT NOT NULL,         
+    original_tag_type TEXT NOT NULL,
+    mapped_tag_type TEXT NOT NULL,
+    is_active BOOLEAN DEFAULT true,
+    insert_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(raw_tag, original_tag_type)
+
+CREATE VIEW analysis.TagAnalysisView AS
+SELECT DISTINCT 
+    r.id route_id,
+    r.route_name,
+    COALESCE(tm.mapped_tag_type, tm.original_tag_type) as mapped_type, 
+    COALESCE(tm.clean_tag, tm.raw_tag) as mapped_tag
+FROM analysis.RouteAnalysisTags rat 
+LEFT JOIN analysis.TagMapping tm on tm.raw_tag = rat.tag_value 
+JOIN analysis.RouteAnalysis ra on rat.analysis_id = ra.id
+JOIN routes.Routes r on r.id = ra.route_id 
+WHERE tm.is_active = true;
+);
 '''
 
 for query in create_table_query.split(';'):

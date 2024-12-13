@@ -24,7 +24,6 @@ def year_filter(year=None):
     """
     return f"AND EXTRACT(YEAR FROM t.date) = {year}" if year else ''
 
-
 def get_tick_type_distribution(conn, route_types=None):
     """Get distribution of tick types (Lead, TR, etc.)"""
     query = f"""

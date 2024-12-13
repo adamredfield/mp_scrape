@@ -1,12 +1,19 @@
+import os
+import sys
+
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+sys.path.append(project_root)
+
+from src.analysis.ai_route_analysis import process_route, process_route_response, save_analysis_results
+
 import json
 import requests
 import re
-from src.database.utils import create_connection
+from src.database.utils import create_connection, add_new_tags_to_mapping
 from src.database import queries
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 import re
-import os
 from playwright.sync_api import sync_playwright
 
 mp_home_url = "https://www.mountainproject.com"
@@ -23,11 +30,12 @@ def get_proxy_url():
 
 def login_and_save_session(playwright):
 
-    """Initialize browser with proxy and login"""
+    browser = None
+    context = None
+    page = None
+
     mp_username = os.getenv('MP_USERNAME')
     mp_password = os.getenv('MP_PASSWORD')
-    proxy_username = os.getenv('IPROYAL_USERNAME')
-    proxy_password = os.getenv('IPROYAL_PASSWORD')
 
     print("Starting browser launch sequence...")
     try:
@@ -39,23 +47,16 @@ def login_and_save_session(playwright):
                 '--disable-dev-shm-usage',
                 '--single-process',
                 '--no-zygote'
-            ],
-            proxy={
-                'server': 'http://geo.iproyal.com:12321',
-                'username': proxy_username,
-                'password': proxy_password
-            }
+            ]
         )
         print("Browser launched successfully")
 
-        context = browser.new_context(
-            viewport={'width': 1280, 'height': 720}
-        )
+        context = browser.new_context()
+        page = context.new_page()
         print("Context created successfully")
     
-        page = context.new_page()
-        page.set_default_navigation_timeout(60000)
-        page.set_default_timeout(30000)
+        page.set_default_navigation_timeout(90000)
+        page.set_default_timeout(90000)
         page.goto(mp_home_url)
         print("Navigation complete")
         page.wait_for_selector("a.sign-in", timeout=10000)
@@ -85,30 +86,34 @@ def login_and_save_session(playwright):
             browser.close()
         raise
 
-def fetch_dynamic_page_content(page, route_link):
-        page.goto(route_link)
-        last_height = None
+def fetch_dynamic_page_content(page, route_link, max_retries=3):
+        for attempt in range(max_retries):
+            try:
+                page.goto(route_link, timeout=90000)
+                last_height = None
 
-        # loads comments
-        while True:
-            page.evaluate("window.scrollTo(0, document.body.scrollHeight)")  # Scroll down
-            page.wait_for_timeout(1000)
-            new_height = page.evaluate("document.body.scrollHeight")  # Get new scroll height
-            if new_height == last_height:  # Stop if no change in scroll height
-                break
-            last_height = new_height
-            
-        html_content = page.content()
-        return html_content
+                # loads comments
+                while True:
+                    page.evaluate("window.scrollTo(0, document.body.scrollHeight)")  # Scroll down
+                    page.wait_for_timeout(1000)
+                    new_height = page.evaluate("document.body.scrollHeight")  # Get new scroll height
+                    if new_height == last_height:  # Stop if no change in scroll height
+                        break
+                    last_height = new_height
+                    
+                html_content = page.content()
+                return html_content
+            except Exception as e:
+                print(f"Error fetching {route_link} (Attempt {attempt + 1}): {str(e)}")
+                
+                if attempt < max_retries - 1:
+                    continue
+                else:
+                    print(f"Failed to fetch {route_link} after {max_retries} attempts")
+                    raise
 
 def get_total_pages(ticks_url):
-    proxy_url = get_proxy_url()
-    proxies = {
-        'http': proxy_url,
-        'https': proxy_url
-    }
-     # Get total number of rows to paginate through
-    pagination_response = requests.get(ticks_url, proxies=proxies)
+    pagination_response = requests.get(ticks_url)
     if pagination_response.status_code != 200:
         print(f"Failed to retrieve data: {pagination_response.status_code}")
         raise Exception(f"Failed to get total pages: {pagination_response.status_code}")
@@ -218,13 +223,12 @@ def get_route_attributes(route_soup):
     avg_rating_text = stars_avg_text_element.text.strip().replace('\n', ' ')
     avg_rating_parts = avg_rating_text.split('from')
     route_attributes['avg_stars'] = avg_rating_parts[0].replace('Avg:', '').strip()
-    route_attributes['num_ratings'] = int(avg_rating_parts[1].replace('votes', '').replace(',', '').strip() )
+    route_attributes['num_ratings'] = int(avg_rating_parts[1].replace('votes', '').replace('vote', '').replace(',', '').strip() )
     route_attributes['formatted_location'] = ' > '.join(link.text.strip() for link in route_soup.select('.mb-half.small.text-warm a'))
     photo_link = route_soup.find('div', class_='carousel-item')
     route_attributes['primary_photo_url'] = (
         photo_link['style'].split('url("')[1].split('")')[0] if photo_link and 'style' in photo_link.attrs else None
     )
-
     return route_attributes
 
 def parse_route_type(route_details_string):
@@ -329,162 +333,241 @@ def parse_location(location_string):
         location_data['specific_location'] = ' > '.join(parts[3:])
 
     return location_data
+    
+def check_routes_exist(cursor, route_ids):
+    """Check multiple routes at once"""
+    if not route_ids:
+        return set()
+        
+    placeholders = ','.join(['%s'] * len(route_ids))
+    cursor.execute(
+        f"SELECT id FROM routes.Routes WHERE id IN ({placeholders})",
+        tuple(route_ids)
+    )
+    return {row[0] for row in cursor.fetchall()}
+
+def parse_route_data(route_soup, route_id, route_name, route_link):
+    route_attributes = get_route_attributes(route_soup)
+    route_location = parse_location(route_attributes.get('formatted_location'))
+    route_sections = get_route_sections(route_soup)
+    route_details = get_route_details(route_soup)
+
+    current_route_data = {
+        'route_id': route_id,
+        'route_name': route_name,
+        'route_url': route_link,
+        'yds_rating': route_attributes.get('yds_rating'),  
+        'hueco_rating': route_attributes.get('hueco_rating'),
+        'aid_rating': route_attributes.get('aid_rating'),
+        'danger_rating': route_attributes.get('danger_rating'),
+        'avg_stars': route_attributes.get('avg_stars'),
+        'num_votes': route_attributes.get('num_ratings'),
+        'region': route_location.get('region'),
+        'main_area': route_location.get('main_area'),
+        'sub_area': route_location.get('sub_area'),
+        'specific_location': route_location.get('specific_location'),
+        'route_type': route_details.get('route_type'),
+        'length_ft': route_details.get('length_ft'),
+        'pitches': route_details.get('pitches'),
+        'commitment_grade': route_details.get('commitment_grade'),
+        'fa': route_details.get('fa'),
+        'description': route_sections.get('description'),
+        'protection': route_sections.get('protection'),
+        'primary_photo_url': route_attributes.get('primary_photo_url'),
+        'insert_date': datetime.now(timezone.utc).isoformat()
+        }
+    return current_route_data
+
+def parse_route_comments_data(route_soup, route_id):
+    comments = get_comments(route_soup)
+    comments_dict = [{'route_id': route_id, 'comment': comment, 'insert_date': datetime.now(timezone.utc).isoformat()} for comment in comments]
+    return comments_dict
+
+def parse_tick_details(tick_details, current_route_data, user_id):
+
+    tick_details_text = tick_details.text.strip()
+
+    date_pattern = r'[A-Z][a-z]{2}\s+\d{1,2},\s+\d{4}'
+    date_match = re.search(date_pattern, tick_details_text)
+    tick_date = date_match.group() if date_match else None
+
+    tick_type = None
+    tick_note = None
+
+    valid_tick_types = [
+        'Solo', 'TR', 'Follow', 'Lead',
+        'Lead / Onsight', 'Lead / Flash',
+        'Lead / Redpoint', 'Lead / Pinkpoint',
+        'Lead / Fell/Hung'
+    ]
+
+    if ' · ' in tick_details_text:
+        post_date_text = tick_details_text.split(' · ')[1]  # Get everything after the bullet, following date
+        if '.' in post_date_text:
+            parts = post_date_text.split('.', 1)
+            if "pitches" in parts[0].lower():
+                next_parts = parts[1].split('.', 1)
+                potential_type = next_parts[0].strip()
+                if potential_type in valid_tick_types:
+                    tick_type = potential_type
+                    tick_note = next_parts[1].strip() if len(next_parts) > 1 else None
+                else:
+                    tick_note = parts[1].strip()
+            else:
+                potential_type = parts[0].strip()
+                if potential_type in valid_tick_types:
+                    tick_type = potential_type
+                    tick_note = parts[1].strip() if len(parts) > 1 else None
+                else:
+                    tick_note = parts[1].strip()
+        else:
+            tick_note = post_date_text.strip()
+            
+    tick_data = {
+        'user_id': user_id,
+        'route_id': current_route_data['route_id'],
+        'date': tick_date,
+        'type': tick_type,
+        'note': tick_note,
+        'insert_date': datetime.now(timezone.utc).isoformat()
+    }
+    return tick_data
 
 def process_page(page_number, ticks_url, user_id, retry_count=0):
     """Process a single page"""
-    proxy_url = get_proxy_url()
-    proxies = {
-        'http': proxy_url,
-        'https': proxy_url
-    }
-    
-    with create_connection() as conn:
-        cursor = conn.cursor()
+
+    tick_data = []
+    route_data = []
+    route_comments_data = []
+    route_ids_to_check = {}
+    tick_details_map = {}
+    current_route_data = None
+    ai_route_analysis_data = []
+
+    browser = None
+    context = None
+    page = None
+
+    try:
         with sync_playwright() as playwright:
-            browser = None
-            context = None
             try:
                 browser, context = login_and_save_session(playwright)
                 page = context.new_page()
 
-                print(f'Processing page: {page_number}. (Retry #{retry_count})')
+                print(f'Processing page: {page_number} for user {user_id}. (Retry #{retry_count})')
                 
                 current_page_url = f"{ticks_url}{page_number}"
-                print(f"Fetching page: {current_page_url}")
-                tick_response = requests.get(current_page_url, proxies=proxies)
-                print(f"Response status code: {tick_response.status_code}")
-                if tick_response.status_code != 200:
-                    raise Exception(f"Failed to retrieve data: {tick_response.status_code}")
-                
-                tick_soup = BeautifulSoup(tick_response.text, 'html.parser')
+                page.goto(current_page_url, timeout=90000)
+                tick_html = page.content()
+                tick_soup = BeautifulSoup(tick_html, 'html.parser')
                 tick_table = tick_soup.find('table', class_='table route-table hidden-xs-down')
                 tick_rows = tick_table.find_all('tr', class_='route-row')
-                print(f"Found {len(tick_rows)} rows to process")
-
-                for row in tick_rows:
-                    tick_details = row.find('td', class_='text-warm small pt-0')
-                    print(f"Found tick details: {tick_details}")
+                print(f"Found {len(tick_rows) / 2} routes to process")
                 
-                    if not tick_details:
-                        cells = row.find_all('td')
+                for i in range(0, len(tick_rows), 2):  # Step by 2 since routes and ticks alternate
+
+                    try:
+                        route_row = tick_rows[i]
+                        tick_row = tick_rows[i + 1] if i + 1 < len(tick_rows) else None
+                        cells = route_row.find_all('td')
                         route_name = ' '.join(cells[0].text.strip().replace('●', '').split())
-                        print(f'Retrieving data for {route_name}')
-                        route_link = row.find('a', href=True)['href']
+                        route_link = route_row.find('a', href=True)['href']
                         route_id = route_link.split('/route/')[1].split('/')[0]
-                        route_exists = queries.check_route_exists(cursor, route_id)
-                        if route_exists:
-                            print(f"Route {route_name} already exists in the database.")
-                            current_route_data = {
+
+                        tick_details = tick_row.find('td', class_='text-warm small pt-0') if tick_row else None
+
+                        route_ids_to_check[route_id] = (route_name, route_link)
+                        tick_details_map[route_id] = tick_details
+                    except IndexError as e:
+                        print(f"Error processing row {i}: {str(e)}")
+                        continue  # Skip this row and continue with next
+                    except Exception as e:
+                        print(f"Unexpected error processing row {i}: {str(e)}")
+                        continue
+
+                with create_connection() as conn:
+                    cursor = conn.cursor()
+                    existing_routes = queries.check_routes_exists(cursor, route_ids_to_check.keys())
+
+                    for route_id, (route_name, route_link) in route_ids_to_check.items():
+                        print(f'Retrieving data for {route_name}')
+
+                        current_route_data = {
                             'route_id': route_id,
                             'route_name': route_name
                         }
-                        else:
+                        if int(route_id) in existing_routes:
+                            print(f"Route {route_name} with id {route_id} already exists in the database.")
+                            
+                        if int(route_id) not in existing_routes:
                             route_html_content = fetch_dynamic_page_content(page, route_link)
                             route_soup = BeautifulSoup(route_html_content, 'html.parser')
+                            current_route_data = parse_route_data(route_soup, route_id, route_name, route_link)
+                            current_route_comments_data = parse_route_comments_data(route_soup, route_id)
 
-                            route_attributes = get_route_attributes(route_soup)
-                            route_location = parse_location(route_attributes.get('formatted_location'))
-                            route_sections = get_route_sections(route_soup)
-                            route_details = get_route_details(route_soup)
-                            comments = get_comments(route_soup)
+                            route_data.append(current_route_data)
+                            route_comments_data.extend(current_route_comments_data)
 
-                            current_route_data = {
-                                'route_id': route_id,
-                                'route_name': route_name,
-                                'route_url': route_link,
-                                'yds_rating': route_attributes.get('yds_rating'),  
-                                'hueco_rating': route_attributes.get('hueco_rating'),
-                                'aid_rating': route_attributes.get('aid_rating'),
-                                'danger_rating': route_attributes.get('danger_rating'),
-                                'avg_stars': route_attributes.get('avg_stars'),
-                                'num_votes': route_attributes.get('num_ratings'),
-                                'region': route_location.get('region'),
-                                'main_area': route_location.get('main_area'),
-                                'sub_area': route_location.get('sub_area'),
-                                'specific_location': route_location.get('specific_location'),
-                                'route_type': route_details.get('route_type'),
-                                'length_ft': route_details.get('length_ft'),
-                                'pitches': route_details.get('pitches'),
-                                'commitment_grade': route_details.get('commitment_grade'),
-                                'fa': route_details.get('fa'),
-                                'description': route_sections.get('description'),
-                                'protection': route_sections.get('protection'),
-                                'primary_photo_url': route_attributes.get('primary_photo_url'),
-                                'insert_date': datetime.now(timezone.utc).isoformat()
-                            }
+                            combined_grade = ' '.join(filter(None, [
+                                current_route_data.get('yds_rating') or '',
+                                current_route_data.get('hueco_rating') or '',
+                                current_route_data.get('aid_rating') or '',
+                                current_route_data.get('danger_rating') or '',
+                                current_route_data.get('commitment_grade') or ''
+                            ])).strip() or None
 
-                            comments_dict = [{'route_id': route_id, 'comment': comment, 'insert_date': datetime.now(timezone.utc).isoformat()} for comment in comments]
-
-                            queries.insert_route(cursor, conn, current_route_data)
-                            queries.insert_comments(cursor, conn, comments_dict)
-                            conn.commit()
-
-                            current_route_data = {
-                                'route_id': route_id,
-                                'route_name': route_name
-                            }
+                            combined_location = ' > '.join(filter(None, [
+                                current_route_data.get('region') or '',
+                                current_route_data.get('main_area') or '',
+                                current_route_data.get('sub_area') or '',
+                                current_route_data.get('specific_location') or ''
+                            ])).strip() or None
                         
-                        # Check if tick details row rather than a route row. 
-                        if tick_details and current_route_data:
-                            # Append the additional info to the previous row's data
-                            tick_details_text = tick_details.text.strip()
-
-                            date_pattern = r'[A-Z][a-z]{2}\s+\d{1,2},\s+\d{4}'
-                            date_match = re.search(date_pattern, tick_details_text)
-                            tick_date = date_match.group() if date_match else None
-
-                            tick_type = None
-                            tick_note = None
-
-                            valid_tick_types = [
-                                'Solo', 'TR', 'Follow', 'Lead',
-                                'Lead / Onsight', 'Lead / Flash',
-                                'Lead / Redpoint', 'Lead / Pinkpoint',
-                                'Lead / Fell/Hung'
-                            ]
-
-                            if ' · ' in tick_details_text:
-                                post_date_text = tick_details_text.split(' · ')[1]  # Get everything after the bullet, following date
-                                if '.' in post_date_text:
-                                    parts = post_date_text.split('.', 1)
-                                    if "pitches" in parts[0].lower():
-                                        next_parts = parts[1].split('.', 1)
-                                        potential_type = next_parts[0].strip()
-                                        if potential_type in valid_tick_types:
-                                            tick_type = potential_type
-                                            tick_note = next_parts[1].strip() if len(next_parts) > 1 else None
-                                        else:
-                                            tick_note = parts[1].strip()
-                                    else:
-                                        potential_type = parts[0].strip()
-                                        if potential_type in valid_tick_types:
-                                            tick_type = potential_type
-                                            tick_note = parts[1].strip() if len(parts) > 1 else None
-                                        else:
-                                            tick_note = parts[1].strip()
-                                else:
-                                    tick_note = post_date_text.strip()
-                                    
-                            tick_data = {
-                                'user_id': user_id,
+                            route_for_analysis = {
                                 'route_id': current_route_data['route_id'],
-                                'date': tick_date,
-                                'type': tick_type,
-                                'note': tick_note,
-                                'insert_date': datetime.now(timezone.utc).isoformat()
-                            }
-                            queries.insert_tick(cursor, conn, tick_data)
-                            conn.commit()
-                            current_route_data = None
-                
-                print(f'Successfully processed page {page_number}')
-            
-            except Exception as e:
-                print(f"Error processing page {page_number}: {str(e)}")
-                raise
-                
+                                'route_name': current_route_data['route_name'],
+                                'combined_grade': combined_grade,
+                                'avg_stars': current_route_data['avg_stars'],
+                                'num_votes': current_route_data['num_votes'],
+                                'location': combined_location,
+                                'route_type': current_route_data['route_type'],
+                                'fa': current_route_data['fa'],
+                                'description': current_route_data['description'],
+                                'protection': current_route_data['protection'],
+                                'comments': ' | '.join(c['comment'] for c in current_route_comments_data)
+                        }
+                            print(f"Running AI analysis")
+                            ai_route_response = process_route(route_for_analysis)
+                            if ai_route_response:
+                                ai_route_analysis_data.append(process_route_response(ai_route_response))
+                                
+                        if tick_details_map[route_id]:
+                            tick_data.append(parse_tick_details(tick_details_map[route_id], current_route_data, user_id))
+
+                    if route_data:
+                        print(f"Attempting to insert {len(route_data)} routes")
+                        queries.insert_routes_batch(cursor, route_data)
+                    if route_comments_data:
+                        print(f"Attempting to insert {len(route_comments_data)} comments")
+                        queries.insert_comments_batch(cursor, route_comments_data)
+                    if tick_data:
+                        print(f"Attempting to insert {len(tick_data)} ticks")
+                        cursor = conn.cursor()
+                        queries.insert_ticks_batch(cursor, tick_data)
+                    if ai_route_analysis_data:
+                        print(f"Attempting to insert AI results")
+                        save_analysis_results(cursor, ai_route_analysis_data)
+                    
+                    add_new_tags_to_mapping(cursor)
+
+                    conn.commit() # commit all transactions together
+                    print(f'Successfully processed page {page_number}')
             finally:
                 if context:
                     context.close()
                 if browser:
                     browser.close()
+        
+    except Exception as e:
+        print(f"Error processing page {page_number}: {str(e)}")
+        raise

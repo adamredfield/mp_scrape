@@ -2,7 +2,7 @@ name: Deploy Lambda Functions
 
 on:
   push:
-    branches: [ main, postgres-migration ]
+    branches: [ main, bulk-insert ]
   pull_request:
     branches: [ main ]
 
@@ -76,7 +76,6 @@ jobs:
           --package-type Image \
           --code ImageUri=${{ steps.login-ecr.outputs.registry }}/mp-scraper:latest \
           --role ${{ secrets.AWS_LAMBDA_ROLE_ARN }} \
-          --vpc-config SubnetIds=${{ secrets.SUBNET_IDS }},SecurityGroupIds=${{ secrets.SECURITY_GROUP_IDS }} \
           --environment '{"Variables": {
               "POSTGRES_HOST": "${{ secrets.POSTGRES_HOST }}",
               "POSTGRES_DB": "${{ secrets.POSTGRES_DB }}",
@@ -86,7 +85,8 @@ jobs:
               "IPROYAL_USERNAME": "${{ secrets.IPROYAL_USERNAME }}",
               "IPROYAL_PASSWORD": "${{ secrets.IPROYAL_PASSWORD }}",
               "MP_USERNAME": "${{ secrets.MP_USERNAME }}",
-              "MP_PASSWORD": "${{ secrets.MP_PASSWORD }}"
+              "MP_PASSWORD": "${{ secrets.MP_PASSWORD }}",
+              "OPENAI_API_KEY": "${{ secrets.OPENAI_API_KEY }}"
           }}' \
           --timeout 900 \
           --memory-size 2048 \
@@ -96,7 +96,7 @@ jobs:
       run: |
         aws lambda put-function-concurrency \
           --function-name mp-scraper-worker \
-          --reserved-concurrent-executions 10
+          --reserved-concurrent-executions 100
 
     - name: Deploy retry worker function
       run: |
@@ -105,7 +105,6 @@ jobs:
           --package-type Image \
           --code ImageUri=${{ steps.login-ecr.outputs.registry }}/mp-scraper:latest \
           --role ${{ secrets.AWS_LAMBDA_ROLE_ARN }} \
-          --vpc-config SubnetIds=${{ secrets.SUBNET_IDS }},SecurityGroupIds=${{ secrets.SECURITY_GROUP_IDS }} \
           --environment '{
             "Variables": {
               "MP_USERNAME": "${{ secrets.MP_USERNAME }}",
@@ -116,12 +115,19 @@ jobs:
               "POSTGRES_DB": "${{ secrets.POSTGRES_DB }}",
               "POSTGRES_USER": "${{ secrets.POSTGRES_USER }}",
               "POSTGRES_PASSWORD": "${{ secrets.POSTGRES_PASSWORD }}",
-              "POSTGRES_PORT": "${{ secrets.POSTGRES_PORT }}"
+              "POSTGRES_PORT": "${{ secrets.POSTGRES_PORT }}",
+              "OPENAI_API_KEY": "${{ secrets.OPENAI_API_KEY }}"
             }
           }' \
           --timeout 900 \
           --memory-size 2048 \
           --image-config '{"Command": ["src.lambda.retry_worker.lambda_handler"]}'
+        
+    - name: Set retry worker concurrency
+      run: |
+        aws lambda put-function-concurrency \
+          --function-name mp-scraper-retry-worker \
+          --reserved-concurrent-executions 100
 
     - name: Deploy orchestrator function
       run: |
