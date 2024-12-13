@@ -22,9 +22,11 @@ cursor.mogrify(
             route_id, comment, comment_hash, insert_date
         ) VALUES {args_str}
         ON CONFLICT (route_id, comment_hash) DO NOTHING
+        RETURNING id
         """
         cursor.execute(comments_sql)
-        print(f"Successfully inserted {len(comments)} comments")
+        inserted_count = cursor.rowcount
+        print(f"Successfully inserted {inserted_count} comments")
         
     except Exception as e:
         print(f"Error inserting comments batch: {str(e)}")
@@ -77,9 +79,11 @@ def insert_routes_batch(cursor, routes_data):
             fa, description, protection, primary_photo_url, insert_date
         ) VALUES {args_str}
         ON CONFLICT (id) DO NOTHING
+        RETURNING id
         """ 
         cursor.execute(route_sql)
-        print(f"Successfully inserted {len(routes_data)} routes")
+        inserted_count = cursor.rowcount
+        print(f"Successfully inserted {inserted_count} routes")
         
     except Exception as e:
         print(f"Error inserting routes batch: {str(e)}")
