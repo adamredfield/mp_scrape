@@ -9,7 +9,7 @@ from src.analysis.ai_route_analysis import process_route, process_route_response
 import json
 import requests
 import re
-from src.database.utils import create_connection
+from src.database.utils import create_connection, add_new_tags_to_mapping
 from src.database import queries
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
@@ -536,6 +536,7 @@ def process_page(page_number, ticks_url, user_id, retry_count=0):
                                 'protection': current_route_data['protection'],
                                 'comments': ' | '.join(c['comment'] for c in current_route_comments_data)
                         }
+                            print(f"Running AI analysis")
                             ai_route_response = process_route(route_for_analysis)
                             if ai_route_response:
                                 ai_route_analysis_data.append(process_route_response(ai_route_response))
@@ -557,6 +558,8 @@ def process_page(page_number, ticks_url, user_id, retry_count=0):
                         print(f"Attempting to insert AI results")
                         save_analysis_results(cursor, ai_route_analysis_data)
                     
+                    add_new_tags_to_mapping(cursor)
+
                     conn.commit() # commit all transactions together
                     print(f'Successfully processed page {page_number}')
             finally:
