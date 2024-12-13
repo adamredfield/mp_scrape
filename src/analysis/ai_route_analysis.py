@@ -10,8 +10,6 @@ from datetime import datetime
 import json
 from datetime import timezone
 
-openai.api_key = os.getenv('OPENAI_API_KEY')
-
 def get_next_route(cursor):
     """Get routes from database that haven't been analyzed yet"""
     query = '''
@@ -73,6 +71,8 @@ def construct_prompt(route):
     return prompt
 
 def process_route(route: dict, max_retries = 2) -> dict:
+
+    openai.api_key = os.getenv('OPENAI_API_KEY')
 
     messages = [
         {"role": "system",
