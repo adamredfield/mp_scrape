@@ -85,7 +85,8 @@ jobs:
               "IPROYAL_USERNAME": "${{ secrets.IPROYAL_USERNAME }}",
               "IPROYAL_PASSWORD": "${{ secrets.IPROYAL_PASSWORD }}",
               "MP_USERNAME": "${{ secrets.MP_USERNAME }}",
-              "MP_PASSWORD": "${{ secrets.MP_PASSWORD }}"
+              "MP_PASSWORD": "${{ secrets.MP_PASSWORD }}",
+              "OPENAI_API_KEY": "${{ secrets.OPENAI_API_KEY }}"
           }}' \
           --timeout 900 \
           --memory-size 2048 \
@@ -114,7 +115,8 @@ jobs:
               "POSTGRES_DB": "${{ secrets.POSTGRES_DB }}",
               "POSTGRES_USER": "${{ secrets.POSTGRES_USER }}",
               "POSTGRES_PASSWORD": "${{ secrets.POSTGRES_PASSWORD }}",
-              "POSTGRES_PORT": "${{ secrets.POSTGRES_PORT }}"
+              "POSTGRES_PORT": "${{ secrets.POSTGRES_PORT }}",
+              "OPENAI_API_KEY": "${{ secrets.OPENAI_API_KEY }}"
             }
           }' \
           --timeout 900 \
