@@ -496,7 +496,7 @@ def page_top_routes():
                         <span class='item-number'>{i}. </span>
                         <span class='item-name'>{route}</span>
                     </div>
-                    <div class='item-details'>⭐ {stars} stars ��� {grade}</div>
+                    <div class='item-details'>⭐ {stars:.1f} stars &bull; {grade}</div>
                 </div>
                 """,
                 unsafe_allow_html=True
