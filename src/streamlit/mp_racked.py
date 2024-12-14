@@ -6,7 +6,6 @@ sys.path.append(project_root)
 
 import streamlit as st
 import src.analysis.mp_wrapped_metrics as metrics
-import src.analysis.analysis_queries as analysis_queries
 import pandas as pd
 import plotly.graph_objects as go
 
@@ -303,7 +302,7 @@ def diamond_template(main_text, subtitle=None, detail_text=None):
 
 def page_total_length():
     """First page showing total length climbed"""
-    length_data = analysis_queries.get_length_climbed(conn, year='2024')
+    length_data = metrics.get_length_climbed(conn, year='2024')
     length_df = pd.DataFrame(length_data, columns=['Year', 'Location', 'Length'])
     total_length = length_df['Length'].sum()
 
@@ -474,7 +473,7 @@ def page_top_routes():
         
     
     # Get filtered routes based on selected styles
-    top_rated_routes = analysis_queries.get_highest_rated_climbs(
+    top_rated_routes = metrics.get_highest_rated_climbs(
         conn,
         selected_styles=selected_styles,
         route_types=None,  # route_types
@@ -609,7 +608,7 @@ def page_areas_breakdown():
         )
     
     # Get length data based on selected filter
-    length_data = analysis_queries.get_length_climbed(conn, area_type=area_type, year='2024')
+    length_data = metrics.get_length_climbed(conn, area_type=area_type, year='2024')
     length_df = pd.DataFrame(length_data, columns=['Year', 'Location', 'Length'])
     
     # Create horizontal bar chart
@@ -671,8 +670,8 @@ def page_grade_distribution():
         )
     
     # Get the data based on selected grade level
-    grade_dist = analysis_queries.get_grade_distribution(route_types=None, level=grade_level, year='2024')
-    top_grade = metrics.top_grade(level=grade_level)
+    grade_dist = metrics.get_grade_distribution(conn, route_types=None, level=grade_level, year='2024')
+    top_grade = metrics.top_grade(conn,level=grade_level)
     
     # Apply Spotify styling
     st.markdown(get_spotify_style(), unsafe_allow_html=True)
