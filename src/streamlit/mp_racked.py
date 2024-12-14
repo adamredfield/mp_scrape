@@ -609,7 +609,7 @@ def page_areas_breakdown():
         )
     
     # Get length data based on selected filter
-    length_data = analysis_queries.get_length_climbed(area_type=area_type, year='2024')
+    length_data = analysis_queries.get_length_climbed(conn, area_type=area_type, year='2024')
     length_df = pd.DataFrame(length_data, columns=['Year', 'Location', 'Length'])
     
     # Create horizontal bar chart

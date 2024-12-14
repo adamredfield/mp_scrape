@@ -205,9 +205,9 @@ def states_climbed(conn):
         GROUP BY region
         ORDER BY days_out desc;
     """
-    result = conn.query(query).fetchall()
+    result = conn.query(query)
     
-    return result
+    return result.values.tolist()
 
 
 def sub_areas_climbed(conn):
@@ -219,9 +219,9 @@ def sub_areas_climbed(conn):
         GROUP BY sub_area 
         ORDER BY days_out desc;
     """
-    result = conn.query(query).fetchall()
+    result = conn.query(query)
     
-    return result
+    return result.values.tolist()
 
 def regions_climbed(conn):
     query = """
