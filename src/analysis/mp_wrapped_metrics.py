@@ -14,12 +14,13 @@ estimated_lengths_cte = f"""
                     THEN (SELECT avg(length_ft) FROM routes.Routes r WHERE route_type ILIKE '%trad%'AND length_ft IS NOT NULL and pitches IS NULL AND length_ft < 230) -- avg single-pitch trad pitch length
                     WHEN route_type ILIKE '%trad%' AND length_ft IS NULL AND pitches IS NOT NULL -- trad multipitch
                     THEN (SELECT avg(length_ft/ pitches) FROM routes.Routes r WHERE route_type ILIKE '%trad%' AND length_ft IS NOT NULL and pitches IS NOT NULL) * pitches
-                    WHEN route_type ILIKE '%sport%' AND length_ft IS NULL AND pitches IS NOT NULL -- sport multipitch
+                    WHEN route_type ILIKE '%sport%' AND length_ft IS NULL AND pitches IS NOT NULL -- sport single-pitch
                     THEN (SELECT avg(length_ft) FROM routes.Routes r WHERE route_type ILIKE '%sport%'AND length_ft IS NOT NULL and pitches IS NULL AND length_ft < 230) -- avg single-pitch sport pitch length
                     WHEN route_type ILIKE '%sport%' AND length_ft IS NULL AND pitches IS NOT NULL -- sport multipitch
-                    THEN (SELECT avg(length_ft/ pitches) FROM routes.Routes r WHERE route_type ILIKE '%trad%' AND length_ft IS NOT NULL and pitches IS NOT NULL) * pitches
+                    THEN (SELECT avg(length_ft/ pitches) FROM routes.Routes r WHERE route_type ILIKE '%sport%' AND length_ft IS NOT NULL and pitches IS NOT NULL) * pitches
                     WHEN route_type ILIKE '%boulder%' AND length_ft IS NULL
                     THEN (SELECT avg(length_ft) FROM routes.Routes r WHERE route_type ILIKE '%boulder%' AND length_ft IS NOT NULL) -- boulder
+                    ELSE (SELECT avg(length_ft) FROM routes.Routes r WHERE route_type ILIKE '%trad%'AND length_ft IS NOT NULL and pitches IS NULL AND length_ft < 230)
                 END AS estimated_length
         FROM routes.Routes
         )
@@ -45,7 +46,8 @@ def most_climbed_route(conn):
         JOIN routes.Routes r ON t.route_id = r.id
         LEFT JOIN estimated_lengths el on el.id = t.route_id 
         WHERE EXTRACT(YEAR FROM t.date) = 2024
-        GROUP BY r.route_name
+        GROUP BY r.route_name, r.specific_location, r.yds_rating, r.hueco_rating, 
+                 r.aid_rating, r.danger_rating, r.commitment_grade, el.estimated_length
         ORDER BY COUNT(*) DESC
         LIMIT 1
     """
@@ -240,6 +242,8 @@ def regions_sub_areas(conn):
     return conn.query(query).iloc[0,0]
 
 def top_tags(conn, tag_type):
+
+    print(f"Received tag_type: {tag_type}")
     
     query = f"""
         WITH deduped_ticks AS(
@@ -251,9 +255,18 @@ def top_tags(conn, tag_type):
         SELECT tav.mapped_type, tav.mapped_tag tag_value, count(*) as count
         FROM analysis.TagAnalysisView tav 
         JOIN deduped_ticks dt on dt.route_id = tav.route_id AND dt.rn = 1
-        WHERE tav.mapped_type = '{tag_type}'
         GROUP BY tav.mapped_type, tav.mapped_tag
         ORDER BY count DESC;
     """
-    result = conn.query(query).fetchall()
-    return result
+    all_results = conn.query(query)
+    filtered = all_results[all_results['mapped_type'].str.lower() == tag_type.lower()]
+
+    filtered = filtered.rename(columns={
+        'mapped_type': 'Type',
+        'tag_value': 'Tag',
+        'count': 'Count'
+    })
+
+    print("Filtered results:", filtered)
+
+    return filtered
