@@ -4,7 +4,7 @@ import sys
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(project_root)
 
-from src.test_lambdas.orchestrator import lambda_handler
+from src.lambdas.orchestrator import lambda_handler
 from dotenv import load_dotenv
 load_dotenv()
 

@@ -45,4 +45,4 @@ def add_new_tags_to_mapping(cursor):
         ON CONFLICT (raw_tag, original_tag_type) DO NOTHING;
     ''')
 
-    
+  

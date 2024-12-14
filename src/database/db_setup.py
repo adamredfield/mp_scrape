@@ -12,7 +12,6 @@ cursor = connection.cursor()
 create_routes_schema_query = 'CREATE SCHEMA IF NOT EXISTS routes;'
 create_analysis_schema_query = 'CREATE SCHEMA IF NOT EXISTS analysis;'
 
-# Write the SQL command to create the Students table
 create_table_query = '''
 CREATE TABLE IF NOT EXISTS routes.Routes (
     id INTEGER PRIMARY KEY,
@@ -47,7 +46,7 @@ CREATE TABLE IF NOT EXISTS routes.Ticks (
     date TIMESTAMP,
     type TEXT,
     note TEXT,
-    note_hash TEXT,
+    note_hash TEXT DEFAULT md5('') NOT NULL,
     insert_date TIMESTAMP,
     FOREIGN KEY (route_id) REFERENCES routes.Routes(id),
     UNIQUE(user_id, route_id, type, note_hash, date)

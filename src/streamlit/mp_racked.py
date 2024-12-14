@@ -459,7 +459,7 @@ def page_top_routes():
         )
     
     # Get tag data for filter options
-    tag_data = metrics.top_tags(tag_type)
+    tag_data = metrics.top_tags(conn, tag_type)
     tag_df = pd.DataFrame(tag_data, columns=['Type', 'Tag', 'Count']).head(5)
     
     # Calculate max_count from the actual Count column
@@ -471,14 +471,16 @@ def page_top_routes():
             options=tag_df['Tag'].tolist(),
             key='style_filter'
         )
+        
     
     # Get filtered routes based on selected styles
     top_rated_routes = analysis_queries.get_highest_rated_climbs(
+        conn,
         selected_styles=selected_styles,
         route_types=None,  # route_types
         year='2024', # year
         tag_type=tag_type
-    )
+    ).values.tolist()
     
     # Create a centered layout with two columns
     left_col, right_col = st.columns(2)
@@ -494,7 +496,7 @@ def page_top_routes():
                         <span class='item-number'>{i}. </span>
                         <span class='item-name'>{route}</span>
                     </div>
-                    <div class='item-details'>⭐ {stars} stars ��� {grade}</div>
+                    <div class='item-details'>⭐ {stars:.1f} stars &bull; {grade}</div>
                 </div>
                 """,
                 unsafe_allow_html=True
@@ -504,9 +506,12 @@ def page_top_routes():
     with right_col:
         st.markdown(f"<h2 class='spotify-header'>Top {tag_type.replace('_', ' ').title()}</h2>", unsafe_allow_html=True)
         
-        for i, (_, tag, count) in enumerate(zip(tag_df['Type'], tag_df['Tag'], tag_df['Count']), 1):
+        counts = tag_df['Count'].fillna(0)
+        max_count = counts.max() if len(counts) > 0 else 1
+
+        for i, (_, tag, count) in enumerate(zip(tag_df['Type'], tag_df['Tag'], counts), 1):
             # Calculate number of bars based on proportion of max count
-            num_bars = min(10, round((count / max_count) * 10))
+            num_bars = min(10, round((count / max_count) * 10)) if max_count > 0 else 0
             frequency_bars = '|' * num_bars
             
             st.markdown(
@@ -517,7 +522,7 @@ def page_top_routes():
                         <span class='item-name'>{tag}</span>
                     </div>
                     <div class='item-details'>
-                        <span style="color: #1ed760;">{frequency_bars}</span> {count} routes
+                        <span style="color: #1ed760;">{frequency_bars}</span> {int(count)} routes
                     </div>
                 </div>
                 """,

@@ -157,9 +157,9 @@ def process_route(route: dict, max_retries = 2) -> dict:
             # Process responses
             response_text = response.choices[0].message.content.strip()
 
-            response_text = response_text.replace('\n', ' ')
-            response_text = response_text.replace('\\', '\\\\')
-            response_text = response_text.replace('```json', '').replace('```', '')
+            response_text = response_text.replace('```json', '').replace('```', '')  # Remove code blocks
+            response_text = response_text.replace('\n', ' ')  # Remove newlines
+            response_text = response_text.strip()  # Clean up whitespace   
 
             try:
                 parsed_tags = json.loads(response_text)

@@ -157,7 +157,8 @@ def get_highest_rated_climbs(conn, selected_styles=None, route_types=None, year=
     WHERE r.num_votes >= 10
     {route_type_filter(route_types)}
     {year_filter(year)}
-    GROUP BY r.route_name, r.yds_rating, r.avg_stars, r.num_votes
+    GROUP BY r.route_name, r.main_area, r.specific_location, r.yds_rating, r.hueco_rating, 
+             r.aid_rating, r.danger_rating, r.commitment_grade, r.avg_stars, r.num_votes
     {style_filter}
     ORDER BY r.avg_stars DESC, num_votes DESC
     LIMIT 20
