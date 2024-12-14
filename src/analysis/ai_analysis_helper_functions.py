@@ -10,11 +10,12 @@ from datetime import datetime
 import json
 from datetime import timezone
 
+# for running analysis locally 
 def get_next_route(cursor):
     """Get routes from database that haven't been analyzed yet"""
     query = '''
     SELECT 
-        r.id,
+        r.id as route_id,
         r.route_name,
         r.yds_rating,
         r.avg_stars,
@@ -41,7 +42,37 @@ def get_next_route(cursor):
     cursor.execute(query)
     columns = [description[0] for description in cursor.description]
     result = cursor.fetchone()
-    return dict(zip(columns, result)) if result else None
+    current_route_data = dict(zip(columns, result)) if result else None
+
+    combined_grade = ' '.join(filter(None, [
+        current_route_data.get('yds_rating') or '',
+        current_route_data.get('hueco_rating') or '',
+        current_route_data.get('aid_rating') or '',
+        current_route_data.get('danger_rating') or '',
+        current_route_data.get('commitment_grade') or ''
+    ])).strip() or None
+
+    combined_location = ' > '.join(filter(None, [
+        current_route_data.get('region') or '',
+        current_route_data.get('main_area') or '',
+        current_route_data.get('sub_area') or '',
+        current_route_data.get('specific_location') or ''
+    ])).strip() or None
+
+    route_for_analysis = {
+        'route_id': current_route_data['route_id'],
+        'route_name': current_route_data['route_name'],
+        'combined_grade': combined_grade,
+        'avg_stars': current_route_data['avg_stars'],
+        'num_votes': current_route_data['num_votes'],
+        'location': combined_location,
+        'route_type': current_route_data['route_type'],
+        'fa': current_route_data['fa'],
+        'description': current_route_data['description'],
+        'protection': current_route_data['protection'],
+        'comments': current_route_data['comments']
+    }
+    return route_for_analysis
 
 def construct_prompt(route):
 
@@ -125,14 +156,22 @@ def process_route(route: dict, max_retries = 2) -> dict:
 
             # Process responses
             response_text = response.choices[0].message.content.strip()
-            # Remove newlines and backslashes
+
             response_text = response_text.replace('\n', ' ')
             response_text = response_text.replace('\\', '\\\\')
-
-            # Remove code block markers
             response_text = response_text.replace('```json', '').replace('```', '')
 
-            parsed_tags = json.loads(response_text)
+            try:
+                parsed_tags = json.loads(response_text)
+            except json.JSONDecodeError as e:
+                print(f"JSON Parse Error on attempt {attempt + 1}:")
+                print(f"Error details: {str(e)}")
+                print(f"Error position: {e.pos}")
+                print(f"Problematic text around error:")
+                start = max(0, e.pos - 50)
+                end = min(len(response_text), e.pos + 50)
+                print(response_text[start:end])
+                continue
 
             result = {
                 "route_id": route["route_id"],
@@ -191,82 +230,56 @@ def process_route_response(ai_response: dict) -> dict:
         print(f"Error processing AI response: {e}")
         return None
 
-def save_analysis_results(cursor, result_list):
-    for result in result_list:
-        try:
-            # Insert RouteAnalysis
-            analysis_insert_sql = """
-            INSERT INTO analysis.RouteAnalysis (
-                route_id,
-                insert_date
-            ) VALUES (%s, %s)
-            RETURNING id
-            """
-            cursor.execute(analysis_insert_sql, (
-                result['route_id'],
-                result['insert_date']
-            ))
-            analysis_id = cursor.fetchone()[0]
+def save_analysis_results(cursor, result):
+    try:
+        # Insert RouteAnalysis
+        analysis_insert_sql = """
+        INSERT INTO analysis.RouteAnalysis (
+            route_id,
+            insert_date
+        ) VALUES (%s, %s)
+        RETURNING id
+        """
+        cursor.execute(analysis_insert_sql, (
+            result['route_id'],
+            result['insert_date']
+        ))
+        analysis_id = cursor.fetchone()[0]
 
-            # Insert RouteAnalysisTags
-            tag_insert_sql = """
-            INSERT INTO analysis.RouteAnalysisTags (
+        # Insert RouteAnalysisTags
+        tag_insert_sql = """
+        INSERT INTO analysis.RouteAnalysisTags (
+            analysis_id,
+            tag_type,
+            tag_value,
+            insert_date
+        ) VALUES (%s, %s, %s, %s)
+        """
+        for tag_type, tag_value in result['tags']:
+            cursor.execute(tag_insert_sql, (
                 analysis_id,
                 tag_type,
                 tag_value,
-                insert_date
-            ) VALUES (%s, %s, %s, %s)
-            """
-            for tag_type, tag_value in result['tags']:
-                cursor.execute(tag_insert_sql, (
-                    analysis_id,
-                    tag_type,
-                    tag_value,
-                    result['insert_date']
-                ))
+                result['insert_date']
+            ))
 
-            # Insert RouteAnalysisTagsReasoning
-            reasoning_insert_sql = """
-            INSERT INTO analysis.RouteAnalysisTagsReasoning (
+        # Insert RouteAnalysisTagsReasoning
+        reasoning_insert_sql = """
+        INSERT INTO analysis.RouteAnalysisTagsReasoning (
+            analysis_id,
+            tag_type,
+            reasoning,
+            insert_date
+        ) VALUES (%s, %s, %s, %s)
+        """
+        for tag_type, reasoning in result['reasoning']:
+            cursor.execute(reasoning_insert_sql, (
                 analysis_id,
                 tag_type,
                 reasoning,
-                insert_date
-            ) VALUES (%s, %s, %s, %s)
-            """
-            for tag_type, reasoning in result['reasoning']:
-                cursor.execute(reasoning_insert_sql, (
-                    analysis_id,
-                    tag_type,
-                    reasoning,
-                    result['insert_date']
-                ))
-
-        except Exception as e:
-            print(f"Error saving analysis results: {e}")
-
-def main():
-    try:    
-        connection = create_connection()
-        cursor = connection.cursor()
-
-        while True:
-            route = get_next_route(cursor)
-            if not route:
-                print("No new routes to analyze")
-                break
-        
-            result = process_route(route)
-            
-            if result:
-                save_analysis_results(cursor, connection, result)
-                print(f"Successfully analyzed {route['route_name']}")
+                result['insert_date']
+            ))
 
     except Exception as e:
-        print(f"Error: {e}")
-    finally:
-        if connection:
-            connection.close()
+        print(f"Error saving analysis results: {e}")
 
-if __name__ == "__main__":
-    main()

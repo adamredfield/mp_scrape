@@ -21,4 +21,4 @@ COPY src/ ${LAMBDA_TASK_ROOT}/src/
 
 # Set the handler
 ENTRYPOINT [ "python3", "-m", "awslambdaric" ]
-CMD [ "src.lambda.worker.lambda_handler" ]
+CMD [ "src.lambdas.worker.lambda_handler" ]

@@ -4,7 +4,7 @@ import sys
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(project_root)
 
-from src.analysis.ai_route_analysis import process_route, process_route_response, save_analysis_results
+from src.analysis.ai_analysis_helper_functions import process_route, process_route_response, save_analysis_results
 
 import json
 import requests
@@ -556,7 +556,8 @@ def process_page(page_number, ticks_url, user_id, retry_count=0):
                         queries.insert_ticks_batch(cursor, tick_data)
                     if ai_route_analysis_data:
                         print(f"Attempting to insert AI results")
-                        save_analysis_results(cursor, ai_route_analysis_data)
+                        for result in ai_route_analysis_data:
+                            save_analysis_results(cursor, result)
                     
                     add_new_tags_to_mapping(cursor)
 

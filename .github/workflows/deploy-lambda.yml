@@ -89,8 +89,8 @@ jobs:
               "OPENAI_API_KEY": "${{ secrets.OPENAI_API_KEY }}"
           }}' \
           --timeout 900 \
-          --memory-size 2048 \
-          --image-config '{"Command": ["src.lambda.worker.lambda_handler"]}'
+          --memory-size 900 \
+          --image-config '{"Command": ["src.lambdas.worker.lambda_handler"]}'
 
     - name: Set worker concurrency
       run: |
@@ -120,7 +120,7 @@ jobs:
             }
           }' \
           --timeout 900 \
-          --memory-size 2048 \
+          --memory-size 900 \
           --image-config '{"Command": ["src.lambda.retry_worker.lambda_handler"]}'
         
     - name: Set retry worker concurrency
@@ -142,5 +142,5 @@ jobs:
               "IPROYAL_PASSWORD": "${{ secrets.IPROYAL_PASSWORD }}"
           }}' \
           --timeout 900 \
-          --memory-size 1024 \
+          --memory-size 900 \
           --image-config '{"Command": ["src.lambda.orchestrator.lambda_handler"]}'
