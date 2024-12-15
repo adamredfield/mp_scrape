@@ -187,7 +187,7 @@ jobs:
           --role ${{ secrets.AWS_LAMBDA_ROLE_ARN }} \
           --environment '{"Variables": {
               "QUEUE_URL": "${{ secrets.SQS_URL }}",
-              "NEW_SCRAPE_QUEUE_URL": "${{ NEW_SCRAPE_QUEUE_URL }}",
+              "NEW_SCRAPE_QUEUE_URL": "${{ secrets.NEW_SCRAPE_QUEUE_URL }}",
               "IPROYAL_USERNAME": "${{ secrets.IPROYAL_USERNAME }}",
               "IPROYAL_PASSWORD": "${{ secrets.IPROYAL_PASSWORD }}"
           }}' \
