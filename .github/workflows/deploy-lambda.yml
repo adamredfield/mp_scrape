@@ -201,4 +201,3 @@ jobs:
           --function-name mp-scraper-orchestrator \
           --event-source-arn arn:aws:sqs:us-east-1:855154218477:initiate-orchestrator-queue \
           --batch-size 1 \
-          --enabled || true
