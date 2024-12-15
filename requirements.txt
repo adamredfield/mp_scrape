@@ -42,4 +42,7 @@ tzdata==2024.2
 urllib3==2.2.3
 sqlalchemy==2.0.36
 plotly==5.24.1
-
+openai==1.57.4
+pytest==8.3.4
+playwright==1.49.1
+bs4==0.0.2
