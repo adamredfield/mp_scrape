@@ -35,9 +35,9 @@ cursor.mogrify(
 def insert_ticks_batch(cursor, tick_data):
     args_str = ','.join(
         cursor.mogrify(
-            "(%(user_id)s, %(route_id)s, %(date)s, %(type)s, %(note)s, encode(digest(%(note)s, 'sha256'), 'hex'), %(insert_date)s)",
+            "(%(user_id)s, %(route_id)s, %(date)s, %(type)s, %(note)s, encode(digest(COALESCE(%(note)s, ''), 'sha256'), 'hex'), %(insert_date)s)",
             tick
-        ).decode('utf-8') 
+        ).decode('utf-8')
         for tick in tick_data
     )
     tick_sql = f"""

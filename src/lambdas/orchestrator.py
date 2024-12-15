@@ -6,26 +6,42 @@ sys.path.append(project_root)
 
 import json
 import boto3
+from src.scraping import helper_functions
 
 sqs = boto3.client('sqs')
-QUEUE_URL = os.environ['QUEUE_URL']
+NEW_SCRAPE_QUEUE_URL = os.environ['NEW_SCRAPE_QUEUE_URL']
 BATCH_SIZE = 1  # pages per batch
 
 def lambda_handler(event, context):
-    if 'user_id' not in event:
+    try:
+        if 'Records' in event:
+            for record in event['Records']:
+                try:
+                    message = json.loads(record['body'])
+                    user_id = message['user_id']
+
+                    scrape_user(user_id)
+                except Exception as e:
+                    print(f"Error processing message: {str(e)}")
+                    raise e
+        else:
+            return {
+                    'statusCode': 400,
+                    'body': json.dumps('Error: user_id is required')
+                }
+    except Exception as e:
+        print(f"Error in lambda_handler: {str(e)}")
         return {
-            'statusCode': 400,
-            'body': json.dumps('Error: user_id is required')
+            'statusCode': 500,
+            'body': json.dumps(f'Error: {str(e)}')
         }
 
-    user_id = event['user_id']
+def scrape_user(user_id):
     base_url = f'https://www.mountainproject.com/user/{user_id}'
     ticks_url = f'{base_url}/ticks?page='
 
     print(f"Starting scrape for user: {user_id}")
-    print(f"Queue URL: {QUEUE_URL}")
-    from src.scraping import helper_functions
-    print("Initialized helper functions")
+    print(f"Queue URL: {NEW_SCRAPE_QUEUE_URL}")
 
     try:
         total_pages = helper_functions.get_total_pages(ticks_url)
@@ -42,14 +58,15 @@ def lambda_handler(event, context):
                         'user_id': user_id
                     })
                 })
-            
-            # Send smaller batch to SQS
-            sqs.send_message_batch(
-                QueueUrl=QUEUE_URL,
-                Entries=batch
+            if batch:
+                QUEUE_URL = os.environ['QUEUE_URL']
+                # Send batch to SQS
+                sqs.send_message_batch(
+                    QueueUrl=QUEUE_URL,
+                    Entries=batch
             )
             print(f"Queued pages {i} to {min(i + BATCH_SIZE, total_pages)}")
-            
+
         return {
             'statusCode': 200,
             'body': json.dumps({
@@ -61,8 +78,9 @@ def lambda_handler(event, context):
         }
         
     except Exception as e:
-        print(f"Error in orchestrator: {str(e)}")
+        print(f"Error in scrape_user: {str(e)}")
         return {
             'statusCode': 500,
             'body': json.dumps(f'Error: {str(e)}')
         }
+    

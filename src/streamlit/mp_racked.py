@@ -4,10 +4,14 @@ import sys
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(project_root)
 
+from dotenv import load_dotenv
 import streamlit as st
 import src.analysis.mp_racked_metrics as metrics
 import pandas as pd
 import plotly.graph_objects as go
+import json
+import boto3
+from datetime import datetime
 
 # Page config
 st.set_page_config(
@@ -21,6 +25,8 @@ st.set_page_config(
         'About': None
     }
 )
+
+load_dotenv()
 
 conn = st.connection('postgresql', type='sql')
 
@@ -304,9 +310,11 @@ def get_user_id():
     """Handle user identification"""
     if 'user_id' not in st.session_state:
         st.session_state.user_id = None
+    if 'data_status' not in st.session_state:
+        st.session_state.data_status = None
 
     if st.session_state.user_id is None:
-        st.title("Mountain Project Wrapped")
+        st.title("Mountain Project Racked")
         
         col1, col2 = st.columns([2,1])
         with col1:
@@ -322,44 +330,126 @@ def get_user_id():
                     if "mountainproject.com" in user_input:
                         try:
                             user_id = user_input.split("/user/")[1].strip("/")
+                            st.write(f"Extracted from URL: {user_id}")
                         except IndexError:
                             st.error("Invalid Mountain Project URL")
                             return None
                     else:
-                        user_id = user_input
+                        user_id = user_input.strip().strip('/')
                     
-                    # Verify user exists in database
-                    if verify_user_exists(conn, user_id):
-                        st.session_state.user_id = user_id
-                        st.rerun()
-                    else:
-                        st.error("User not found in database")
+                    st.session_state.user_id = user_id
+                    st.session_state.data_status = None  # Reset data status
+                    st.rerun()
                 else:
                     st.error("Please enter a user ID")
-        
+
         st.markdown("""
         ### How to find your User ID:
         1. Go to [Mountain Project](https://www.mountainproject.com)
         2. Log in and click your profile
         3. Copy your profile URL or ID from the address bar
+        
+        Example: https://www.mountainproject.com/user/200362278/doctor-choss or 200362278/doctor-choss
         """)
+        return None
+    if st.session_state.data_status is None:     
+        # Verify user exists in database
+        if verify_user_exists(conn, st.session_state.user_id):
+            st.session_state.data_status = 'ready'
+            st.rerun()
         return None
 
     return st.session_state.user_id
 
+def trigger_user_scrape(user_id):
+    """Send message to SQS to trigger scrape"""
+    sqs = boto3.client('sqs')
+    new_scrape_queue_url = os.getenv('NEW_SCRAPE_QUEUE_URL')  
+
+    if not new_scrape_queue_url:
+        st.error("SQS Queue URL not configured")
+        return False
+
+    message = {
+        'user_id': user_id,
+        'source': 'streamlit_app',
+        'action': 'new_user_scrape'
+    }
+
+    try:
+        response = sqs.send_message(
+            QueueUrl=new_scrape_queue_url,
+            MessageBody=json.dumps(message)
+        )
+        st.write(f"SQS Response: {response}") 
+        st.session_state.scrape_requested = True
+        st.session_state.scrape_time = datetime.now()
+
+        return True
+    except Exception as e:
+        st.error(f"Failed to trigger scrape: {str(e)}")
+        return False
+
 def verify_user_exists(conn, user_id):
     """Check if user has ticks in the database"""
-    query = """
+    exists_query = """
     SELECT EXISTS (
-        SELECT 1 
-        FROM routes.Ticks 
-        WHERE user_id = :user_id
+        SELECT 1
+        FROM routes.Ticks t
+        JOIN routes.Routes r ON t.route_id = r.id
+        WHERE t.user_id = :user_id
         LIMIT 1
     )
     """
-    result = conn.query(query, params={"user_id": user_id})
-    return result.iloc[0,0]
+    result = conn.query(exists_query, params={"user_id": user_id})
+    exists = result.iloc[0,0]
 
+    if exists:
+        latest_query = """
+        SELECT 
+            t.insert_date,
+            r.route_name,
+            t.date
+        FROM routes.Ticks t
+        JOIN routes.Routes r ON t.route_id = r.id
+        WHERE t.user_id = :user_id
+        ORDER BY t.date DESC
+        LIMIT 1
+        """
+        latest_result = conn.query(latest_query, params={"user_id": user_id})
+        latest_insert = latest_result.iloc[0]['insert_date']
+        latest_route = latest_result.iloc[0]['route_name']
+        tick_date = latest_result.iloc[0]['date']
+
+        st.info(f"Your ticks up to {tick_date.strftime('%Y-%m-%d')} are already in the database.\n\n"
+                f"Your data was last updated on {latest_insert.strftime('%Y-%m-%d')}")
+    
+        st.write(f"""
+            Have you climbed and logged additional routes since {latest_route}?  \n    
+            We want your data to be as accurate as possible.  \n
+            Please only refresh if you have climbed and logged additional routes.  \n
+            Data collection isn't free for the creator of this app. 🙏
+        """)
+        col1, col2 = st.columns([1,2])
+        with col1:
+            if st.button("Refresh Data"):
+                st.info("Initiating data update...")
+                if trigger_user_scrape(user_id):
+                    st.success("Update started! Please check back in about 15 minutes.")
+                    st.stop()
+        with col2:
+            if st.button("Continue with existing data"):
+                st.session_state.data_status = 'ready'
+                return True
+        
+        st.stop()
+
+    else:
+        st.warning("Your data has not been collected yet. Initiating data collection...")
+        if trigger_user_scrape(user_id):
+            st.info("This will take a bit. Please go bang out a set of repeaters and check back in 15 minutes.")
+            st.stop()
+        return False
 
 def page_total_length(user_id):
     """First page showing total length climbed"""
