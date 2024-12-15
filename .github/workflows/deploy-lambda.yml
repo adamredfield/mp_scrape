@@ -200,7 +200,7 @@ jobs:
         aws lambda create-event-source-mapping \
           --function-name mp-scraper-orchestrator \
           --event-source-arn arn:aws:sqs:us-east-1:855154218477:initiate-orchestrator-queue \
-          --batch-size 1 
+          --batch-size 1 || true
 
     - name: Add SQS Permission to Lambda
       run: |
