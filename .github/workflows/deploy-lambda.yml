@@ -156,7 +156,7 @@ jobs:
     - name: Update Lambda IAM Role
       run: |
         aws iam put-role-policy \
-          --role-name mp-scraper-orchestrator-role \
+          --role-name new_lambda_role \
           --policy-name sqs-permissions \
           --policy-document '{
             "Version": "2012-10-17",
