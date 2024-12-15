@@ -366,11 +366,13 @@ def trigger_user_scrape(user_id):
         'source': 'streamlit_app',
         'action': 'new_user_scrape'
     }
+
     try:
         response = sqs.send_message(
             QueueUrl=new_scrape_queue_url,
             MessageBody=json.dumps(message)
         )
+        st.write(f"SQS Response: {response}") 
         return True
     except Exception as e:
         st.error(f"Failed to trigger scrape: {str(e)}")
