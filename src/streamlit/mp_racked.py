@@ -5,7 +5,7 @@ project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(project_root)
 
 import streamlit as st
-import src.analysis.mp_wrapped_metrics as metrics
+import src.analysis.mp_racked_metrics as metrics
 import pandas as pd
 import plotly.graph_objects as go
 
@@ -300,9 +300,70 @@ def diamond_template(main_text, subtitle=None, detail_text=None):
         </div>
     """
 
-def page_total_length():
+def get_user_id():
+    """Handle user identification"""
+    if 'user_id' not in st.session_state:
+        st.session_state.user_id = None
+
+    if st.session_state.user_id is None:
+        st.title("Mountain Project Wrapped")
+        
+        col1, col2 = st.columns([2,1])
+        with col1:
+            user_input = st.text_input(
+                "Enter your Mountain Project URL or User ID",
+                placeholder="e.g., https://www.mountainproject.com/user/200362278/doctor-choss"
+            )
+        
+        with col2:
+            if st.button("Submit"):
+                if user_input:
+                    # Extract user_id from URL or use direct input
+                    if "mountainproject.com" in user_input:
+                        try:
+                            user_id = user_input.split("/user/")[1].strip("/")
+                        except IndexError:
+                            st.error("Invalid Mountain Project URL")
+                            return None
+                    else:
+                        user_id = user_input
+                    
+                    # Verify user exists in database
+                    if verify_user_exists(conn, user_id):
+                        st.session_state.user_id = user_id
+                        st.rerun()
+                    else:
+                        st.error("User not found in database")
+                else:
+                    st.error("Please enter a user ID")
+        
+        st.markdown("""
+        ### How to find your User ID:
+        1. Go to [Mountain Project](https://www.mountainproject.com)
+        2. Log in and click your profile
+        3. Copy your profile URL or ID from the address bar
+        """)
+        return None
+
+    return st.session_state.user_id
+
+def verify_user_exists(conn, user_id):
+    """Check if user has ticks in the database"""
+    query = """
+    SELECT EXISTS (
+        SELECT 1 
+        FROM routes.Ticks 
+        WHERE user_id = :user_id
+        LIMIT 1
+    )
+    """
+    result = conn.query(query, params={"user_id": user_id})
+    return result.iloc[0,0]
+
+
+def page_total_length(user_id):
     """First page showing total length climbed"""
-    length_data = metrics.get_length_climbed(conn, year='2024')
+    length_data = metrics.get_length_climbed(conn, year='2024', user_id=user_id)
     length_df = pd.DataFrame(length_data, columns=['Year', 'Location', 'Length'])
     total_length = length_df['Length'].sum()
 
@@ -316,10 +377,10 @@ def page_total_length():
     subtitle = f"That's like climbing {el_caps_str} El Caps! 🏔️"
     st.markdown(wrapped_template(main_text, subtitle), unsafe_allow_html=True)
 
-def page_biggest_day():
+def page_biggest_day(user_id):
     """Biggest climbing day page"""
     try:
-        biggest_day = metrics.biggest_climbing_day(conn)
+        biggest_day = metrics.biggest_climbing_day(conn, user_id=user_id)
         
         if not biggest_day:
             st.error("No climbing data found for 2024")
@@ -347,17 +408,17 @@ def page_biggest_day():
     except Exception as e:
         st.error(f"Error: {str(e)}")
 
-def page_total_routes():
+def page_total_routes(user_id):
     """Second page showing total routes"""
-    total_routes = metrics.total_routes(conn)
+    total_routes = metrics.total_routes(conn, user_id=user_id)
     
     main_text = f"You climbed {total_routes:,} routes<br>this year"
     subtitle = "And one route again, and again, and again..."
     st.markdown(diamond_template(main_text, subtitle), unsafe_allow_html=True)
 
-def page_most_climbed():
+def page_most_climbed(user_id):
     """Page showing most repeated route"""
-    route_data = metrics.most_climbed_route(conn)
+    route_data = metrics.most_climbed_route(conn, user_id=user_id)
     
     if route_data:
         route_name = route_data[0]
@@ -444,7 +505,7 @@ def get_spotify_style():
         </style>
     """
 
-def page_top_routes():
+def page_top_routes(user_id):
     """Page showing top rated routes and tags"""
     st.markdown("<div style='height: 2rem;'></div>", unsafe_allow_html=True)
     filter_col1, filter_col2, _ = st.columns([1, 1, 2])
@@ -458,7 +519,7 @@ def page_top_routes():
         )
     
     # Get tag data for filter options
-    tag_data = metrics.top_tags(conn, tag_type)
+    tag_data = metrics.top_tags(conn, tag_type, user_id=user_id)
     tag_df = pd.DataFrame(tag_data, columns=['Type', 'Tag', 'Count']).head(5)
     
     # Calculate max_count from the actual Count column
@@ -478,7 +539,8 @@ def page_top_routes():
         selected_styles=selected_styles,
         route_types=None,  # route_types
         year='2024', # year
-        tag_type=tag_type
+        tag_type=tag_type,
+        user_id=user_id
     ).values.tolist()
     
     # Create a centered layout with two columns
@@ -528,12 +590,12 @@ def page_top_routes():
                 unsafe_allow_html=True
             )
 
-def page_areas_breakdown():
+def page_areas_breakdown(user_id):
     """Page showing top states and areas"""
-    states = metrics.states_climbed(conn)
-    sub_areas = metrics.sub_areas_climbed(conn)
-    total_states = metrics.regions_climbed(conn)
-    total_areas = metrics.regions_sub_areas(conn)
+    states = metrics.states_climbed(conn, user_id=user_id)
+    sub_areas = metrics.sub_areas_climbed(conn, user_id=user_id)
+    total_states = metrics.regions_climbed(conn, user_id=user_id)
+    total_areas = metrics.regions_sub_areas(conn, user_id=user_id)
     
     # Apply Spotify styling
     st.markdown(get_spotify_style(), unsafe_allow_html=True)
@@ -608,7 +670,7 @@ def page_areas_breakdown():
         )
     
     # Get length data based on selected filter
-    length_data = metrics.get_length_climbed(conn, area_type=area_type, year='2024')
+    length_data = metrics.get_length_climbed(conn, area_type=area_type, year='2024', user_id=user_id)
     length_df = pd.DataFrame(length_data, columns=['Year', 'Location', 'Length'])
     
     # Create horizontal bar chart
@@ -655,7 +717,7 @@ def page_areas_breakdown():
     
     st.plotly_chart(fig, use_container_width=True)
 
-def page_grade_distribution():
+def page_grade_distribution(user_id):
     """Page showing grade distribution and most common grade"""
     # Add filter above the chart
     st.markdown("<div style='height: 2rem;'></div>", unsafe_allow_html=True)
@@ -670,8 +732,8 @@ def page_grade_distribution():
         )
     
     # Get the data based on selected grade level
-    grade_dist = metrics.get_grade_distribution(conn, route_types=None, level=grade_level, year='2024')
-    top_grade = metrics.top_grade(conn,level=grade_level)
+    grade_dist = metrics.get_grade_distribution(conn, route_types=None, level=grade_level, year='2024', user_id=user_id)
+    top_grade = metrics.top_grade(conn,level=grade_level, user_id=user_id)
     
     # Apply Spotify styling
     st.markdown(get_spotify_style(), unsafe_allow_html=True)
@@ -741,20 +803,29 @@ def page_grade_distribution():
         st.plotly_chart(fig, use_container_width=True)
 
 def main():
+    
+    user_id = get_user_id()
+    if not user_id:
+        return
+
+    if 'page' not in st.session_state:
+        st.session_state.page = 0
+
     # Page mapping
     pages = {
-        0: page_total_length,
-        1: page_biggest_day,
-        2: page_total_routes,
-        3: page_most_climbed,
-        4: page_top_routes,
-        5: page_areas_breakdown,
-        6: page_grade_distribution
+        0: lambda: page_total_length(user_id),
+        1: lambda: page_biggest_day(user_id),
+        2: lambda: page_total_routes(user_id),
+        3: lambda: page_most_climbed(user_id),
+        4: lambda: page_top_routes(user_id),
+        5: lambda: page_areas_breakdown(user_id),
+        6: lambda: page_grade_distribution(user_id)
     }
-    
+
     # Display current page
-    if st.session_state.page in pages:
-        pages[st.session_state.page]()
+    current_page = st.session_state.page
+    if current_page in pages:
+        pages[current_page]()
     
     # Navigation buttons
     col1, col2, col3 = st.columns([1, 18, 1])

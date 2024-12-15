@@ -4,16 +4,14 @@ import sys
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(project_root)
 
-from src.analysis.ai_analysis_helper_functions import process_route, process_route_response, save_analysis_results
-
 import json
 import requests
 import re
+from src.analysis.ai_analysis_helper_functions import process_route, process_route_response, save_analysis_results
 from src.database.utils import create_connection, add_new_tags_to_mapping
 from src.database import queries
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
-import re
 from playwright.sync_api import sync_playwright
 
 mp_home_url = "https://www.mountainproject.com"
@@ -194,10 +192,10 @@ def get_grade(route_soup):
 
     rating_h2 = route_soup.find('h2', class_='inline-block mr-2')
     if rating_h2:
-        # Get all YDS spans (could contain both YDS and Hueco)
+        # Get all YDS spans (could contain both YDS, Hueco & Aid)
         rating_spans = rating_h2.find_all('span', class_='rateYDS')
         for span in rating_spans:
-            rating = span.text.split()[0]  # Get the rating without "YDS"
+            rating = span.text.split()[0]
             if rating.startswith('5.'):
                 grade_types['yds_rating'] = rating
             elif rating.startswith('V'):

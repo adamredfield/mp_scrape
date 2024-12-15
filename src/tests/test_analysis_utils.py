@@ -5,7 +5,7 @@ project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(project_root)
 
 import pytest
-from src.analysis.analysis_utils import get_grade_group
+from src.analysis.ai_analysis_helper_functions import get_grade_group
 
 def test_single_digit_grades():
     assert get_grade_group('5.9', 'base') == '5.9'
