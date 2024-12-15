@@ -2,7 +2,7 @@ name: Deploy Lambda Functions
 
 on:
   push:
-    branches: [ main, bulk-insert ]
+    branches: [ main, user-input ]
   pull_request:
     branches: [ main ]
 
@@ -48,7 +48,11 @@ jobs:
     - name: Create SQS Queue if not exists
       run: |
         aws sqs create-queue --queue-name mp-scraper-queue || true
-        
+
+    - name: Create initiate-orchestrator-queue if not exists
+      run: |
+        aws sqs create-queue --queue-name initiate-orchestrator-queue || true
+          
     - name: Create DLQ Queue
       run: |
         aws sqs set-queue-attributes \
@@ -60,6 +64,26 @@ jobs:
     - name: Update main queue with DLQ
       run: |
         QUEUE_URL=$(aws sqs get-queue-url --queue-name mp-scraper-queue --output text --query 'QueueUrl')
+        DLQ_URL=$(aws sqs get-queue-url --queue-name mp-scraper-dlq --output text --query 'QueueUrl')
+        DLQ_ARN=$(aws sqs get-queue-attributes --queue-url $DLQ_URL --attribute-names QueueArn --query 'Attributes.QueueArn' --output text)
+        
+        aws sqs set-queue-attributes \
+          --queue-url $QUEUE_URL \
+          --attributes '{
+            "RedrivePolicy": "{\"deadLetterTargetArn\":\"'$DLQ_ARN'\",\"maxReceiveCount\":3}"
+          }'
+    - name: Set initiate-orchestrator-queue attributes
+      run: |
+        QUEUE_URL=$(aws sqs get-queue-url --queue-name initiate-orchestrator-queue --output text --query 'QueueUrl')
+        aws sqs set-queue-attributes \
+          --queue-url $QUEUE_URL \
+          --attributes '{
+            "VisibilityTimeout": "900"
+          }'
+
+    - name: Update initiate-orchestrator-queue with DLQ
+      run: |
+        QUEUE_URL=$(aws sqs get-queue-url --queue-name initiate-orchestrator-queue --output text --query 'QueueUrl')
         DLQ_URL=$(aws sqs get-queue-url --queue-name mp-scraper-dlq --output text --query 'QueueUrl')
         DLQ_ARN=$(aws sqs get-queue-attributes --queue-url $DLQ_URL --attribute-names QueueArn --query 'Attributes.QueueArn' --output text)
         
@@ -121,13 +145,38 @@ jobs:
           }' \
           --timeout 900 \
           --memory-size 900 \
-          --image-config '{"Command": ["src.lambda.retry_worker.lambda_handler"]}'
+          --image-config '{"Command": ["src.lambdas.retry_worker.lambda_handler"]}'
         
     - name: Set retry worker concurrency
       run: |
         aws lambda put-function-concurrency \
           --function-name mp-scraper-retry-worker \
           --reserved-concurrent-executions 100
+
+    - name: Update Lambda IAM Role
+      run: |
+        aws iam put-role-policy \
+          --role-name mp-scraper-orchestrator-role \
+          --policy-name sqs-permissions \
+          --policy-document '{
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "sqs:ReceiveMessage",
+                  "sqs:DeleteMessage",
+                  "sqs:GetQueueAttributes",
+                  "sqs:SendMessage",
+                  "sqs:SendMessageBatch"
+                ],
+                "Resource": [
+                  "arn:aws:sqs:us-east-1:855154218477:initiate-orchestrator-queue",
+                  "arn:aws:sqs:us-east-1:855154218477:mp-scraper-queue"
+                ]
+              }
+            ]
+          }'
 
     - name: Deploy orchestrator function
       run: |
@@ -138,9 +187,18 @@ jobs:
           --role ${{ secrets.AWS_LAMBDA_ROLE_ARN }} \
           --environment '{"Variables": {
               "QUEUE_URL": "${{ secrets.SQS_URL }}",
+              "NEW_SCRAPE_QUEUE_URL": "${{ NEW_SCRAPE_QUEUE_URL }}",
               "IPROYAL_USERNAME": "${{ secrets.IPROYAL_USERNAME }}",
               "IPROYAL_PASSWORD": "${{ secrets.IPROYAL_PASSWORD }}"
           }}' \
           --timeout 900 \
           --memory-size 900 \
-          --image-config '{"Command": ["src.lambda.orchestrator.lambda_handler"]}'
+          --image-config '{"Command": ["src.lambdas.orchestrator.lambda_handler"]}'
+
+    - name: Configure SQS Trigger for Orchestrator
+      run: |
+        aws lambda create-event-source-mapping \
+          --function-name mp-scraper-orchestrator \
+          --event-source-arn arn:aws:sqs:us-east-1:855154218477:initiate-orchestrator-queue \
+          --batch-size 1 \
+          --enabled || true

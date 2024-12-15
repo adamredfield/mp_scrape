@@ -4,10 +4,13 @@ import sys
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(project_root)
 
+from dotenv import load_dotenv
 import streamlit as st
 import src.analysis.mp_racked_metrics as metrics
 import pandas as pd
 import plotly.graph_objects as go
+import json
+import boto3
 
 # Page config
 st.set_page_config(
@@ -21,6 +24,8 @@ st.set_page_config(
         'About': None
     }
 )
+
+load_dotenv()
 
 conn = st.connection('postgresql', type='sql')
 
@@ -347,6 +352,30 @@ def get_user_id():
 
     return st.session_state.user_id
 
+def trigger_user_scrape(user_id):
+    """Send message to SQS to trigger scrape"""
+    sqs = boto3.client('sqs')
+    new_scrape_queue_url = os.getenv('NEW_SCRAPE_QUEUE_URL')  
+
+    if not new_scrape_queue_url:
+        st.error("SQS Queue URL not configured")
+        return False
+
+    message = {
+        'user_id': user_id,
+        'source': 'streamlit_app',
+        'action': 'new_user_scrape'
+    }
+    try:
+        response = sqs.send_message(
+            QueueUrl=new_scrape_queue_url,
+            MessageBody=json.dumps(message)
+        )
+        return True
+    except Exception as e:
+        st.error(f"Failed to trigger scrape: {str(e)}")
+        return False
+
 def verify_user_exists(conn, user_id):
     """Check if user has ticks in the database"""
     query = """
@@ -358,8 +387,15 @@ def verify_user_exists(conn, user_id):
     )
     """
     result = conn.query(query, params={"user_id": user_id})
-    return result.iloc[0,0]
+    exists = result.iloc[0,0]
 
+    if not exists:
+        st.warning("Your data has not been collected yet. Initiating data collection...")
+        if trigger_user_scrape(user_id):
+            st.info("This will take a bit. Please go bang out a set of repeaters and check back in 15 minutes.")
+        return False
+
+    return result.iloc[0,0]
 
 def page_total_length(user_id):
     """First page showing total length climbed"""
