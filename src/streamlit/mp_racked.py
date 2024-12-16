@@ -512,7 +512,6 @@ def verify_user_exists(conn, user_id):
 def check_queue_for_user(user_id):
     """Check if user's scrape is still in queue"""
     current_time = datetime.now()
-
     elapsed = (current_time - st.session_state.start_time).total_seconds()
     st.write(f"(Elapsed: {elapsed:.1f}s): Checking queue for user: {user_id}")
 
@@ -523,6 +522,41 @@ def check_queue_for_user(user_id):
     
     main_queue_url = st.secrets["aws"]["queue_url"]
     dlq_url = st.secrets["aws"]["dlq_url"]
+
+    # Check DLQ for failed messages
+    dlq_response = sqs.receive_message(
+        QueueUrl=dlq_url,
+        AttributeNames=['All'],
+        MessageAttributeNames=['All'],
+        MaxNumberOfMessages=10,
+        VisibilityTimeout=30,
+        WaitTimeSeconds=1
+    )
+
+    if 'Messages' in dlq_response:
+        st.write("### Failed Messages in DLQ:")
+        for msg in dlq_response['Messages']:
+            try:
+                message_body = json.loads(msg['Body'])
+                if 'error_context' in message_body:
+                    error = message_body['error_context']
+                    st.error(f"""
+                        **Failed Page**: {message_body.get('page_number')}  
+                        **Error Type**: {error.get('error_type')}  
+                        **Error Message**: {error.get('error_message')}  
+                        **Retry Count**: {error.get('retry_count')}  
+                        **Time**: {error.get('timestamp')}  
+                        
+                        <details>
+                        <summary>Stack Trace</summary>
+                        
+                        ```
+                        {error.get('stack_trace')}
+                        ```
+                        </details>
+                        """, unsafe_allow_html=True)
+            except Exception as e:
+                st.write(f"Error parsing DLQ message: {str(e)}")
 
     # Get queue attributes to check message count
     def check_queue(queue_url):
