@@ -414,12 +414,13 @@ def verify_user_exists(conn, user_id):
             
             time.sleep(10)
             st.rerun()   
-        elif elapsed < 45:  # Wait at least 30 seconds before checking database
+        elif elapsed < 30:  # Wait at least 30 seconds before checking database
             st.info("⏳ Preparing to process your data...")
             time.sleep(10)
             st.rerun()
         else:
             # Queue is empty, but let's verify data was actually inserted
+            time.sleep(10) # Wait 10 seconds before checking database
             verify_query = """
             SELECT COUNT(*) 
             FROM routes.Ticks 
@@ -502,7 +503,7 @@ def verify_user_exists(conn, user_id):
             st.stop()
 
     else:
-        st.warning("Your data has not been collected yet. Initiating data collection...")
+        st.warning("Your data has not been collected yet.")
         if trigger_user_scrape(user_id):
             st.session_state.waiting_for_update = True
             st.rerun()
