@@ -75,3 +75,16 @@ The project uses GitHub Actions for CI/CD. The workflow:
 Below is the database schema showing relationships between Routes, Ticks, and AI Analysis:
 
 ![Mountain Project Racked Data Model](assets/ticklist_db.png)
+
+## Live App
+
+Try out Mountain Project Racked here: [MP Racked App](https://adamredfield-mp-scrape-srcstreamlitmp-racked-gnq4uz.streamlit.app/)
+
+### How to Use
+1. Visit the app link above
+2. Enter your Mountain Project profile URL or User ID
+   - Example URL: `https://www.mountainproject.com/user/200362278/doctor-choss` (this is my profile and can be used as a demo)
+   - Example ID: `200362278/doctor-choss`
+3. If your data hasn't been collected before, the app will scrape and process your climbing history
+   - Initial data collection can take up to 15 minutes depending on how many routes you've climbed
+   - Once complete, your personalized climbing analysis will be displayed

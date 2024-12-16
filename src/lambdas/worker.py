@@ -1,12 +1,12 @@
 import os
 import sys
-import time
 
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(project_root)
 
 import json
-import os
+import traceback
+from datetime import datetime
 
 def lambda_handler(event, context):
     from src.scraping import helper_functions
@@ -32,7 +32,23 @@ def lambda_handler(event, context):
                 )
                 
             except Exception as e:
-                print(f"Error processing record: {str(e)}")
+                error_context = {
+                    "original_message": message,
+                    "error_type": str(type(e).__name__),
+                    "error_message": str(e),
+                    "stack_trace": traceback.format_exc(),
+                    "lambda_request_id": context.aws_request_id,
+                    "timestamp": datetime.now().isoformat(),
+                    "function_name": context.function_name,
+                    "remaining_time_ms": context.get_remaining_time_in_millis(),
+                }
+
+                print(f"Error context: {json.dumps(error_context, default=str)}")
+
+                if isinstance(message, dict):
+                    message['error_context'] = error_context
+                    record['body'] = json.dumps(message)
+                
                 raise
                 
     except Exception as e:
