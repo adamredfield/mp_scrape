@@ -5,6 +5,8 @@ project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(project_root)
 
 import json
+import traceback
+from datetime import datetime
 
 def lambda_handler(event, context):
     from src.scraping import helper_functions
@@ -19,6 +21,10 @@ def lambda_handler(event, context):
                 ticks_url = message['ticks_url']
                 user_id = message['user_id']
 
+                if 'error_context' in message:
+                    print("Previous failure error context:")
+                    print(json.dumps(message['error_context'], indent=2))
+
                 print(f"Processing page {page_number} for user {user_id} using url: {ticks_url}")
                 
                 if retry_count <= 3:
@@ -32,6 +38,21 @@ def lambda_handler(event, context):
 
             except Exception as e:
                 print(f"Page {message['page_number']} exceeded max retries")
+                # Add new error context for this retry attempt
+                error_context = {
+                    "original_message": message,
+                    "error_type": str(type(e).__name__),
+                    "error_message": str(e),
+                    "stack_trace": traceback.format_exc(),
+                    "lambda_request_id": context.aws_request_id,
+                    "timestamp": datetime.now().isoformat(),
+                    "retry_count": retry_count,
+                    "function_name": context.function_name,
+                    "memory_limit": context.memory_limit_in_mb,
+                    "remaining_time_ms": context.get_remaining_time_in_millis()
+                }
+                print(f"Retry failure error context:")
+                print(json.dumps(error_context, indent=2))
                 raise
                 
     except Exception as e:
