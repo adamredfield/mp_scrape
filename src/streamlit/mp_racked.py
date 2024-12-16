@@ -321,7 +321,7 @@ def get_user_id():
         with col1:
             user_input = st.text_input(
                 "Enter your Mountain Project URL or User ID",
-                placeholder="e.g., https://www.mountainproject.com/user/200362278/doctor-choss"
+                placeholder="e.g., https://www.mountainproject.com/user/200362278/doctor-choss or 200362278/doctor-choss"
             )
         
         with col2:
@@ -349,8 +349,6 @@ def get_user_id():
         1. Go to [Mountain Project](https://www.mountainproject.com)
         2. Log in and click your profile
         3. Copy your profile URL or ID from the address bar
-        
-        Example: https://www.mountainproject.com/user/200362278/doctor-choss or 200362278/doctor-choss
         """)
         return None
     if st.session_state.data_status is None:     
