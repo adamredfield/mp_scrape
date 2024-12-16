@@ -323,7 +323,7 @@ def biggest_climbing_day(conn, user_id=None):
                           ' - ', 
                           TRIM(NULLIF(CONCAT_WS(' ', r.yds_rating, r.hueco_rating, r.aid_rating, r.danger_rating, r.commitment_grade), '')), 
                           ' - ',
-                          CAST(el.estimated_length AS INT),' ft'
+                          CAST(coalesce(r.length_ft,el.estimated_length) AS INT),' ft'
                     ), ' | '
                 ) routes,
                 CAST(ROUND(SUM(COALESCE(r.length_ft, el.estimated_length)),0) AS INTEGER) total_length,

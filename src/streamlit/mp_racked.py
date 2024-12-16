@@ -364,9 +364,6 @@ def get_user_id():
 def trigger_user_scrape(user_id):
     """Send message to SQS to trigger scrape"""
 
-    st.write("Checking AWS configuration...")
-    st.write(f"Region from secrets: {st.secrets['aws']['region']}")
-
     sqs = boto3.client('sqs',
             region_name=st.secrets["aws"]["region"],
             aws_access_key_id=st.secrets["aws"]["access_key_id"],
@@ -389,7 +386,6 @@ def trigger_user_scrape(user_id):
             QueueUrl=new_scrape_queue_url,
             MessageBody=json.dumps(message)
         )
-        st.write(f"SQS Response: {response}") 
         st.session_state.scrape_requested = True
         st.session_state.scrape_time = datetime.now()
 
@@ -488,12 +484,23 @@ def page_biggest_day(user_id):
         routes = biggest_day[1]
         total_length = int(biggest_day[2])
         areas = biggest_day[3].rstrip(" & ")
+
+        formatted_date = date.strftime('%b %d')
+        day = date
+        if day in [1, 21, 31]:
+            suffix = 'st'
+        elif day in [2, 22]:
+            suffix = 'nd'
+        elif day in [3, 23]:
+            suffix = 'rd'
+        else:
+            suffix = 'th'
         
         # Format routes list
         route_list = routes.split(" | ")
         formatted_routes = "<br>".join(route_list)
         
-        main_text = f"Your biggest climbing day<br>was {date} with<br>{total_length:,d} feet of GNAR GNAR"
+        main_text = f"Your biggest climbing day<br>was {formatted_date}{suffix} with<br>{total_length:,d} feet of GNAR GNAR"
         st.markdown(
             wrapped_template(
                 main_text=main_text,
@@ -524,6 +531,18 @@ def page_most_climbed(user_id):
         first_date = route_data[2]
         times_climbed = route_data[3]
 
+        formatted_date = first_date.strftime('%b %d')
+        day = first_date.day
+
+        if day in [1, 21, 31]:
+            suffix = 'st'
+        elif day in [2, 22]:
+            suffix = 'nd'
+        elif day in [3, 23]:
+            suffix = 'rd'
+        else:
+            suffix = 'th'
+
         note_list = notes.split(" | ") if notes else []
         note_list.reverse()
         
@@ -538,7 +557,7 @@ def page_most_climbed(user_id):
         
         main_text = f"Your most climbed route was<br>{route_name}"
         subtitle = f"You climbed it {times_climbed} times"
-        detail_text = f"starting on {first_date}<br><br>{formatted_notes}"
+        detail_text = f"starting on {formatted_date}{suffix}<br><br>{formatted_notes}"
         
         st.markdown(diamond_template(main_text, subtitle, detail_text), unsafe_allow_html=True)
 
