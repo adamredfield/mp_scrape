@@ -108,8 +108,8 @@ def get_grade_group(grade:str, level:str = 'base') -> str:
             return f'{grade_prefix}{base_grade}+'
         else:
             return f'{grade_prefix}{base_grade}'
-        
-    return grade 
+    else:
+        return grade 
 
 def construct_prompt(route):
 
