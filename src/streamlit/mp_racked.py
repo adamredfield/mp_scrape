@@ -521,45 +521,58 @@ def check_queue_for_user(user_id):
         aws_access_key_id=st.secrets["aws"]["access_key_id"],
         aws_secret_access_key=st.secrets["aws"]["secret_access_key"])
     
-    queue_url = st.secrets["aws"]["queue_url"]
+    main_queue_url = st.secrets["aws"]["queue_url"]
+    dlq_url = st.secrets["aws"]["dlq_url"]
 
     # Get queue attributes to check message count
-    queue_attrs = sqs.get_queue_attributes(
-        QueueUrl=queue_url,
-        AttributeNames=[
-            'ApproximateNumberOfMessages',
-            'ApproximateNumberOfMessagesNotVisible',
-            'ApproximateNumberOfMessagesDelayed'
-        ]
-    )
-
-    visible_count = int(queue_attrs['Attributes']['ApproximateNumberOfMessages'])
-    in_flight_count = int(queue_attrs['Attributes']['ApproximateNumberOfMessagesNotVisible'])
-
-    st.write(f"[{current_time.strftime('%H:%M:%S')}] (Elapsed: {elapsed:.1f}s):")
-    st.write(f"  - Visible messages: {visible_count}")
-    st.write(f"  - In-flight messages: {in_flight_count}")
-
-    if visible_count == 0 and in_flight_count == 0:
-        return False
+    def check_queue(queue_url):
+        queue_attrs = sqs.get_queue_attributes(
+            QueueUrl=queue_url,
+            AttributeNames=[
+                'ApproximateNumberOfMessages',
+                'ApproximateNumberOfMessagesNotVisible',
+                'ApproximateNumberOfMessagesDelayed'
+            ]
+        )
+        visible_count = int(queue_attrs['Attributes']['ApproximateNumberOfMessages'])
+        in_flight_count = int(queue_attrs['Attributes']['ApproximateNumberOfMessagesNotVisible'])
+        return visible_count, in_flight_count
     
     # Keep checking messages until we either find the user or exhaust the queue
-    response = sqs.receive_message(
-        QueueUrl=queue_url,
-        AttributeNames=['All'],
-        MessageAttributeNames=['All'],
-        MaxNumberOfMessages=10,  # Max messages we can get at once
-        VisibilityTimeout=30,
-        WaitTimeSeconds=5
-    )
+    def check_messages(queue_url):
+        response = sqs.receive_message(
+            QueueUrl=queue_url,
+            AttributeNames=['All'],
+            MessageAttributeNames=['All'],
+            MaxNumberOfMessages=10,  # Max messages we can get at once
+            VisibilityTimeout=30,
+            WaitTimeSeconds=5
+        )
     
-    # Check messages in batch of 10
-    if 'Messages' in response:
-        for message in response['Messages']:
-            message_body = json.loads(message['Body'])
-            if message_body.get('user_id') == user_id:
-                return True  # User's job is still in queue
-    return in_flight_count > 0   
+        # Check messages in batch of 10
+        if 'Messages' in response:
+            for message in response['Messages']:
+                message_body = json.loads(message['Body'])
+                if message_body.get('user_id') == user_id:
+                    return True  # User's job is still in queue
+            return False
+
+    main_visible, main_inflight = check_queue(main_queue_url)
+    dlq_visible, dlq_inflight = check_queue(dlq_url)
+
+    st.write(f"[{current_time.strftime('%H:%M:%S')}] (Elapsed: {elapsed:.1f}s):")
+    st.write(f"  Main Queue - Visible: {main_visible}, In-flight: {main_inflight}")
+    st.write(f"  DLQ - Visible: {dlq_visible}, In-flight: {dlq_inflight}")
+
+    total_messages = main_visible + main_inflight + dlq_visible + dlq_inflight
+
+    if total_messages == 0:
+        return False
+    
+    user_in_main = check_messages(main_queue_url)
+    user_in_dlq = check_messages(dlq_url)
+        
+    return user_in_main or user_in_dlq or total_messages > 0 
 
 def page_total_length(user_id):
     """First page showing total length climbed"""
