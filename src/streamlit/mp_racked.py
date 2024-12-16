@@ -381,13 +381,14 @@ def trigger_user_scrape(user_id):
     }
 
     try:
-        response = sqs.send_message(
+        sqs.send_message(
             QueueUrl=new_scrape_queue_url,
             MessageBody=json.dumps(message)
         )
         st.session_state.scrape_requested = True
         st.session_state.scrape_time = datetime.now()
-
+        st.session_state.initial_delay = True
+        st.session_state.start_time = datetime.now()
         return True
     except Exception as e:
         st.error(f"Failed to trigger scrape: {str(e)}")
@@ -397,13 +398,26 @@ def verify_user_exists(conn, user_id):
     """Check if user has ticks in the database"""
 
     if 'waiting_for_update' in st.session_state and st.session_state.waiting_for_update:
+        if st.session_state.get('initial_delay', False):
+            st.info("⏳ Initializing data collection...")
+            time.sleep(20)  # Wait 20 seconds before first queue check
+            st.session_state.initial_delay = False
+            st.rerun()
+
         queue_status = check_queue_for_user(user_id)
+        elapsed = (datetime.now() - st.session_state.start_time).total_seconds()
 
         if queue_status:
             st.info("⏳ Still processing your data....\n\n"
-                    "this can take up to 15 minutes depending on how many routes you have climbed that are not already in the database.")
+                    "   This can take up to 15 minutes.\n\n"
+                    "   Depending if routes you climb are already in the database.\n\n")
+            
             time.sleep(10)
             st.rerun()   
+        elif elapsed < 45:  # Wait at least 30 seconds before checking database
+            st.info("⏳ Preparing to process your data...")
+            time.sleep(10)
+            st.rerun()
         else:
             # Queue is empty, but let's verify data was actually inserted
             verify_query = """
@@ -429,7 +443,6 @@ def verify_user_exists(conn, user_id):
                 st.cache_data.clear()
                 time.sleep(2)  # Brief pause to show success message
                 st.rerun()
-
 
     exists_query = """
     SELECT EXISTS (
@@ -498,8 +511,6 @@ def verify_user_exists(conn, user_id):
 def check_queue_for_user(user_id):
     """Check if user's scrape is still in queue"""
     current_time = datetime.now()
-    if 'start_time' not in st.session_state:
-        st.session_state.start_time = current_time
 
     elapsed = (current_time - st.session_state.start_time).total_seconds()
     st.write(f"(Elapsed: {elapsed:.1f}s): Checking queue for user: {user_id}")
