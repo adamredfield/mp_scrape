@@ -9,6 +9,7 @@ import traceback
 from datetime import datetime
 
 def lambda_handler(event, context):
+    print(f"Starting retry worker with event: {json.dumps(event, default=str)}")
     from src.scraping import helper_functions
     print("Initialized helper functions")
 
@@ -57,4 +58,5 @@ def lambda_handler(event, context):
                 
     except Exception as e:
         print(f"Error processing record: {str(e)}")
+        print(f"Stack trace: {traceback.format_exc()}")
         raise  # Let Lambda handle the retry
