@@ -12,6 +12,7 @@ import plotly.graph_objects as go
 import json
 import boto3
 from datetime import datetime
+import time
 
 # Page config
 st.set_page_config(
@@ -396,6 +397,42 @@ def trigger_user_scrape(user_id):
 
 def verify_user_exists(conn, user_id):
     """Check if user has ticks in the database"""
+
+    if 'waiting_for_update' in st.session_state and st.session_state.waiting_for_update:
+        queue_status = check_queue_for_user(user_id)
+
+        if queue_status:
+            st.info("⏳ Still processing your data....\n\n"
+                    "this can take up to 15 minutes depending on how many routes you have climbed that are not already in the database.")
+            time.sleep(10)
+            st.rerun()   
+        else:
+            # Queue is empty, but let's verify data was actually inserted
+            verify_query = """
+            SELECT COUNT(*) 
+            FROM routes.Ticks 
+            WHERE user_id = :user_id
+            """
+
+            result = conn.query(verify_query, params={"user_id": user_id}, ttl=0)
+            tick_count = result.iloc[0,0]
+            st.write(f"Found {tick_count} ticks in database for {user_id}") 
+
+            if tick_count == 0:
+                # No data yet, keep waiting
+                st.info("⏳ Finalizing data insertion...")
+                time.sleep(10)
+                st.rerun()
+            else:
+                # User's job is not in queue, so we can proceed
+                st.success(f"Update complete. Found {tick_count} ticks. Racking up...")
+                st.session_state.waiting_for_update = False
+                st.session_state.data_status = 'ready'  # Reset data status
+                st.cache_data.clear()
+                time.sleep(2)  # Brief pause to show success message
+                st.rerun()
+
+
     exists_query = """
     SELECT EXISTS (
         SELECT 1
@@ -439,21 +476,80 @@ def verify_user_exists(conn, user_id):
             if st.button("Refresh Data"):
                 st.info("Initiating data update...")
                 if trigger_user_scrape(user_id):
-                    st.success("Update started! Please check back in about 15 minutes.")
-                    st.stop()
+                    st.session_state.waiting_for_update = True
+                    st.session_state.update_start_time = datetime.now()
+
+                    st.info("Starting update process...")
+                    time.sleep(20) 
+                    st.rerun()
         with col2:
             if st.button("Continue with existing data"):
                 st.session_state.data_status = 'ready'
                 return True
         
-        st.stop()
+        if st.session_state.get('data_status') != 'ready':
+            st.stop()
 
     else:
         st.warning("Your data has not been collected yet. Initiating data collection...")
         if trigger_user_scrape(user_id):
-            st.info("This will take a bit. Please go bang out a set of repeaters and check back in 15 minutes.")
-            st.stop()
+            st.session_state.waiting_for_update = True
+            st.rerun()
         return False
+    
+def check_queue_for_user(user_id):
+    """Check if user's scrape is still in queue"""
+    current_time = datetime.now()
+    if 'start_time' not in st.session_state:
+        st.session_state.start_time = current_time
+
+    elapsed = (current_time - st.session_state.start_time).total_seconds()
+    st.write(f"(Elapsed: {elapsed:.1f}s): Checking queue for user: {user_id}")
+
+    sqs = boto3.client('sqs',
+        region_name=st.secrets["aws"]["region"],
+        aws_access_key_id=st.secrets["aws"]["access_key_id"],
+        aws_secret_access_key=st.secrets["aws"]["secret_access_key"])
+    
+    queue_url = st.secrets["aws"]["queue_url"]
+
+    # Get queue attributes to check message count
+    queue_attrs = sqs.get_queue_attributes(
+        QueueUrl=queue_url,
+        AttributeNames=[
+            'ApproximateNumberOfMessages',
+            'ApproximateNumberOfMessagesNotVisible',
+            'ApproximateNumberOfMessagesDelayed'
+        ]
+    )
+
+    visible_count = int(queue_attrs['Attributes']['ApproximateNumberOfMessages'])
+    in_flight_count = int(queue_attrs['Attributes']['ApproximateNumberOfMessagesNotVisible'])
+
+    st.write(f"[{current_time.strftime('%H:%M:%S')}] (Elapsed: {elapsed:.1f}s):")
+    st.write(f"  - Visible messages: {visible_count}")
+    st.write(f"  - In-flight messages: {in_flight_count}")
+
+    if visible_count == 0 and in_flight_count == 0:
+        return False
+    
+    # Keep checking messages until we either find the user or exhaust the queue
+    response = sqs.receive_message(
+        QueueUrl=queue_url,
+        AttributeNames=['All'],
+        MessageAttributeNames=['All'],
+        MaxNumberOfMessages=10,  # Max messages we can get at once
+        VisibilityTimeout=30,
+        WaitTimeSeconds=5
+    )
+    
+    # Check messages in batch of 10
+    if 'Messages' in response:
+        for message in response['Messages']:
+            message_body = json.loads(message['Body'])
+            if message_body.get('user_id') == user_id:
+                return True  # User's job is still in queue
+    return in_flight_count > 0   
 
 def page_total_length(user_id):
     """First page showing total length climbed"""
