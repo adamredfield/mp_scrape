@@ -364,13 +364,14 @@ def get_user_id():
 def trigger_user_scrape(user_id):
     """Send message to SQS to trigger scrape"""
 
-    boto3.setup_default_session(
-        region_name=st.secrets.aws.region,
-        aws_access_key_id=st.secrets.aws.access_key_id,
-        aws_secret_access_key=st.secrets.aws.secret_access_key
-    )
+    st.write("Checking AWS configuration...")
+    st.write(f"Region from secrets: {st.secrets['aws']['region']}")
 
-    sqs = boto3.client('sqs')
+    sqs = boto3.client('sqs',
+            region_name=st.secrets["aws"]["region"],
+            aws_access_key_id=st.secrets["aws"]["access_key_id"],
+            aws_secret_access_key=st.secrets["aws"]["secret_access_key"])
+
     new_scrape_queue_url = st.secrets["aws"]["new_scrape_queue_url"]
 
     if not new_scrape_queue_url:
