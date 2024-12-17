@@ -445,6 +445,8 @@ def verify_user_exists(conn, user_id):
                 time.sleep(2)  # Brief pause to show success message
                 st.rerun()
 
+        return None
+
     exists_query = """
     SELECT EXISTS (
         SELECT 1
