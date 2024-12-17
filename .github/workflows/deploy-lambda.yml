@@ -172,7 +172,8 @@ jobs:
                 ],
                 "Resource": [
                   "arn:aws:sqs:us-east-1:855154218477:initiate-orchestrator-queue",
-                  "arn:aws:sqs:us-east-1:855154218477:mp-scraper-queue"
+                  "arn:aws:sqs:us-east-1:855154218477:mp-scraper-queue",
+                  "arn:aws:sqs:us-east-1:855154218477:mp-scraper-dlq"
                 ]
               }
             ]
@@ -201,8 +202,14 @@ jobs:
           --function-name mp-scraper-orchestrator \
           --event-source-arn arn:aws:sqs:us-east-1:855154218477:initiate-orchestrator-queue \
           --batch-size 1 || true
+    - name: Configure SQS Trigger for Retry Worker
+      run: |
+        aws lambda create-event-source-mapping \
+          --function-name mp-scraper-retry-worker \
+          --event-source-arn arn:aws:sqs:us-east-1:855154218477:mp-scraper-dlq \
+          --batch-size 1 || true
 
-    - name: Add SQS Permission to Lambda
+    - name: Add SQS Permission to Orchestrator
       run: |
         aws lambda add-permission \
           --function-name mp-scraper-orchestrator \
@@ -210,3 +217,12 @@ jobs:
           --action lambda:InvokeFunction \
           --principal sqs.amazonaws.com \
           --source-arn arn:aws:sqs:us-east-1:855154218477:initiate-orchestrator-queue || true
+
+    - name: Add SQS Permission to Retry Worker
+      run: |
+        aws lambda add-permission \
+          --function-name mp-scraper-retry-worker \
+          --statement-id SQSDLQInvoke \
+          --action lambda:InvokeFunction \
+          --principal sqs.amazonaws.com \
+          --source-arn arn:aws:sqs:us-east-1:855154218477:mp-scraper-dlq || true
