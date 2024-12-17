@@ -54,6 +54,9 @@ def lambda_handler(event, context):
                 }
                 print(f"Retry failure error context:")
                 print(json.dumps(error_context, indent=2))
+
+                message['error_context'] = error_context
+                record['body'] = json.dumps(message)
                 raise
                 
     except Exception as e:
