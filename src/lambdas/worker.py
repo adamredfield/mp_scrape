@@ -30,6 +30,7 @@ def lambda_handler(event, context):
                     user_id=user_id,
                     retry_count=message.get('retry_count', 0)
                 )
+                return
                 
             except Exception as e:
                 error_context = {
@@ -50,7 +51,6 @@ def lambda_handler(event, context):
                     record['body'] = json.dumps(message)
                 
                 raise
-                
     except Exception as e:
         print(f"Error in handler: {str(e)}")
         raise

@@ -36,6 +36,7 @@ def lambda_handler(event, context):
                         retry_count=retry_count
                     )
                     print(f"Successfully processed failed page {message['page_number']}")
+                    return
 
             except Exception as e:
                 print(f"Page {message['page_number']} exceeded max retries")
