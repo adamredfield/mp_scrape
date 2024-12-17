@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS routes.Ticks (
     note_hash TEXT DEFAULT md5('') NOT NULL,
     insert_date TIMESTAMP,
     FOREIGN KEY (route_id) REFERENCES routes.Routes(id),
-    UNIQUE(user_id, route_id, type, note_hash, date)
+    UNIQUE (user_id, route_id, "date", type, note_hash)
 );
 
 CREATE TABLE IF NOT EXISTS routes.RouteComments (
