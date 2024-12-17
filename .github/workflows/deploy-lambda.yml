@@ -38,6 +38,26 @@ jobs:
       run: |
         docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+  
+    - name: Delete existing event source mappings
+      run: |
+        # Get and delete orchestrator mappings
+        MAPPINGS=$(aws lambda list-event-source-mappings --function-name mp-scraper-orchestrator --query 'EventSourceMappings[*].UUID' --output text || true)
+        for UUID in $MAPPINGS; do
+          aws lambda delete-event-source-mapping --uuid $UUID || true
+        done
+        
+        # Get and delete worker mappings
+        MAPPINGS=$(aws lambda list-event-source-mappings --function-name mp-scraper-worker --query 'EventSourceMappings[*].UUID' --output text || true)
+        for UUID in $MAPPINGS; do
+          aws lambda delete-event-source-mapping --uuid $UUID || true
+        done
+        
+        # Get and delete retry worker mappings
+        MAPPINGS=$(aws lambda list-event-source-mappings --function-name mp-scraper-retry-worker --query 'EventSourceMappings[*].UUID' --output text || true)
+        for UUID in $MAPPINGS; do
+          aws lambda delete-event-source-mapping --uuid $UUID || true
+        done
 
     - name: Delete existing functions
       run: |
@@ -208,6 +228,12 @@ jobs:
           --function-name mp-scraper-retry-worker \
           --event-source-arn arn:aws:sqs:us-east-1:855154218477:mp-scraper-dlq \
           --batch-size 1 || true
+    - name: Configure SQS Trigger for Worker
+      run: |
+        aws lambda create-event-source-mapping \
+          --function-name mp-scraper-worker \
+          --event-source-arn arn:aws:sqs:us-east-1:855154218477:mp-scraper-queue \
+          --batch-size 1 || true
 
     - name: Add SQS Permission to Orchestrator
       run: |
@@ -226,3 +252,12 @@ jobs:
           --action lambda:InvokeFunction \
           --principal sqs.amazonaws.com \
           --source-arn arn:aws:sqs:us-east-1:855154218477:mp-scraper-dlq || true
+
+    - name: Add SQS Permission to Worker
+      run: |
+        aws lambda add-permission \
+          --function-name mp-scraper-worker \
+          --statement-id SQSInvoke \
+          --action lambda:InvokeFunction \
+          --principal sqs.amazonaws.com \
+          --source-arn arn:aws:sqs:us-east-1:855154218477:mp-scraper-queue || true  
