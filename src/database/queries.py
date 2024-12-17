@@ -37,25 +37,6 @@ def insert_ticks_batch(cursor, tick_data):
     for tick in tick_data:
         if tick['type'] is None:
             tick['type'] = ''
-        print(f"\nRoute: {tick['route_id']}")
-        print(f"Date: {tick['date']}")
-        print(f"Type: '{tick['type']}'")
-        print(f"Note: '{tick['note']}'")
-
-        # Let's also query if this combination already exists
-        cursor.execute("""
-            SELECT id, note, note_hash 
-            FROM routes.ticks 
-            WHERE user_id = %s 
-              AND route_id = %s 
-              AND date = %s 
-              AND type = %s
-        """, (tick['user_id'], tick['route_id'], tick['date'], tick['type']))
-        existing = cursor.fetchall()
-        if existing:
-            print(f"Found {len(existing)} existing entries for this combination:")
-            for e in existing:
-                print(f"ID: {e[0]}, Note: '{e[1]}', Hash: {e[2]}")
 
     args_str = ','.join(
         cursor.mogrify(
