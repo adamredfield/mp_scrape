@@ -38,6 +38,34 @@ jobs:
       run: |
         docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+    - name: Delete existing event source mappings
+      run: |
+        # Get and disable/delete orchestrator mappings
+        MAPPINGS=$(aws lambda list-event-source-mappings --function-name mp-scraper-orchestrator --query 'EventSourceMappings[*].UUID' --output text || true)
+        for UUID in $MAPPINGS; do
+          # First disable the mapping
+          aws lambda update-event-source-mapping --uuid $UUID --enabled False || true
+          sleep 2  # Give AWS time to disable the mapping
+          # Then delete it
+          aws lambda delete-event-source-mapping --uuid $UUID || true
+        done
+        
+        # Get and disable/delete worker mappings
+        MAPPINGS=$(aws lambda list-event-source-mappings --function-name mp-scraper-worker --query 'EventSourceMappings[*].UUID' --output text || true)
+        for UUID in $MAPPINGS; do
+          aws lambda update-event-source-mapping --uuid $UUID --enabled False || true
+          sleep 2
+          aws lambda delete-event-source-mapping --uuid $UUID || true
+        done
+        
+        # Get and disable/delete retry worker mappings
+        MAPPINGS=$(aws lambda list-event-source-mappings --function-name mp-scraper-retry-worker --query 'EventSourceMappings[*].UUID' --output text || true)
+        for UUID in $MAPPINGS; do
+          aws lambda update-event-source-mapping --uuid $UUID --enabled False || true
+          sleep 2
+          aws lambda delete-event-source-mapping --uuid $UUID || true
+        done
   
     - name: Delete existing event source mappings
       run: |
