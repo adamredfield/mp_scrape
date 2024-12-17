@@ -43,7 +43,7 @@ def insert_ticks_batch(cursor, tick_data):
     tick_sql = f"""
         INSERT INTO routes.Ticks (user_id, route_id, date, type, note, note_hash, insert_date)
         VALUES {args_str}
-        ON CONFLICT (user_id, route_id, date, note_hash) DO NOTHING
+        ON CONFLICT ON CONSTRAINT ticks_user_id_route_id_date_type_note_hash_key DO NOTHING
         RETURNING id
     """
     try:
