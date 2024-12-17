@@ -33,6 +33,11 @@ cursor.mogrify(
         raise
 
 def insert_ticks_batch(cursor, tick_data):
+
+    for tick in tick_data:
+        if tick['type'] is None:
+            tick['type'] = ''
+
     args_str = ','.join(
         cursor.mogrify(
             "(%(user_id)s, %(route_id)s, %(date)s, %(type)s, %(note)s, encode(digest(COALESCE(%(note)s, ''), 'sha256'), 'hex'), %(insert_date)s)",

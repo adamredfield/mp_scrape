@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS routes.Ticks (
     user_id TEXT,
     route_id INTEGER,
     date TIMESTAMP,
-    type TEXT,
+    type TEXT DEFAULT '' NOT NULL,
     note TEXT,
     note_hash TEXT DEFAULT md5('') NOT NULL,
     insert_date TIMESTAMP,

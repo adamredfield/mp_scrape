@@ -19,8 +19,8 @@ def test_worker():
         'Records': [{
             'body': json.dumps({
                 'page_number': 1,
-                'ticks_url': 'https://www.mountainproject.com/user/108932097/ryan-petronella/ticks?page=',
-                'user_id': '108932097/ryan-petronella'
+                'ticks_url': 'https://www.mountainproject.com/user/200780729/choss-pirate/ticks?page=',
+                'user_id': '200780729/choss-pirate'
             })
         }]
     }

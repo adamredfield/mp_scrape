@@ -463,7 +463,6 @@ def process_page(page_number, ticks_url, user_id, retry_count=0):
                 print(f"Found {len(tick_rows) / 2} routes to process")
                 
                 for i in range(0, len(tick_rows), 2):  # Step by 2 since routes and ticks alternate
-
                     try:
                         route_row = tick_rows[i]
                         tick_row = tick_rows[i + 1] if i + 1 < len(tick_rows) else None
@@ -474,8 +473,14 @@ def process_page(page_number, ticks_url, user_id, retry_count=0):
 
                         tick_details = tick_row.find('td', class_='text-warm small pt-0') if tick_row else None
 
+                        if route_id not in tick_details_map:
+                            tick_details_map[route_id] = []
+
+                        if tick_details:
+                            tick_details_map[route_id].append(tick_details)
+
                         route_ids_to_check[route_id] = (route_name, route_link)
-                        tick_details_map[route_id] = tick_details
+
                     except IndexError as e:
                         print(f"Error processing row {i}: {str(e)}")
                         continue  # Skip this row and continue with next
@@ -539,8 +544,12 @@ def process_page(page_number, ticks_url, user_id, retry_count=0):
                             if ai_route_response:
                                 ai_route_analysis_data.append(process_route_response(ai_route_response))
                                 
-                        if tick_details_map[route_id]:
-                            tick_data.append(parse_tick_details(tick_details_map[route_id], current_route_data, user_id))
+                        if route_id in tick_details_map:
+                            print(f"\nProcessing ticks for {route_name} ({route_id})")
+                            print(f"Number of ticks: {len(tick_details_map[route_id])}")
+                            for tick_detail in tick_details_map[route_id]:
+                                tick_info = parse_tick_details(tick_detail, current_route_data, user_id)
+                                tick_data.append(parse_tick_details(tick_detail, current_route_data, user_id))
 
                     if route_data:
                         print(f"Attempting to insert {len(route_data)} routes")
