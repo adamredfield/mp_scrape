@@ -90,7 +90,8 @@ jobs:
         aws sqs set-queue-attributes \
           --queue-url $QUEUE_URL \
           --attributes '{
-            "RedrivePolicy": "{\"deadLetterTargetArn\":\"'$DLQ_ARN'\",\"maxReceiveCount\":3}"
+            "RedrivePolicy": "{\"deadLetterTargetArn\":\"'$DLQ_ARN'\",\"maxReceiveCount\":3}",
+            "VisibilityTimeout": "900",
           }'
     - name: Set initiate-orchestrator-queue attributes
       run: |
@@ -110,7 +111,8 @@ jobs:
         aws sqs set-queue-attributes \
           --queue-url $QUEUE_URL \
           --attributes '{
-            "RedrivePolicy": "{\"deadLetterTargetArn\":\"'$DLQ_ARN'\",\"maxReceiveCount\":3}"
+            "RedrivePolicy": "{\"deadLetterTargetArn\":\"'$DLQ_ARN'\",\"maxReceiveCount\":3}",
+            "VisibilityTimeout": "900"
           }'
 
     - name: Deploy worker function
