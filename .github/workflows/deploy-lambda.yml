@@ -90,8 +90,10 @@ jobs:
         aws sqs set-queue-attributes \
           --queue-url $QUEUE_URL \
           --attributes '{
-            "RedrivePolicy": "{\"deadLetterTargetArn\":\"'$DLQ_ARN'\",\"maxReceiveCount\":3}"
+            "RedrivePolicy": "{\"deadLetterTargetArn\":\"'$DLQ_ARN'\",\"maxReceiveCount\":3}",
+            "VisibilityTimeout": "900"
           }'
+          
     - name: Set initiate-orchestrator-queue attributes
       run: |
         QUEUE_URL=$(aws sqs get-queue-url --queue-name initiate-orchestrator-queue --output text --query 'QueueUrl')
@@ -110,7 +112,8 @@ jobs:
         aws sqs set-queue-attributes \
           --queue-url $QUEUE_URL \
           --attributes '{
-            "RedrivePolicy": "{\"deadLetterTargetArn\":\"'$DLQ_ARN'\",\"maxReceiveCount\":3}"
+            "RedrivePolicy": "{\"deadLetterTargetArn\":\"'$DLQ_ARN'\",\"maxReceiveCount\":3}",
+            "VisibilityTimeout": "900"
           }'
 
     - name: Deploy worker function
@@ -173,6 +176,23 @@ jobs:
           --function-name mp-scraper-retry-worker \
           --reserved-concurrent-executions 100
 
+    - name: Deploy orchestrator function
+      run: |
+        aws lambda create-function \
+          --function-name mp-scraper-orchestrator \
+          --package-type Image \
+          --code ImageUri=${{ steps.login-ecr.outputs.registry }}/mp-scraper:latest \
+          --role ${{ secrets.AWS_LAMBDA_ROLE_ARN }} \
+          --environment '{"Variables": {
+              "QUEUE_URL": "${{ secrets.SQS_URL }}",
+              "NEW_SCRAPE_QUEUE_URL": "${{ secrets.NEW_SCRAPE_QUEUE_URL }}",
+              "IPROYAL_USERNAME": "${{ secrets.IPROYAL_USERNAME }}",
+              "IPROYAL_PASSWORD": "${{ secrets.IPROYAL_PASSWORD }}"
+          }}' \
+          --timeout 900 \
+          --memory-size 900 \
+          --image-config '{"Command": ["src.lambdas.orchestrator.lambda_handler"]}'
+
     - name: Update Lambda IAM Role
       run: |
         aws iam put-role-policy \
@@ -198,23 +218,6 @@ jobs:
               }
             ]
           }'
-
-    - name: Deploy orchestrator function
-      run: |
-        aws lambda create-function \
-          --function-name mp-scraper-orchestrator \
-          --package-type Image \
-          --code ImageUri=${{ steps.login-ecr.outputs.registry }}/mp-scraper:latest \
-          --role ${{ secrets.AWS_LAMBDA_ROLE_ARN }} \
-          --environment '{"Variables": {
-              "QUEUE_URL": "${{ secrets.SQS_URL }}",
-              "NEW_SCRAPE_QUEUE_URL": "${{ secrets.NEW_SCRAPE_QUEUE_URL }}",
-              "IPROYAL_USERNAME": "${{ secrets.IPROYAL_USERNAME }}",
-              "IPROYAL_PASSWORD": "${{ secrets.IPROYAL_PASSWORD }}"
-          }}' \
-          --timeout 900 \
-          --memory-size 900 \
-          --image-config '{"Command": ["src.lambdas.orchestrator.lambda_handler"]}'
 
     - name: Configure SQS Trigger for Orchestrator
       run: |
