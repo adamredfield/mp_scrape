@@ -10,10 +10,25 @@ def with_retry(max_retries=3, delay=1):
             for attempt in range(max_retries):
                 try:
                     return func(*args, **kwargs)
-                except psycopg2.OperationalError as e:
+                except (psycopg2.OperationalError, psycopg2.InterfaceError) as e:
                     last_exception = e
-                    if "SSL connection has been closed" in str(e) and attempt < max_retries - 1:
+                    if (("SSL connection has been closed" in str(e) or 
+                         "cursor already closed" in str(e)) and 
+                        attempt < max_retries - 1):
                         print(f"Database connection failed on attempt {attempt + 1}, retrying in {delay} seconds...")
+                        
+                        # Get new cursor if needed
+                        if "cursor already closed" in str(e):
+                            cursor = args[0]
+                            if hasattr(cursor, 'connection'):
+                                try:
+                                    args = list(args)
+                                    args[0] = cursor.connection.cursor()
+                                    args = tuple(args)
+                                except Exception as conn_err:
+                                    print(f"Failed to get new cursor: {conn_err}")
+                                    raise
+                        
                         time.sleep(delay)
                         continue
                     raise

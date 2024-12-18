@@ -180,19 +180,29 @@ def page_top_routes(user_id):
     # Top Routes Column
     with left_col:
         st.markdown("<h2 class='spotify-header'>Your Top Routes</h2>", unsafe_allow_html=True)
-        for i, (route, grade, stars, votes, tags) in enumerate(top_rated_routes[:5], 1):
-            st.markdown(
-                f"""
-                <div class='list-item'>
-                    <div>
-                        <span class='item-number'>{i}. </span>
-                        <span class='item-name'>{route}</span>
+        for i, (route, grade, stars, primary_photo_url) in enumerate(top_rated_routes[:10], 1):
+            with st.container():
+                cols = st.columns([1, 4])
+                with cols[0]:
+                    if primary_photo_url:
+                        st.image(
+                            primary_photo_url,
+                            width=50,  # Fixed width for thumbnail
+                            output_format="JPEG"  # Better for photos
+                        )
+            with cols[1]:
+                st.markdown(
+                    f"""
+                    <div class='list-item'>
+                        <div>
+                            <span class='item-number'>{i}. </span>
+                            <span class='item-name'>{route}</span>
+                        </div>
+                        <div class='item-details'>⭐ {stars:.1f} stars &bull; {grade}</div>
                     </div>
-                    <div class='item-details'>⭐ {stars:.1f} stars &bull; {grade}</div>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
+                    """,
+                    unsafe_allow_html=True
+                )
     
     # Top Tags Column
     with right_col:

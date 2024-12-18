@@ -146,7 +146,8 @@ def get_highest_rated_climbs(conn, selected_styles=None, route_types=None, year=
             r.commitment_grade), '')) as grade,
         r.avg_stars,
         r.num_votes,
-        STRING_AGG(tav.mapped_tag, ', ') as tags
+        STRING_AGG(tav.mapped_tag, ', ') as tags,
+        r.primary_photo_url
     FROM routes.Routes r
     LEFT JOIN analysis.TagAnalysisView tav on r.id = tav.route_id 
         AND tav.mapped_type = '{tag_type}'
@@ -156,7 +157,8 @@ def get_highest_rated_climbs(conn, selected_styles=None, route_types=None, year=
     {year_filter(year)}
     {add_user_filter(user_id)}
     GROUP BY r.route_name, r.main_area, r.specific_location, r.yds_rating, r.hueco_rating, 
-             r.aid_rating, r.danger_rating, r.commitment_grade, r.avg_stars, r.num_votes
+             r.aid_rating, r.danger_rating, r.commitment_grade, r.avg_stars, r.num_votes,
+             r.primary_photo_url
     {style_filter}
     ORDER BY r.avg_stars DESC, num_votes DESC
     LIMIT 20
