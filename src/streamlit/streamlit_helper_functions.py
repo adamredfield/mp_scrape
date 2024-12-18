@@ -61,7 +61,6 @@ def verify_user_exists(conn, user_id):
 
         result = handle_queue_processing(conn, user_id, sqs)
         if result: 
-            st.write(f"Update complete. Found {result} ticks. Racking up...")
             time.sleep(3)
             st.session_state.waiting_for_update = False
             st.session_state.show_info_message = True
@@ -251,10 +250,10 @@ def handle_queue_processing(conn, user_id, sqs):
                 queue_progress = 0
             else:
                 queue_progress = (st.session_state.total_messages - current_messages) / st.session_state.total_messages
-            queue_progress_bar.progress(queue_progress)
+            #queue_progress_bar.progress(queue_progress)
 
-            st.session_state.pages_message = f"Processing {current_messages} remaining pages..."
-            pages_text.info(st.session_state.pages_message)
+            pages_message = f"Processing {current_messages} remaining pages..."
+            pages_text.write(pages_message)
             st.rerun()
     else:
         # Queue is empty, but let's verify data was actually inserted
