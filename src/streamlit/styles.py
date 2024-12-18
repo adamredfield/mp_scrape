@@ -294,3 +294,64 @@ def diamond_template(main_text, subtitle=None, detail_text=None):
             {f'<div class="route-list">{detail_text}</div>' if detail_text else ''}
         </div>
     """
+
+def get_spotify_style():
+    return """
+        <style>
+        .stApp {
+            background-color: black !important;
+        }
+        
+        .content-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        .spotify-header {
+            color: #1ed760;
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+            text-align: center;
+        }
+        
+        .list-item {
+            margin: 0.25rem 0;
+            text-align: left;
+            padding-left: 40%;
+        }
+        
+        .item-number {
+            color: #1ed760;
+            font-size: 1.2rem;
+        }
+        
+        .item-name {
+            color: white;
+            font-size: 1.2rem;
+        }
+        
+        .item-details {
+            color: #b3b3b3;
+            font-size: 0.9rem;
+            margin-top: -0.2rem;
+        }
+        
+        .total-section {
+            margin-top: 2rem;
+            text-align: center;
+        }
+        
+        .total-label {
+            color: #1ed760;
+            font-size: 1.2rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .total-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: white;
+        }
+        </style>
+    """
