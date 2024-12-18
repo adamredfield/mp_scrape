@@ -10,6 +10,9 @@ import streamlit as st
 import src.analysis.mp_racked_metrics as metrics
 import pandas as pd
 import plotly.graph_objects as go
+from PIL import Image
+import requests
+from io import BytesIO
 
 # Page config
 st.set_page_config(
@@ -135,6 +138,28 @@ def page_most_climbed(user_id):
         detail_text = f"starting on {formatted_date}{suffix}<br><br>{formatted_notes}"
         
         st.markdown(diamond_template(main_text, subtitle, detail_text), unsafe_allow_html=True)
+def get_squared_image(url):
+    try:
+        response = requests.get(url)
+        img = Image.open(BytesIO(response.content))
+        
+        # Get the largest dimension
+        max_dim = max(img.width, img.height)
+        
+        # Create a square black background of the largest dimension
+        square_img = Image.new('RGB', (max_dim, max_dim), (0, 0, 0))
+        
+        # Calculate position to paste (center)
+        paste_x = (max_dim - img.width) // 2
+        paste_y = (max_dim - img.height) // 2
+        
+        # Paste original onto square background
+        square_img.paste(img, (paste_x, paste_y))
+        return square_img
+        
+    except Exception as e:
+        print(f"Error loading image from {url}: {e}")
+        return None
 
 def page_top_routes(user_id):
     """Page showing top rated routes and tags"""
@@ -151,7 +176,7 @@ def page_top_routes(user_id):
     
     # Get tag data for filter options
     tag_data = metrics.top_tags(conn, tag_type, user_id=user_id)
-    tag_df = pd.DataFrame(tag_data, columns=['Type', 'Tag', 'Count']).head(5)
+    tag_df = pd.DataFrame(tag_data, columns=['Type', 'Tag', 'Count']).head(10)
     
     # Calculate max_count from the actual Count column
     max_count = tag_df['Count'].max() if not tag_df.empty else 1
@@ -163,7 +188,6 @@ def page_top_routes(user_id):
             key='style_filter'
         )
         
-    
     # Get filtered routes based on selected styles
     top_rated_routes = metrics.get_highest_rated_climbs(
         conn,
@@ -179,17 +203,25 @@ def page_top_routes(user_id):
     # Create a centered layout with two columns
     left_col, right_col = st.columns(2)
     
+    st.markdown("""
+        <style>
+        .route-container {
+            margin-bottom: 20px;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
     # Top Routes Column
     with left_col:
         st.markdown("<h2 class='spotify-header'>Your Top Routes</h2>", unsafe_allow_html=True)
-        for i, (route, grade, stars, route_id, tags, photo_url) in enumerate(top_rated_routes[:10], 1):
+        for i, (route, grade, stars, route_id, tags, photo_url, route_url) in enumerate(top_rated_routes[:10], 1):
             with st.container():
-                cols = st.columns([1, 4])
+                cols = st.columns([1, 10])
                 with cols[0]:
                     if photo_url:
+                        img = get_squared_image(photo_url)
                         st.image(
-                            photo_url,
-                            width=50,  # Fixed width for thumbnail
+                            img, # Fixed width for thumbnail
                             output_format="JPEG"  # Better for photos
                         )
             with cols[1]:
@@ -198,7 +230,11 @@ def page_top_routes(user_id):
                     <div class='list-item'>
                         <div>
                             <span class='item-number'>{i}. </span>
-                            <span class='item-name'>{route}</span>
+                            <span class='item-name'>
+                                <a href="{route_url}" target="_blank" style="color: inherit; text-decoration: none; border-bottom: 1px dotted #888;">
+                                    {route}
+                                </a>
+                            </span>
                         </div>
                         <div class='item-details'>⭐ {stars:.1f} stars &bull; {grade}</div>
                     </div>
@@ -208,7 +244,7 @@ def page_top_routes(user_id):
     
     # Top Tags Column
     with right_col:
-        st.markdown(f"<h2 class='spotify-header'>Top {tag_type.replace('_', ' ').title()}</h2>", unsafe_allow_html=True)
+        st.markdown(f"<h2 class='spotify-header'>Top {tag_type.replace('_', ' ').title()}s</h2>", unsafe_allow_html=True)
         
         counts = tag_df['Count'].fillna(0)
         max_count = counts.max() if len(counts) > 0 else 1
