@@ -30,7 +30,6 @@ def lambda_handler(event, context):
                     user_id=user_id,
                     retry_count=message.get('retry_count', 0)
                 )
-                return
                 
             except Exception as e:
                 error_context = {
@@ -44,12 +43,7 @@ def lambda_handler(event, context):
                     "remaining_time_ms": context.get_remaining_time_in_millis(),
                 }
 
-                print(f"Error context: {json.dumps(error_context, default=str)}")
-
-                if isinstance(message, dict):
-                    message['error_context'] = error_context
-                    record['body'] = json.dumps(message)
-                
+                print(f"Error context: {json.dumps(error_context, default=str)}")             
                 raise
     except Exception as e:
         print(f"Error in handler: {str(e)}")

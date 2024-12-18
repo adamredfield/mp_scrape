@@ -217,7 +217,7 @@ def handle_queue_processing(conn, user_id, sqs):
     time_since_update = (current_time - st.session_state.last_increment_time).total_seconds()
 
     if time_since_update >= 3:
-        increment = random.uniform(0.01, 0.07)
+        increment = random.uniform(0.005, 0.04)
         st.session_state.current_progress = min(0.9, st.session_state.current_progress + increment)
         st.session_state.last_increment_time = current_time
 
