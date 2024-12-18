@@ -173,6 +173,8 @@ def page_top_routes(user_id):
         tag_type=tag_type,
         user_id=user_id
     ).values.tolist()
+
+    print(f"Routes data structure: {top_rated_routes[:1]}")
     
     # Create a centered layout with two columns
     left_col, right_col = st.columns(2)
@@ -180,13 +182,13 @@ def page_top_routes(user_id):
     # Top Routes Column
     with left_col:
         st.markdown("<h2 class='spotify-header'>Your Top Routes</h2>", unsafe_allow_html=True)
-        for i, (route, grade, stars, primary_photo_url) in enumerate(top_rated_routes[:10], 1):
+        for i, (route, grade, stars, route_id, tags, photo_url) in enumerate(top_rated_routes[:10], 1):
             with st.container():
                 cols = st.columns([1, 4])
                 with cols[0]:
-                    if primary_photo_url:
+                    if photo_url:
                         st.image(
-                            primary_photo_url,
+                            photo_url,
                             width=50,  # Fixed width for thumbnail
                             output_format="JPEG"  # Better for photos
                         )
