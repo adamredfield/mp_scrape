@@ -220,7 +220,7 @@ def handle_queue_processing(conn, user_id, sqs):
 
     if time_since_update >= 3:
         increment = random.uniform(0.01, 0.07)
-        st.session_state.current_progress = min(0.5, st.session_state.current_progress + increment)
+        st.session_state.current_progress = min(0.9, st.session_state.current_progress + increment)
         st.session_state.last_increment_time = current_time
 
     synthetic_progress_bar.progress(st.session_state.current_progress)
