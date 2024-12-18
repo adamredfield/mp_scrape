@@ -4,6 +4,8 @@ import sys
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(project_root)
 
+from src.streamlit.streamlit_helper_functions import check_if_user_exists, get_latest_tick, handle_queue_processing
+from styles import get_all_styles, wrapped_template, diamond_template, get_wrapped_styles, get_diamond_styles, get_routes_styles
 from dotenv import load_dotenv
 import streamlit as st
 import src.analysis.mp_racked_metrics as metrics
@@ -12,7 +14,11 @@ import plotly.graph_objects as go
 import json
 import boto3
 from datetime import datetime
-import time
+
+sqs = boto3.client('sqs',
+        region_name=st.secrets["aws"]["region"],
+        aws_access_key_id=st.secrets["aws"]["access_key_id"],
+        aws_secret_access_key=st.secrets["aws"]["secret_access_key"])
 
 # Page config
 st.set_page_config(
@@ -35,277 +41,7 @@ conn = st.connection('postgresql', type='sql')
 if 'page' not in st.session_state:
     st.session_state.page = 0
 
-# Styling
-st.markdown("""
-    <style>
-    footer {visibility: hidden;}
-    
-    .stApp {
-        background: black;
-    }
-    
-    .wrapped-container {
-        position: relative;
-        height: 100vh;
-        width: 100vw;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        color: white;
-        text-align: center;
-        padding: 0;
-        margin: 0;
-        background: black;
-        overflow: hidden;
-    }
-    
-    .top-pattern {
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: 45vh;
-        background: linear-gradient(to bottom right, #FF1CAE, #FF0080);
-        clip-path: polygon(
-            0 0,
-            10% 0, 10% 8%,
-            20% 8%, 20% 16%,
-            30% 16%, 30% 24%,
-            40% 24%, 40% 32%,
-            50% 32%, 50% 40%,
-            60% 40%, 60% 48%,
-            70% 48%, 70% 56%,
-            80% 56%, 80% 64%,
-            90% 64%, 90% 72%,
-            100% 72%, 100% 0
-        );
-    }
-    
-    .bottom-pattern {
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        height: 45vh;
-        background: linear-gradient(to top left, #FF1CAE, #FF0080);
-        clip-path: polygon(
-            0 28%,
-            10% 28%, 10% 36%,
-            20% 36%, 20% 44%,
-            30% 44%, 30% 52%,
-            40% 52%, 40% 60%,
-            50% 60%, 50% 68%,
-            60% 68%, 60% 76%,
-            70% 76%, 70% 84%,
-            80% 84%, 80% 92%,
-            90% 92%, 90% 100%,
-            0 100%
-        );
-    }
-    
-    .big-text {
-        font-family: 'Helvetica Neue', sans-serif;
-        font-size: 4.5rem;
-        font-weight: 900;
-        line-height: 1.2;
-        margin: 0;
-        padding: 0;
-        text-align: center;
-        z-index: 10;
-    }
-    
-    .subtitle-text {
-        font-family: 'Helvetica Neue', sans-serif;
-        font-size: 2rem;
-        font-weight: 400;
-        margin-top: 3rem;
-        z-index: 10;
-    }
-    
-    .route-list {
-        font-family: 'Helvetica Neue', sans-serif;
-        font-size: 1.5rem;
-        font-weight: 400;
-        margin-top: 1.5rem;
-        z-index: 10;
-    }
-    
-    .diamond-pattern {
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: 25vh;
-        background: linear-gradient(to right, #4B0082, #00BFFF);
-        clip-path: polygon(
-            0 0, 100% 0,              /* Top edge */
-            100% 25%, 80% 25%,        /* Right top step */
-            60% 25%, 40% 25%,         /* Middle space */
-            20% 25%, 0 25%            /* Left top step */
-        );
-    }
-    
-    .diamond-pattern-right {
-        position: absolute;
-        top: 0;
-        right: 0;
-        width: 20vw;
-        height: 40vh;
-        background: linear-gradient(to right, #4B0082, #00BFFF);
-        clip-path: polygon(
-            0 0,                      /* Top left */
-            100% 0,                   /* Top right */
-            100% 100%,                /* Bottom right */
-            0 40%                     /* Bottom point */
-        );
-    }
-    
-    .diamond-pattern-left {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 20vw;
-        height: 40vh;
-        background: linear-gradient(to right, #4B0082, #00BFFF);
-        clip-path: polygon(
-            0 0,                      /* Top left */
-            100% 0,                   /* Top right */
-            100% 40%,                 /* Bottom point */
-            0 100%                    /* Bottom left */
-        );
-    }
-    
-    .diamond-bottom-right {
-        position: absolute;
-        bottom: 0;
-        right: 0;
-        width: 20vw;
-        height: 40vh;
-        background: linear-gradient(to right, #4B0082, #00BFFF);
-        clip-path: polygon(
-            0 60%,                    /* Top point */
-            100% 0,                   /* Top right */
-            100% 100%,                /* Bottom right */
-            0 100%                    /* Bottom left */
-        );
-    }
-    
-    .diamond-bottom-left {
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        width: 20vw;
-        height: 40vh;
-        background: linear-gradient(to right, #4B0082, #00BFFF);
-        clip-path: polygon(
-            0 0,                      /* Top left */
-            100% 60%,                 /* Top point */
-            100% 100%,                /* Bottom right */
-            0 100%                    /* Bottom left */
-        );
-    }
-    
-    .top-routes-container {
-        background: #ffff00;
-        color: black;
-        padding: 2rem;
-        min-height: 100vh;
-        width: 100vw;
-    }
-    
-    .route-title {
-        font-family: 'Helvetica Neue', sans-serif;
-        font-size: 3rem;
-        font-weight: 700;
-        margin-bottom: 2rem;
-    }
-    
-    .route-row {
-        display: flex;
-        align-items: center;
-        margin-bottom: 1.5rem;
-        gap: 1rem;
-    }
-    
-    .route-number {
-        font-size: 2.5rem;
-        font-weight: 700;
-        min-width: 3rem;
-    }
-    
-    .route-info {
-        display: flex;
-        flex-direction: column;
-    }
-    
-    .route-name {
-        font-size: 1.5rem;
-        font-weight: 600;
-        margin: 0;
-    }
-    
-    .route-rating {
-        font-size: 1.2rem;
-        color: #333;
-        margin: 0;
-    }
-    
-    .big-number {
-        font-size: 3rem;
-        font-weight: 700;
-        color: black;
-    }
-    
-    .area-container {
-        background: transparent;
-        padding: 0.5rem;
-    }
-    
-    .area-name {
-        font-size: 1.5rem;
-        font-weight: 600;
-        margin: 0;
-        color: black;
-    }
-    
-    .length-count {
-        font-size: 1.2rem;
-        color: #333;
-        margin: 0;
-    }
-    </style>
-""", unsafe_allow_html=True)
 
-def wrapped_template(main_text, subtitle=None, detail_text=None):
-    """Standardized template for Wrapped pages"""
-    return f"""
-        <div class="wrapped-container">
-            <div class="top-pattern"></div>
-            <div class="bottom-pattern"></div>
-            <div class="big-text">
-                {main_text}
-            </div>
-            {f'<div class="subtitle-text">{subtitle}</div>' if subtitle else ''}
-            {f'<div class="route-list">{detail_text}</div>' if detail_text else ''}
-        </div>
-    """
-
-def diamond_template(main_text, subtitle=None, detail_text=None):
-    """Diamond pattern template for total routes page"""
-    return f"""
-        <div class="wrapped-container">
-            <div class="diamond-pattern-left"></div>
-            <div class="diamond-pattern-right"></div>
-            <div class="diamond-bottom-left"></div>
-            <div class="diamond-bottom-right"></div>
-            <div class="big-text">
-                {main_text}
-            </div>
-            {f'<div class="subtitle-text">{subtitle}</div>' if subtitle else ''}
-            {f'<div class="route-list">{detail_text}</div>' if detail_text else ''}
-        </div>
-    """
 
 def get_user_id():
     """Handle user identification"""
@@ -313,6 +49,12 @@ def get_user_id():
         st.session_state.user_id = None
     if 'data_status' not in st.session_state:
         st.session_state.data_status = None
+
+    # First check if we're in an update
+    if ('waiting_for_update' in st.session_state and 
+        st.session_state.waiting_for_update):
+        verify_user_exists(conn, st.session_state.user_id)
+        return None
 
     if st.session_state.user_id is None:
         st.title("Mountain Project Racked")
@@ -363,11 +105,6 @@ def get_user_id():
 def trigger_user_scrape(user_id):
     """Send message to SQS to trigger scrape"""
 
-    sqs = boto3.client('sqs',
-            region_name=st.secrets["aws"]["region"],
-            aws_access_key_id=st.secrets["aws"]["access_key_id"],
-            aws_secret_access_key=st.secrets["aws"]["secret_access_key"])
-
     new_scrape_queue_url = st.secrets["aws"]["new_scrape_queue_url"]
 
     if not new_scrape_queue_url:
@@ -395,107 +132,35 @@ def trigger_user_scrape(user_id):
         return False
 
 def verify_user_exists(conn, user_id):
-    """Check if user has ticks in the database"""
-
     if 'waiting_for_update' in st.session_state and st.session_state.waiting_for_update:
-        if st.session_state.get('initial_delay', False):
-            st.info("⏳ Initializing data collection...")
-            time.sleep(20)  # Wait 20 seconds before first queue check
-            st.session_state.initial_delay = False
-            st.rerun()
-
-        queue_status = check_queue_for_user(user_id)
-        elapsed = (datetime.now() - st.session_state.start_time).total_seconds()
-
-        if queue_status:
-            st.info("⏳ Still processing your data....\n\n"
-                    "   This can take up to 15 minutes.\n\n"
-                    "   Depending if routes you climb are already in the database.\n\n")
-            
-            time.sleep(10)
-            st.rerun()   
-        elif elapsed < 30:  # Wait at least 30 seconds before checking database
-            st.info("⏳ Preparing to process your data...")
-            time.sleep(10)
-            st.rerun()
-        else:
-            # Queue is empty, but let's verify data was actually inserted
-            time.sleep(10) # Wait 10 seconds before checking database
-            verify_query = """
-            SELECT COUNT(*) 
-            FROM routes.Ticks 
-            WHERE user_id = :user_id
-            """
-
-            result = conn.query(verify_query, params={"user_id": user_id}, ttl=0)
-            tick_count = result.iloc[0,0]
-            st.write(f"Found {tick_count} ticks in database for {user_id}") 
-
-            if tick_count == 0:
-                # No data yet, keep waiting
-                st.info("⏳ Finalizing data insertion...")
-                time.sleep(10)
-                st.rerun()
-            else:
-                # User's job is not in queue, so we can proceed
-                st.success(f"Update complete. Found {tick_count} ticks. Racking up...")
-                st.session_state.waiting_for_update = False
-                st.session_state.data_status = 'ready'  # Reset data status
-                st.cache_data.clear()
-                time.sleep(2)  # Brief pause to show success message
-                st.rerun()
-
+        handle_queue_processing(conn, user_id, sqs)
         return None
 
-    exists_query = """
-    SELECT EXISTS (
-        SELECT 1
-        FROM routes.Ticks t
-        JOIN routes.Routes r ON t.route_id = r.id
-        WHERE t.user_id = :user_id
-        LIMIT 1
-    )
-    """
-    result = conn.query(exists_query, params={"user_id": user_id})
-    exists = result.iloc[0,0]
+    exists = check_if_user_exists(conn, user_id)
 
     if exists:
-        latest_query = """
-        SELECT 
-            t.insert_date,
-            r.route_name,
-            t.date
-        FROM routes.Ticks t
-        JOIN routes.Routes r ON t.route_id = r.id
-        WHERE t.user_id = :user_id
-        ORDER BY t.date DESC
-        LIMIT 1
-        """
-        latest_result = conn.query(latest_query, params={"user_id": user_id})
-        latest_insert = latest_result.iloc[0]['insert_date']
-        latest_route = latest_result.iloc[0]['route_name']
-        tick_date = latest_result.iloc[0]['date']
+        latest_insert, latest_route, tick_date = get_latest_tick(conn, user_id)
 
         st.info(f"Your ticks up to {tick_date.strftime('%Y-%m-%d')} are already in the database.\n\n"
                 f"Your data was last updated on {latest_insert.strftime('%Y-%m-%d')}")
-    
+
         st.write(f"""
             Have you climbed and logged additional routes since {latest_route}?  \n    
             We want your data to be as accurate as possible.  \n
             Please only refresh if you have climbed and logged additional routes.  \n
             Data collection isn't free for the creator of this app. 🙏
         """)
+
         col1, col2 = st.columns([1,2])
         with col1:
-            if st.button("Refresh Data"):
-                st.info("Initiating data update...")
-                if trigger_user_scrape(user_id):
-                    st.session_state.waiting_for_update = True
-                    st.session_state.update_start_time = datetime.now()
-
-                    st.info("Starting update process...")
-                    time.sleep(20) 
-                    st.rerun()
+            with st.empty():
+                if st.button("Refresh Data"):
+                    st.info("Initiating data update...")
+                    if trigger_user_scrape(user_id):
+                        st.session_state.waiting_for_update = True
+                        st.session_state.initial_delay = True
+                        st.session_state.start_time = datetime.now()
+                        st.rerun()
         with col2:
             if st.button("Continue with existing data"):
                 st.session_state.data_status = 'ready'
@@ -503,112 +168,15 @@ def verify_user_exists(conn, user_id):
         
         if st.session_state.get('data_status') != 'ready':
             st.stop()
-
     else:
-        st.warning("Your data has not been collected yet.")
+        with st.empty():
+            st.warning("Your data has not been collected yet.")
         if trigger_user_scrape(user_id):
             st.session_state.waiting_for_update = True
+            st.session_state.initial_delay = True
+            st.session_state.start_time = datetime.now()
             st.rerun()
         return False
-    
-def check_queue_for_user(user_id):
-    """Check if user's scrape is still in queue"""
-    current_time = datetime.now()
-    elapsed = (current_time - st.session_state.start_time).total_seconds()
-    st.write(f"(Elapsed: {elapsed:.1f}s): Checking queue for user: {user_id}")
-
-    sqs = boto3.client('sqs',
-        region_name=st.secrets["aws"]["region"],
-        aws_access_key_id=st.secrets["aws"]["access_key_id"],
-        aws_secret_access_key=st.secrets["aws"]["secret_access_key"])
-    
-    main_queue_url = st.secrets["aws"]["queue_url"]
-    dlq_url = st.secrets["aws"]["dlq_url"]
-
-    # Check DLQ for failed messages
-    dlq_response = sqs.receive_message(
-        QueueUrl=dlq_url,
-        AttributeNames=['All'],
-        MessageAttributeNames=['All'],
-        MaxNumberOfMessages=10,
-        VisibilityTimeout=30,
-        WaitTimeSeconds=1
-    )
-
-    if 'Messages' in dlq_response:
-        st.write("### Failed Messages in DLQ:")
-        for msg in dlq_response['Messages']:
-            try:
-                message_body = json.loads(msg['Body'])
-                if 'error_context' in message_body:
-                    error = message_body['error_context']
-                    st.error(f"""
-                        **Failed Page**: {message_body.get('page_number')}  
-                        **Error Type**: {error.get('error_type')}  
-                        **Error Message**: {error.get('error_message')}  
-                        **Retry Count**: {error.get('retry_count')}  
-                        **Time**: {error.get('timestamp')}  
-                        
-                        <details>
-                        <summary>Stack Trace</summary>
-                        
-                        ```
-                        {error.get('stack_trace')}
-                        ```
-                        </details>
-                        """, unsafe_allow_html=True)
-            except Exception as e:
-                st.write(f"Error parsing DLQ message: {str(e)}")
-
-    # Get queue attributes to check message count
-    def check_queue(queue_url):
-        queue_attrs = sqs.get_queue_attributes(
-            QueueUrl=queue_url,
-            AttributeNames=[
-                'ApproximateNumberOfMessages',
-                'ApproximateNumberOfMessagesNotVisible',
-                'ApproximateNumberOfMessagesDelayed'
-            ]
-        )
-        visible_count = int(queue_attrs['Attributes']['ApproximateNumberOfMessages'])
-        in_flight_count = int(queue_attrs['Attributes']['ApproximateNumberOfMessagesNotVisible'])
-        return visible_count, in_flight_count
-    
-    # Keep checking messages until we either find the user or exhaust the queue
-    def check_messages(queue_url):
-        response = sqs.receive_message(
-            QueueUrl=queue_url,
-            AttributeNames=['All'],
-            MessageAttributeNames=['All'],
-            MaxNumberOfMessages=10,  # Max messages we can get at once
-            VisibilityTimeout=30,
-            WaitTimeSeconds=5
-        )
-    
-        # Check messages in batch of 10
-        if 'Messages' in response:
-            for message in response['Messages']:
-                message_body = json.loads(message['Body'])
-                if message_body.get('user_id') == user_id:
-                    return True  # User's job is still in queue
-            return False
-
-    main_visible, main_inflight = check_queue(main_queue_url)
-    dlq_visible, dlq_inflight = check_queue(dlq_url)
-
-    st.write(f"[{current_time.strftime('%H:%M:%S')}] (Elapsed: {elapsed:.1f}s):")
-    st.write(f"  Main Queue - Visible: {main_visible}, In-flight: {main_inflight}")
-    st.write(f"  DLQ - Visible: {dlq_visible}, In-flight: {dlq_inflight}")
-
-    total_messages = main_visible + main_inflight + dlq_visible + dlq_inflight
-
-    if total_messages == 0:
-        return False
-    
-    user_in_main = check_messages(main_queue_url)
-    user_in_dlq = check_messages(dlq_url)
-        
-    return user_in_main or user_in_dlq or total_messages > 0 
 
 def page_total_length(user_id):
     """First page showing total length climbed"""
@@ -1094,8 +662,18 @@ def main():
         6: lambda: page_grade_distribution(user_id)
     }
 
-    # Display current page
+    # Apply styles based on current page
     current_page = st.session_state.page
+    if current_page in [0, 1]:  # Total length and biggest day pages
+        st.markdown(get_wrapped_styles(), unsafe_allow_html=True)
+    elif current_page in [2, 3]:  # Total routes and most climbed pages
+        st.markdown(get_diamond_styles(), unsafe_allow_html=True)
+    elif current_page in [4, 5, 6]:  # Top routes, areas, and grades pages
+        st.markdown(get_routes_styles(), unsafe_allow_html=True)
+    else:
+        st.markdown(get_all_styles(), unsafe_allow_html=True)
+
+    # Display current page
     if current_page in pages:
         pages[current_page]()
     
