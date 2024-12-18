@@ -50,7 +50,6 @@ def verify_user_exists(conn, user_id):
         details_msg.empty()
         button_cols.empty()
 
-        progress_bar = st.progress(0)
         status_text = st.empty()
         status_text.text("Processing your data. This can take up to 15 minutes...")
 
@@ -246,12 +245,6 @@ def handle_queue_processing(conn, user_id, sqs):
 
     if queue_status:
         if 'total_messages' in st.session_state and st.session_state.total_messages > 0:
-            if current_messages >= st.session_state.total_messages:
-                queue_progress = 0
-            else:
-                queue_progress = (st.session_state.total_messages - current_messages) / st.session_state.total_messages
-            #queue_progress_bar.progress(queue_progress)
-
             pages_message = f"Processing {current_messages} remaining pages..."
             pages_text.write(pages_message)
             st.rerun()
