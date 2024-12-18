@@ -4,21 +4,12 @@ import sys
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(project_root)
 
-from src.streamlit.streamlit_helper_functions import check_if_user_exists, get_latest_tick, handle_queue_processing
-from styles import get_all_styles, wrapped_template, diamond_template, get_wrapped_styles, get_diamond_styles, get_routes_styles
-from dotenv import load_dotenv
+from src.streamlit.streamlit_helper_functions import get_user_id
+from styles import get_all_styles, wrapped_template, diamond_template, get_wrapped_styles, get_diamond_styles, get_routes_styles, get_spotify_style
 import streamlit as st
 import src.analysis.mp_racked_metrics as metrics
 import pandas as pd
 import plotly.graph_objects as go
-import json
-import boto3
-from datetime import datetime
-
-sqs = boto3.client('sqs',
-        region_name=st.secrets["aws"]["region"],
-        aws_access_key_id=st.secrets["aws"]["access_key_id"],
-        aws_secret_access_key=st.secrets["aws"]["secret_access_key"])
 
 # Page config
 st.set_page_config(
@@ -33,150 +24,11 @@ st.set_page_config(
     }
 )
 
-load_dotenv()
-
 conn = st.connection('postgresql', type='sql')
 
 # Initialize session state
 if 'page' not in st.session_state:
     st.session_state.page = 0
-
-
-
-def get_user_id():
-    """Handle user identification"""
-    if 'user_id' not in st.session_state:
-        st.session_state.user_id = None
-    if 'data_status' not in st.session_state:
-        st.session_state.data_status = None
-
-    # First check if we're in an update
-    if ('waiting_for_update' in st.session_state and 
-        st.session_state.waiting_for_update):
-        verify_user_exists(conn, st.session_state.user_id)
-        return None
-
-    if st.session_state.user_id is None:
-        st.title("Mountain Project Racked")
-        
-        col1, col2 = st.columns([2,1])
-        with col1:
-            user_input = st.text_input(
-                "Enter your Mountain Project URL or User ID",
-                placeholder="e.g., https://www.mountainproject.com/user/200362278/doctor-choss or 200362278/doctor-choss"
-            )
-        
-        with col2:
-            if st.button("Submit"):
-                if user_input:
-                    # Extract user_id from URL or use direct input
-                    if "mountainproject.com" in user_input:
-                        try:
-                            user_id = user_input.split("/user/")[1].strip("/")
-                            st.write(f"Extracted from URL: {user_id}")
-                        except IndexError:
-                            st.error("Invalid Mountain Project URL")
-                            return None
-                    else:
-                        user_id = user_input.strip().strip('/')
-                    
-                    st.session_state.user_id = user_id
-                    st.session_state.data_status = None  # Reset data status
-                    st.rerun()
-                else:
-                    st.error("Please enter a user ID")
-
-        st.markdown("""
-        ### How to find your User ID:
-        1. Go to [Mountain Project](https://www.mountainproject.com)
-        2. Log in and click your profile
-        3. Copy your profile URL or ID from the address bar
-        """)
-        return None
-    if st.session_state.data_status is None:     
-        # Verify user exists in database
-        if verify_user_exists(conn, st.session_state.user_id):
-            st.session_state.data_status = 'ready'
-            st.rerun()
-        return None
-
-    return st.session_state.user_id
-
-def trigger_user_scrape(user_id):
-    """Send message to SQS to trigger scrape"""
-
-    new_scrape_queue_url = st.secrets["aws"]["new_scrape_queue_url"]
-
-    if not new_scrape_queue_url:
-        st.error("SQS Queue URL not configured")
-        return False
-
-    message = {
-        'user_id': user_id,
-        'source': 'streamlit_app',
-        'action': 'new_user_scrape'
-    }
-
-    try:
-        sqs.send_message(
-            QueueUrl=new_scrape_queue_url,
-            MessageBody=json.dumps(message)
-        )
-        st.session_state.scrape_requested = True
-        st.session_state.scrape_time = datetime.now()
-        st.session_state.initial_delay = True
-        st.session_state.start_time = datetime.now()
-        return True
-    except Exception as e:
-        st.error(f"Failed to trigger scrape: {str(e)}")
-        return False
-
-def verify_user_exists(conn, user_id):
-    if 'waiting_for_update' in st.session_state and st.session_state.waiting_for_update:
-        handle_queue_processing(conn, user_id, sqs)
-        return None
-
-    exists = check_if_user_exists(conn, user_id)
-
-    if exists:
-        latest_insert, latest_route, tick_date = get_latest_tick(conn, user_id)
-
-        st.info(f"Your ticks up to {tick_date.strftime('%Y-%m-%d')} are already in the database.\n\n"
-                f"Your data was last updated on {latest_insert.strftime('%Y-%m-%d')}")
-
-        st.write(f"""
-            Have you climbed and logged additional routes since {latest_route}?  \n    
-            We want your data to be as accurate as possible.  \n
-            Please only refresh if you have climbed and logged additional routes.  \n
-            Data collection isn't free for the creator of this app. 🙏
-        """)
-
-        col1, col2 = st.columns([1,2])
-        with col1:
-            with st.empty():
-                if st.button("Refresh Data"):
-                    st.info("Initiating data update...")
-                    if trigger_user_scrape(user_id):
-                        st.session_state.waiting_for_update = True
-                        st.session_state.initial_delay = True
-                        st.session_state.start_time = datetime.now()
-                        st.rerun()
-        with col2:
-            if st.button("Continue with existing data"):
-                st.session_state.data_status = 'ready'
-                return True
-        
-        if st.session_state.get('data_status') != 'ready':
-            st.stop()
-    else:
-        with st.empty():
-            st.warning("Your data has not been collected yet.")
-        if trigger_user_scrape(user_id):
-            st.session_state.waiting_for_update = True
-            st.session_state.initial_delay = True
-            st.session_state.start_time = datetime.now()
-            st.rerun()
-        return False
 
 def page_total_length(user_id):
     """First page showing total length climbed"""
@@ -283,67 +135,6 @@ def page_most_climbed(user_id):
         detail_text = f"starting on {formatted_date}{suffix}<br><br>{formatted_notes}"
         
         st.markdown(diamond_template(main_text, subtitle, detail_text), unsafe_allow_html=True)
-
-def get_spotify_style():
-    return """
-        <style>
-        .stApp {
-            background-color: black !important;
-        }
-        
-        .content-container {
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 2rem;
-        }
-        
-        .spotify-header {
-            color: #1ed760;
-            font-size: 1.5rem;
-            margin-bottom: 0.5rem;
-            text-align: center;
-        }
-        
-        .list-item {
-            margin: 0.25rem 0;
-            text-align: left;
-            padding-left: 40%;
-        }
-        
-        .item-number {
-            color: #1ed760;
-            font-size: 1.2rem;
-        }
-        
-        .item-name {
-            color: white;
-            font-size: 1.2rem;
-        }
-        
-        .item-details {
-            color: #b3b3b3;
-            font-size: 0.9rem;
-            margin-top: -0.2rem;
-        }
-        
-        .total-section {
-            margin-top: 2rem;
-            text-align: center;
-        }
-        
-        .total-label {
-            color: #1ed760;
-            font-size: 1.2rem;
-            margin-bottom: 0.5rem;
-        }
-        
-        .total-value {
-            font-size: 2.5rem;
-            font-weight: bold;
-            color: white;
-        }
-        </style>
-    """
 
 def page_top_routes(user_id):
     """Page showing top rated routes and tags"""
@@ -644,7 +435,7 @@ def page_grade_distribution(user_id):
 
 def main():
     
-    user_id = get_user_id()
+    user_id = get_user_id(conn)
     if not user_id:
         return
 
