@@ -1,3 +1,30 @@
+import time
+import psycopg2
+from functools import wraps
+
+def with_retry(max_retries=3, delay=1):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            last_exception = None
+            for attempt in range(max_retries):
+                try:
+                    return func(*args, **kwargs)
+                except psycopg2.OperationalError as e:
+                    last_exception = e
+                    if "SSL connection has been closed" in str(e) and attempt < max_retries - 1:
+                        print(f"Database connection failed on attempt {attempt + 1}, retrying in {delay} seconds...")
+                        time.sleep(delay)
+                        continue
+                    raise
+                except Exception as e:
+                    # Don't retry other types of exceptions
+                    raise
+            raise last_exception
+        return wrapper
+    return decorator
+
+@with_retry()
 def check_routes_exists(cursor, route_ids):
     """Check if routes exist in database"""
     route_id_list = [int(id) for id in route_ids]
@@ -8,6 +35,7 @@ def check_routes_exists(cursor, route_ids):
     print(f"Found existing routes: {results}")
     return results
 
+@with_retry()
 def insert_comments_batch(cursor, comments):  
     try:
         args_str = ','.join(
@@ -32,6 +60,7 @@ cursor.mogrify(
         print(f"Error inserting comments batch: {str(e)}")
         raise
 
+@with_retry()
 def insert_ticks_batch(cursor, tick_data):
 
     for tick in tick_data:
@@ -59,6 +88,7 @@ def insert_ticks_batch(cursor, tick_data):
         print(f"Error inserting tick batch: {str(e)}")
         raise
 
+@with_retry()
 def insert_routes_batch(cursor, routes_data):
     try:
         args_str = ','.join(
