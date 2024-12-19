@@ -316,44 +316,68 @@ def top_climbing_style(conn, user_id=None):
     """
     return conn.query(query).iloc[0,0]
 
-def biggest_climbing_day(conn, user_id=None):
-    query = f"""
-        {estimated_lengths_cte}
-        SELECT  t.date,
-                STRING_AGG(
-                    concat(r.route_name, ' ~ ', 
-                          TRIM(SUBSTRING(r.specific_location FROM POSITION('>' IN r.specific_location) + 1)), 
-                          ' - ', 
-                          TRIM(NULLIF(CONCAT_WS(' ', r.yds_rating, r.hueco_rating, r.aid_rating, r.danger_rating, r.commitment_grade), '')), 
-                          ' - ',
-                          CAST(coalesce(r.length_ft,el.estimated_length) AS INT),' ft'
-                    ), ' | '
-                ) routes,
-                CAST(ROUND(SUM(COALESCE(r.length_ft, el.estimated_length)),0) AS INTEGER) total_length,
-                STRING_AGG(DISTINCT CONCAT(r.main_area, ', ', r.region), ' & ') areas
-        FROM routes.Ticks t 
-        JOIN routes.Routes r on r.id = t.route_id 
-        LEFT JOIN estimated_lengths el on el.id = t.route_id 
-        WHERE EXTRACT(YEAR FROM t.date) = 2024
-        {add_user_filter(user_id)}
-        GROUP BY t.date
-        ORDER BY total_length desc
-    LIMIT 1;
-    """
+def page_biggest_day(user_id):
+    """Biggest climbing day page"""
+    try:
+        biggest_day = metrics.biggest_climbing_day(conn, user_id=user_id)
+        
+        if not biggest_day:
+            st.error("No climbing data found for 2024")
+            return
+            
+        date = biggest_day[0]
+        routes = biggest_day[1]
+        total_length = int(biggest_day[2])
+        areas = biggest_day[3].rstrip(" & ")
+        route_urls = biggest_day[4].split(" | ")
+        photo_urls = biggest_day[5].split(" | ")
 
-    result = conn.query(query)
-    
-    if result.empty:
-        return None
-    
-    row = result.iloc[0]
-    
-    return (
-        row['date'],
-        row['routes'],
-        row['total_length'],
-        row['areas']
-    )
+        formatted_date = date.strftime('%b %d')
+        day = date.day
+        if day in [1, 21, 31]:
+            suffix = 'st'
+        elif day in [2, 22]:
+            suffix = 'nd'
+        elif day in [3, 23]:
+            suffix = 'rd'
+        else:
+            suffix = 'th'
+        
+        # Build route details HTML
+        route_list = routes.split(" | ")
+        route_details = []
+        for route, url, photo in zip(route_list, route_urls, photo_urls):
+            route_parts = route.split(" ~ ")
+            route_name = route_parts[0]
+            route_details_text = route_parts[1] if len(route_parts) > 1 else ""
+            
+            route_details.append(f"""
+                <div style="display: flex; justify-content: space-between; align-items: center; margin: 0.5rem 0;">
+                    <div style="flex-grow: 1;">
+                        <a href="{url}" target="_blank" style="color: white; text-decoration: none; font-size: 0.9rem;">{route_name}</a><br>
+                        <span style="color: #888; font-size: 0.8rem;">{route_details_text}</span>
+                    </div>
+                    <img src="{photo}" style="width: 50px; height: 50px; object-fit: cover; margin-left: 1rem;">
+                </div>
+            """)
+        
+        route_details_html = "\n".join(route_details)
+        
+        main_text = f"Your biggest climbing day<br>was {formatted_date}{suffix} with<br>{total_length:,d} feet of GNAR GNAR"
+        st.markdown(
+            wrapped_template(
+                main_text=main_text,
+                subtitle=f"You Climbed these rigs in {areas}",
+                detail_text=route_details_html,
+                main_font_size="2.5rem",
+                subtitle_font_size="1.5rem",
+                route_font_size="0.9rem"
+            ),
+            unsafe_allow_html=True
+        )
+        
+    except Exception as e:
+        st.error(f"Error: {str(e)}")
 
 def top_grade(conn, level, user_id=None):
     query = f"""

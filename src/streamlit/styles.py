@@ -269,15 +269,14 @@ def get_routes_styles():
         STYLES['misc']
     ]) + "\n</style>"
 
-def wrapped_template(main_text, subtitle=None, detail_text=None):
-    """Standardized template for Wrapped pages"""
+def wrapped_template(main_text, subtitle=None, detail_text=None, main_font_size="4rem", subtitle_font_size="2rem", route_font_size="0.9rem"):
     return f"""
         <div class="wrapped-container">
             <div class="top-pattern"></div>
             <div class="bottom-pattern"></div>
-            <div class="big-text">{main_text}</div>
-            {f'<div class="subtitle-text">{subtitle}</div>' if subtitle else ''}
-            {f'<div class="route-list">{detail_text}</div>' if detail_text else ''}
+            <div class="big-text" style="font-size: {main_font_size};">{main_text}</div>
+            {f'<div class="subtitle-text" style="font-size: {subtitle_font_size};">{subtitle}</div>' if subtitle else ''}
+            {f'<div class="route-container">{detail_text}</div>' if detail_text else ''}
         </div>
     """
 
