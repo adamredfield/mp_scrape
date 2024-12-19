@@ -249,8 +249,6 @@ def page_top_routes(user_id):
         user_id=user_id
     ).values.tolist()
 
-    print(f"Routes data structure: {top_rated_routes[:1]}")
-    
     # Create a centered layout with two columns
     left_col, right_col = st.columns(2)
     
@@ -532,6 +530,196 @@ def page_grade_distribution(user_id):
         
         st.plotly_chart(fig, use_container_width=True)
 
+def page_bigwall_routes(user_id):
+    """Page showing bigwall routes climbed"""
+    try:
+        df = metrics.get_bigwall_routes(conn, user_id=user_id)
+        
+        if df.empty:
+            st.error("No big wall routes found for 2024")
+            return
+            
+        # Apply Spotify styling
+        st.markdown(get_spotify_style(), unsafe_allow_html=True)
+        
+
+        # Create header and filter section
+        st.markdown("<h2 class='spotify-header'>Wall Rat Stats</h2>", unsafe_allow_html=True)
+        st.markdown("""
+            <style>
+            .route-container {
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            .stImage {
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            </style>
+        """, unsafe_allow_html=True)
+        
+        filter_col1, filter_col2, _ = st.columns([1, 1, 2])
+        with filter_col1:
+            available_grades = sorted([g for g in df['commitment_grade'].unique() if pd.notna(g)])
+            selected_grades = st.multiselect(
+                'Filter by Commitment Grade:',
+                options=available_grades,
+                key='commitment_grade_filter'
+            )
+            
+        with filter_col2:
+            min_length = 500
+            max_length = int(df['length'].max())
+            length_filter = st.slider(
+                'Minimum Route Length (ft):',
+                min_value=min_length,
+                max_value=max_length,
+                value=min_length,
+                step=100,
+                key='length_filter'
+            )
+
+        filtered_df = df
+        if selected_grades:
+            filtered_df = filtered_df[filtered_df['commitment_grade'].isin(selected_grades)]
+        filtered_df = filtered_df[filtered_df['length'] >= length_filter]
+        # Minimal spacing
+        st.markdown("<div style='height: 0.5rem;'></div>", unsafe_allow_html=True)
+
+        # Stats right after filters
+        stats_col1, stats_col2, spacer = st.columns([0.5, 1.5, 3])
+        with stats_col1:
+            st.markdown(
+                f"""
+                <div class='total-section' style='margin-left: -20px;'>  
+                    <div class='total-label'>Total Big Walls</div>
+                    <div class='total-value'>{len(filtered_df)}</div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+        with stats_col2:
+            st.markdown(
+                f"""
+                <div class='total-section' style='margin-left: -40px;'>
+                    <div class='total-label'>Total Length</div>
+                    <div class='total-value'>{filtered_df['length'].sum():,} ft</div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+        # Minimal spacing before routes list
+        st.markdown("<div style='height: 0.5rem;'></div>", unsafe_allow_html=True)
+        
+        # Display routes
+        for i, (_, route) in enumerate(filtered_df.iterrows(), 1):
+                    with st.container():
+                        # More compact columns - adjust the ratio as needed
+                        cols = st.columns([0.4, 3])
+                        
+                        # Photo column
+                        with cols[0]:
+                            if pd.notna(route.primary_photo_url):
+                                img = get_squared_image(route.primary_photo_url)
+                                if img:
+                                    st.image(img, output_format="JPEG")
+                        
+                        # Details column - moved closer to image
+                        with cols[1]:
+                            st.markdown(
+                                f"""
+                                <div class='list-item' style='margin-left: 65px; padding: 0; display: flex; flex-direction: column; justify-content: center; min-height: 60px; transform: translateY(45px);'>  
+                                    <div style='margin-bottom: 4px;'>
+                                        <span class='item-number' style='vertical-align: middle;'>{i}. </span>
+                                        <span class='item-name' style='vertical-align: middle;'>{route.route_name}</span>
+                                    </div>
+                                    <div class='item-details' style='margin: 0; line-height: 1.4;'>
+                                        {route.grade} {route.commitment_grade or ''} • {route.length:,} ft • {route.area}
+                                    </div>
+                                </div>
+                                """,
+                                unsafe_allow_html=True
+                            )
+                    
+        st.markdown("<div style='height: 2rem;'></div>", unsafe_allow_html=True)
+
+        # Create color gradients - multiple shades of Spotify green
+        def generate_color_gradient(n):
+            base_color = '#1ed760'  # Spotify green
+            # Create n different shades by adjusting lightness
+            colors = []
+            for i in range(n):
+                # Adjust the multiplier to control color difference
+                factor = 0.5 + (i * 0.5 / n)  # This will give variations from 50% to 100% brightness
+                hex_color = f'#{int(int(base_color[1:3], 16) * factor):02x}'
+                hex_color += f'{int(int(base_color[3:5], 16) * factor):02x}'
+                hex_color += f'{int(int(base_color[5:7], 16) * factor):02x}'
+                colors.append(hex_color)
+            return colors
+
+        # Create horizontal bar chart with stacked routes
+        fig = go.Figure()
+
+        # Group by area but keep individual routes
+        for area in filtered_df['main_area'].unique():
+            area_routes = filtered_df[filtered_df['main_area'] == area]
+            colors = generate_color_gradient(len(area_routes))
+            
+            for route, color in zip(area_routes.itertuples(), colors):
+                fig.add_trace(go.Bar(
+                    y=[area],                    # Area name
+                    x=[route.length],            # Route length
+                    orientation='h',
+                    name='',                     # No legend entries
+                    showlegend=False,
+                    marker_color=color,          # Different shade for each route
+                    hovertemplate=(
+                        "<b>%{customdata[0]}</b><br>" +
+                        "Grade: %{customdata[1]}<br>" +
+                        "Length: %{x:,} ft<br>" +
+                        "<extra></extra>"
+                    ),
+                    customdata=[[route.route_name, route.grade]]
+                ))
+
+        # Update layout with dark theme
+        fig.update_layout(
+            paper_bgcolor='black',
+            plot_bgcolor='black',
+            title={
+                'text': 'Big Wall Lengths by Area',
+                'y': 0.95,
+                'x': 0.5,
+                'xanchor': 'center',
+                'yanchor': 'top',
+                'font': {'color': 'white', 'size': 20}
+            },
+            xaxis_title="Total Length (Feet)",
+            margin=dict(l=20, r=20, t=50, b=20),
+            height=400,
+            xaxis=dict(
+                color='white',
+                gridcolor='#333333',
+                showgrid=True
+            ),
+            yaxis=dict(
+                color='white',
+                gridcolor='#333333',
+                showgrid=False,
+                categoryorder='total ascending'
+            ),
+            font=dict(
+                color='white'
+            ),
+            barmode='stack'
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
+            
+    except Exception as e:
+        st.error(f"Error: {str(e)}")
+
 def main():
     
     user_id = get_user_id(conn)
@@ -549,7 +737,8 @@ def main():
         3: lambda: page_most_climbed(user_id),
         4: lambda: page_top_routes(user_id),
         5: lambda: page_areas_breakdown(user_id),
-        6: lambda: page_grade_distribution(user_id)
+        6: lambda: page_grade_distribution(user_id),
+        7: lambda: page_bigwall_routes(user_id)
     }
 
     # Apply styles based on current page
