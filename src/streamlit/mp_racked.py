@@ -10,6 +10,10 @@ import streamlit as st
 import src.analysis.mp_racked_metrics as metrics
 import pandas as pd
 import plotly.graph_objects as go
+from PIL import Image
+import requests
+from io import BytesIO
+import base64
 
 # Page config
 st.set_page_config(
@@ -59,9 +63,11 @@ def page_biggest_day(user_id):
         routes = biggest_day[1]
         total_length = int(biggest_day[2])
         areas = biggest_day[3].rstrip(" & ")
+        route_urls = biggest_day[4].split(" | ")
+        photo_urls = biggest_day[5].split(" | ")
 
         formatted_date = date.strftime('%b %d')
-        day = date
+        day = date.day
         if day in [1, 21, 31]:
             suffix = 'st'
         elif day in [2, 22]:
@@ -71,22 +77,70 @@ def page_biggest_day(user_id):
         else:
             suffix = 'th'
         
-        # Format routes list
+        # Adjust sizes based on number of routes
         route_list = routes.split(" | ")
-        formatted_routes = "<br>".join(route_list)
+        num_routes = len(route_list)
+        
+        # Dynamic sizing
+        if num_routes <= 1:
+            img_size = "150px"
+            margin = "0.5rem"
+            font_size = "0.9rem"
+            detail_size = "0.8rem"
+        elif num_routes <= 3:
+            img_size = "100px"
+            margin = "0.35rem"
+            font_size = "0.85rem"
+            detail_size = "0.75rem"
+        elif num_routes <= 5:
+            img_size = "75px"
+            margin = "0.35rem"
+            font_size = "0.85rem"
+            detail_size = "0.75rem"
+        else:
+            img_size = "50px"
+            margin = "0.25rem"
+            font_size = "0.8rem"
+            detail_size = "0.7rem"
+        
+        formatted_routes = []
+        for route, url, photo in zip(route_list, route_urls, photo_urls):
+            route_parts = route.split(" ~ ")
+            route_name = route_parts[0]
+            route_details = route_parts[1] if len(route_parts) > 1 else ""
+            
+            formatted_routes.append(
+                f'<div style="display: flex; align-items: center; gap: 0.5rem; margin: {margin} 0;">'
+                f'<div style="flex: 1;">'
+                f'<a href="{url}" target="_blank" style="color: white; text-decoration: none; font-size: {font_size};">{route_name}</a>'
+                f'<div style="color: #888; font-size: {detail_size}; line-height: 1.2;">{route_details}</div>'
+                f'</div>'
+                f'<img src="{image_to_base64(get_squared_image(photo))}" style="width: {img_size}; height: {img_size}; object-fit: cover;"></div>'
+            )
+        
+        formatted_routes_html = "".join(formatted_routes)
         
         main_text = f"Your biggest climbing day<br>was {formatted_date}{suffix} with<br>{total_length:,d} feet of GNAR GNAR"
         st.markdown(
             wrapped_template(
                 main_text=main_text,
                 subtitle=f"You Climbed these rigs in {areas}",
-                detail_text=formatted_routes
+                detail_text=formatted_routes_html,
+                main_font_size="2.5rem",
+                subtitle_font_size="1.5rem",
+                route_font_size="0.9rem"
             ),
             unsafe_allow_html=True
         )
         
     except Exception as e:
         st.error(f"Error: {str(e)}")
+
+def image_to_base64(pil_image):
+    buffered = BytesIO()
+    pil_image.save(buffered, format="JPEG")
+    img_str = base64.b64encode(buffered.getvalue()).decode()
+    return f"data:image/jpeg;base64,{img_str}"
 
 def page_total_routes(user_id):
     """Second page showing total routes"""
@@ -135,6 +189,28 @@ def page_most_climbed(user_id):
         detail_text = f"starting on {formatted_date}{suffix}<br><br>{formatted_notes}"
         
         st.markdown(diamond_template(main_text, subtitle, detail_text), unsafe_allow_html=True)
+def get_squared_image(url):
+    try:
+        response = requests.get(url)
+        img = Image.open(BytesIO(response.content))
+        
+        # Get the largest dimension
+        max_dim = max(img.width, img.height)
+        
+        # Create a square black background of the largest dimension
+        square_img = Image.new('RGB', (max_dim, max_dim), (0, 0, 0))
+        
+        # Calculate position to paste (center)
+        paste_x = (max_dim - img.width) // 2
+        paste_y = (max_dim - img.height) // 2
+        
+        # Paste original onto square background
+        square_img.paste(img, (paste_x, paste_y))
+        return square_img
+        
+    except Exception as e:
+        print(f"Error loading image from {url}: {e}")
+        return None
 
 def page_top_routes(user_id):
     """Page showing top rated routes and tags"""
@@ -151,7 +227,7 @@ def page_top_routes(user_id):
     
     # Get tag data for filter options
     tag_data = metrics.top_tags(conn, tag_type, user_id=user_id)
-    tag_df = pd.DataFrame(tag_data, columns=['Type', 'Tag', 'Count']).head(5)
+    tag_df = pd.DataFrame(tag_data, columns=['Type', 'Tag', 'Count']).head(10)
     
     # Calculate max_count from the actual Count column
     max_count = tag_df['Count'].max() if not tag_df.empty else 1
@@ -163,7 +239,6 @@ def page_top_routes(user_id):
             key='style_filter'
         )
         
-    
     # Get filtered routes based on selected styles
     top_rated_routes = metrics.get_highest_rated_climbs(
         conn,
@@ -179,17 +254,25 @@ def page_top_routes(user_id):
     # Create a centered layout with two columns
     left_col, right_col = st.columns(2)
     
+    st.markdown("""
+        <style>
+        .route-container {
+            margin-bottom: 20px;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
     # Top Routes Column
     with left_col:
         st.markdown("<h2 class='spotify-header'>Your Top Routes</h2>", unsafe_allow_html=True)
-        for i, (route, grade, stars, route_id, tags, photo_url) in enumerate(top_rated_routes[:10], 1):
+        for i, (route, grade, stars, route_id, tags, photo_url, route_url) in enumerate(top_rated_routes[:10], 1):
             with st.container():
-                cols = st.columns([1, 4])
+                cols = st.columns([1, 10])
                 with cols[0]:
                     if photo_url:
+                        img = get_squared_image(photo_url)
                         st.image(
-                            photo_url,
-                            width=50,  # Fixed width for thumbnail
+                            img, # Fixed width for thumbnail
                             output_format="JPEG"  # Better for photos
                         )
             with cols[1]:
@@ -198,7 +281,11 @@ def page_top_routes(user_id):
                     <div class='list-item'>
                         <div>
                             <span class='item-number'>{i}. </span>
-                            <span class='item-name'>{route}</span>
+                            <span class='item-name'>
+                                <a href="{route_url}" target="_blank" style="color: inherit; text-decoration: none; border-bottom: 1px dotted #888;">
+                                    {route}
+                                </a>
+                            </span>
                         </div>
                         <div class='item-details'>⭐ {stars:.1f} stars &bull; {grade}</div>
                     </div>
@@ -208,7 +295,7 @@ def page_top_routes(user_id):
     
     # Top Tags Column
     with right_col:
-        st.markdown(f"<h2 class='spotify-header'>Top {tag_type.replace('_', ' ').title()}</h2>", unsafe_allow_html=True)
+        st.markdown(f"<h2 class='spotify-header'>Top {tag_type.replace('_', ' ').title()}s</h2>", unsafe_allow_html=True)
         
         counts = tag_df['Count'].fillna(0)
         max_count = counts.max() if len(counts) > 0 else 1
