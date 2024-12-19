@@ -184,25 +184,27 @@ def get_route_type_preferences(conn, user_id=None):
     '''
     return conn.query(query)
 
-def get_bigwall_routes(cursor, user_id=None):
+def get_bigwall_routes(conn, user_id=None):
     """Get all bigwall routes"""
-    query = '''
-    SELECT  
+    query = f'''
+    {estimated_lengths_cte}
+    SELECT  DISTINCT
         t.date,
-        STRING_AGG(concat(r.route_name, ' - ', TRIM(NULLIF(CONCAT_WS(' ', r.yds_rating, r.hueco_rating, r.aid_rating,r.danger_rating, r.commitment_grade), ''))), ' | ') routes,
-        CAST(round(sum(coalesce(r.length_ft, el.estimated_length)),0) AS INTEGER) total_length,
-        STRING_AGG(DISTINCT r.main_area || ' | ') areas
+        r.route_name,
+        TRIM(NULLIF(CONCAT_WS(' ', r.yds_rating, r.hueco_rating, r.aid_rating, r.danger_rating), '')) as grade,
+        r.commitment_grade,
+        CAST(COALESCE(r.length_ft, el.estimated_length) AS INTEGER) as length,
+        CONCAT(r.main_area, ', ', r.region) as area,
+        r.route_url,
+        r.primary_photo_url
     FROM routes.Ticks t 
     JOIN routes.Routes r on r.id = t.route_id 
     LEFT JOIN estimated_lengths el on el.id = t.route_id 
-    WHERE TO_CHAR(t.date, 'YYYY') ILIKE '2024'
-    {add_user_filter(user_id)}
-    GROUP BY t.date
-    ORDER BY total_length desc
-    LIMIT 1;
+    WHERE EXTRACT(YEAR FROM t.date) = 2024
+    AND (r.length_ft >= 1000 OR el.estimated_length >= 1000)
+    ORDER BY length DESC;
     '''
-    cursor.execute(query)
-    return cursor.fetchall()
+    return conn.query(query)
 
 def get_length_climbed(conn, area_type="main_area", year=None, user_id=None):
     query = f"""
@@ -248,12 +250,10 @@ def total_routes(conn, user_id=None):
 def most_climbed_route(conn, user_id=None):
     query = f"""
         {estimated_lengths_cte}
-        SELECT DISTINCT concat(r.route_name, ' ~ ' ,
-            r.specific_location,
-            ' - ', 
-            TRIM(NULLIF(CONCAT_WS(' ', r.yds_rating, r.hueco_rating, r.aid_rating,r.danger_rating, r.commitment_grade), '')), 
-            ' - ',
-            CAST(el.estimated_length AS INT),' ft') routes, 
+        SELECT DISTINCT     
+        (r.route_name || ' ~ ' || r.specific_location || ' - ' || 
+  		TRIM(NULLIF(CONCAT_WS(' ', r.yds_rating, r.hueco_rating, r.aid_rating, r.danger_rating, r.commitment_grade), '')) ||
+        ' - ' || CAST(COALESCE(r.length_ft, el.estimated_length) AS INTEGER)::text || ' ft') as routes,
         STRING_AGG(t.note, ' | ') notes,
         min(t.date) first_climbed,
         COUNT(*) times_climbed
@@ -263,7 +263,7 @@ def most_climbed_route(conn, user_id=None):
         WHERE EXTRACT(YEAR FROM t.date) = 2024
         {add_user_filter(user_id)}
         GROUP BY r.route_name, r.specific_location, r.yds_rating, r.hueco_rating, 
-                 r.aid_rating, r.danger_rating, r.commitment_grade, el.estimated_length
+                 r.aid_rating, r.danger_rating, r.commitment_grade, el.estimated_length, r.length_ft
         ORDER BY COUNT(*) DESC
         LIMIT 1
     """

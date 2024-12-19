@@ -532,6 +532,50 @@ def page_grade_distribution(user_id):
         
         st.plotly_chart(fig, use_container_width=True)
 
+def page_bigwall_routes(user_id):
+    """Page showing bigwall routes climbed"""
+    try:
+        bigwall_routes = metrics.get_bigwall_routes(conn, user_id=user_id)
+        
+        if not bigwall_routes:
+            st.error("No big wall routes found for 2024")
+            return
+            
+        total_routes = len(bigwall_routes)
+        total_length = sum(route['length'] for route in bigwall_routes)
+        
+        # Main text showing total routes and length
+        main_text = f"You climbed {total_routes}<br>big wall{'s' if total_routes != 1 else ''}<br>totaling {total_length:,} feet"
+        
+        # Format route details
+        formatted_routes = []
+        for route in bigwall_routes:
+            formatted_routes.append(
+                f'<div style="display: flex; align-items: center; gap: 1rem; margin: 0.5rem 0;">'
+                f'<div style="flex: 1;">'
+                f'<a href="{route["route_url"]}" target="_blank" style="color: white; text-decoration: none;">{route["route_name"]}</a><br>'
+                f'<span style="color: #888;">{route["grade"]} - {route["length"]} ft - {route["area"]}</span>'
+                f'</div>'
+                f'<img src="{route["primary_photo_url"]}" style="width: 50px; height: 50px; object-fit: cover;"></div>'
+            )
+        
+        formatted_routes_html = "".join(formatted_routes)
+        
+        st.markdown(
+            wrapped_template(
+                main_text=main_text,
+                subtitle="Your Big Wall Sends",
+                detail_text=formatted_routes_html,
+                main_font_size="2.5rem",
+                subtitle_font_size="1.5rem",
+                route_font_size="0.9rem"
+            ),
+            unsafe_allow_html=True
+        )
+        
+    except Exception as e:
+        st.error(f"Error: {str(e)}")
+
 def main():
     
     user_id = get_user_id(conn)
@@ -549,7 +593,8 @@ def main():
         3: lambda: page_most_climbed(user_id),
         4: lambda: page_top_routes(user_id),
         5: lambda: page_areas_breakdown(user_id),
-        6: lambda: page_grade_distribution(user_id)
+        6: lambda: page_grade_distribution(user_id),
+        7: lambda: page_bigwall_routes(user_id)
     }
 
     # Apply styles based on current page
