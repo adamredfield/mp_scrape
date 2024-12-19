@@ -195,13 +195,19 @@ def get_bigwall_routes(conn, user_id=None):
         r.commitment_grade,
         CAST(COALESCE(r.length_ft, el.estimated_length) AS INTEGER) as length,
         CONCAT(r.main_area, ', ', r.region) as area,
+        r.main_area,
         r.route_url,
         r.primary_photo_url
     FROM routes.Ticks t 
     JOIN routes.Routes r on r.id = t.route_id 
     LEFT JOIN estimated_lengths el on el.id = t.route_id 
     WHERE EXTRACT(YEAR FROM t.date) = 2024
-    AND (r.length_ft >= 1000 OR el.estimated_length >= 1000)
+    {add_user_filter(user_id)}
+    AND (
+        r.length_ft >= 1000 
+        OR el.estimated_length >= 1000 
+        OR r.commitment_grade IN ('IV', 'V', 'VI', 'VII')
+    )
     ORDER BY length DESC;
     '''
     return conn.query(query)
@@ -237,6 +243,8 @@ estimated_lengths_cte = f"""
                     THEN (SELECT avg(length_ft/ pitches) FROM routes.Routes r WHERE route_type ILIKE '%sport%' AND length_ft IS NOT NULL and pitches IS NOT NULL) * pitches
                     WHEN route_type ILIKE '%boulder%' AND length_ft IS NULL
                     THEN (SELECT avg(length_ft) FROM routes.Routes r WHERE route_type ILIKE '%boulder%' AND length_ft IS NOT NULL) -- boulder
+                    WHEN route_type ILIKE '%aid%' AND length_ft IS NULL AND pitches IS NOT NULL -- aid multipitch
+                    THEN (SELECT avg(length_ft/ pitches) FROM routes.Routes r WHERE route_type ILIKE '%aid%' AND length_ft IS NOT NULL and pitches IS NOT NULL) * pitches
                     ELSE (SELECT avg(length_ft) FROM routes.Routes r WHERE route_type ILIKE '%trad%'AND length_ft IS NOT NULL and pitches IS NULL AND length_ft < 230)
                 END AS estimated_length
         FROM routes.Routes
