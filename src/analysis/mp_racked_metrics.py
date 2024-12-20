@@ -7,6 +7,54 @@ sys.path.append(project_root)
 from src.analysis.ai_analysis_helper_functions import get_grade_group
 from operator import itemgetter
 
+estimated_lengths_cte = f"""
+        WITH estimated_lengths AS (
+        SELECT  id,
+                CASE WHEN route_type ILIKE '%trad%' AND length_ft IS NULL AND pitches IS NULL -- trad single-pitch
+                    THEN (SELECT avg(length_ft) FROM routes.Routes r WHERE route_type ILIKE '%trad%'AND length_ft IS NOT NULL and pitches IS NULL AND length_ft < 230) -- avg single-pitch trad pitch length
+                    WHEN route_type ILIKE '%trad%' AND length_ft IS NULL AND pitches IS NOT NULL -- trad multipitch
+                    THEN (SELECT avg(length_ft/ pitches) FROM routes.Routes r WHERE route_type ILIKE '%trad%' AND length_ft IS NOT NULL and pitches IS NOT NULL) * pitches
+                    WHEN route_type ILIKE '%sport%' AND length_ft IS NULL AND pitches IS NOT NULL -- sport single-pitch
+                    THEN (SELECT avg(length_ft) FROM routes.Routes r WHERE route_type ILIKE '%sport%'AND length_ft IS NOT NULL and pitches IS NULL AND length_ft < 230) -- avg single-pitch sport pitch length
+                    WHEN route_type ILIKE '%sport%' AND length_ft IS NULL AND pitches IS NOT NULL -- sport multipitch
+                    THEN (SELECT avg(length_ft/ pitches) FROM routes.Routes r WHERE route_type ILIKE '%sport%' AND length_ft IS NOT NULL and pitches IS NOT NULL) * pitches
+                    WHEN route_type ILIKE '%boulder%' AND length_ft IS NULL
+                    THEN (SELECT avg(length_ft) FROM routes.Routes r WHERE route_type ILIKE '%boulder%' AND length_ft IS NOT NULL) -- boulder
+                    WHEN route_type ILIKE '%aid%' AND length_ft IS NULL AND pitches IS NOT NULL -- aid multipitch
+                    THEN (SELECT avg(length_ft/ pitches) FROM routes.Routes r WHERE route_type ILIKE '%aid%' AND length_ft IS NOT NULL and pitches IS NOT NULL) * pitches
+                    ELSE (SELECT avg(length_ft) FROM routes.Routes r WHERE route_type ILIKE '%trad%'AND length_ft IS NOT NULL and pitches IS NULL AND length_ft < 230)
+                END AS estimated_length
+        FROM routes.Routes
+        )
+        """
+
+def get_deduped_ticks_cte(user_id=None, year='2024'):
+    """
+    Creates a CTE for deduped ticks with optional user and year filtering
+    
+    Args:
+        user_id: Optional user ID to filter by
+        year: Year to filter ticks by (default '2024')
+        table_alias: Alias for the ticks table (default 't')
+    
+    Returns:
+        str: SQL CTE for deduped ticks
+    """
+    deduped_ticks_cte = f"""
+        WITH deduped_ticks_base AS(
+                SELECT *,
+                ROW_NUMBER() OVER (PARTITION BY route_id ORDER BY date DESC) as rn
+                FROM routes.Ticks t
+                {year_filter(year)}
+                {add_user_filter(user_id) if user_id else ''}
+            ),
+        deduped_ticks AS (  
+            SELECT * FROM deduped_ticks_base
+            WHERE rn = 1
+        )
+    """
+    return deduped_ticks_cte
+
 def route_type_filter(route_types):
     if route_types:
         type_conditions = []
@@ -17,12 +65,20 @@ def route_type_filter(route_types):
         type_filter = ''
     return type_filter
 
-def year_filter(year=None):
-    """Generate SQL WHERE clause for year filtering
+def year_filter(year=None, use_where=True, table_alias='t'):
+    """Generate SQL clause for year filtering
     Args:
         year: Optional year to filter by. If None, no filter is applied
+        use_where: If True, starts with WHERE, otherwise starts with AND (default True)
+        table_alias: Table alias to use (default 't')
+    Returns:
+        str: SQL filter clause
     """
-    return f"AND EXTRACT(YEAR FROM t.date) = {year}" if year else ''
+    if not year:
+        return ''
+        
+    prefix = 'WHERE' if use_where else 'AND'
+    return f"{prefix} EXTRACT(YEAR FROM {table_alias}.date) = {year}"
 
 def add_user_filter(user_id, table_alias='t'):
     """
@@ -104,7 +160,7 @@ def get_grade_distribution(conn, route_types=None, level='base', year=None, user
                 OR (r2.route_type ILIKE '%Aid%')                                     -- Keep all ticks for aid
             )
             {route_type_filter(route_types)}
-            {year_filter(year)}
+            {year_filter(year, use_where=False)}
             {add_user_filter(user_id)}
         ), 2) as percentage
     FROM routes.Routes r
@@ -115,7 +171,7 @@ def get_grade_distribution(conn, route_types=None, level='base', year=None, user
         OR (r.route_type ILIKE '%Aid%')
     )
     {route_type_filter(route_types)}
-    {year_filter(year)}
+    {year_filter(year, use_where=False)}
     {add_user_filter(user_id)}
     GROUP BY grade
     ORDER BY COUNT(*) DESC;
@@ -160,11 +216,7 @@ def get_highest_rated_climbs(conn, selected_styles=None, route_types=None, year=
         style_filter = f"HAVING {' AND '.join(style_conditions)}"
 
     query = f"""
-    WITH deduped_ticks AS(
-    SELECT *,
-           ROW_NUMBER() OVER (PARTITION BY route_id ORDER BY date DESC) as rn
-    FROM routes.Ticks
-    )
+    {get_deduped_ticks_cte(user_id)}
     SELECT 
         DISTINCT concat(r.route_name, ' ~ ', r.main_area, ' > ', r.specific_location,' - ', 
         TRIM(NULLIF(CONCAT_WS(' ', r.yds_rating, r.hueco_rating, r.aid_rating,r.danger_rating, r.commitment_grade), ''))) routes,
@@ -182,10 +234,10 @@ def get_highest_rated_climbs(conn, selected_styles=None, route_types=None, year=
     FROM routes.Routes r
     LEFT JOIN analysis.TagAnalysisView tav on r.id = tav.route_id 
         AND tav.mapped_type = '{tag_type}'
-    JOIN deduped_ticks t ON r.id = t.route_id AND rn = 1
+    JOIN deduped_ticks t ON r.id = t.route_id
     WHERE r.num_votes >= 10
     {route_type_filter(route_types)}
-    {year_filter(year)}
+    {year_filter(year, use_where=False)}
     {add_user_filter(user_id)}
     GROUP BY r.route_name, r.main_area, r.specific_location, r.yds_rating, r.hueco_rating, 
              r.aid_rating, r.danger_rating, r.commitment_grade, r.avg_stars, r.num_votes,
@@ -253,33 +305,12 @@ def get_length_climbed(conn, area_type="main_area", year=None, user_id=None):
     JOIN routes.Ticks t ON r.id = t.route_id
     LEFT JOIN estimated_lengths el on el.id = r.id
     WHERE t.date IS NOT NULL AND EXTRACT(YEAR FROM t.date) >= 1999
-    {year_filter(year)}
+    {year_filter(year, use_where=False)}
     {add_user_filter(user_id)}
     GROUP BY year, r.{area_type}
     ORDER BY year DESC, length_climbed DESC;
     """
     return conn.query(query).itertuples(index=False)
-
-estimated_lengths_cte = f"""
-        WITH estimated_lengths AS (
-        SELECT  id,
-                CASE WHEN route_type ILIKE '%trad%' AND length_ft IS NULL AND pitches IS NULL -- trad single-pitch
-                    THEN (SELECT avg(length_ft) FROM routes.Routes r WHERE route_type ILIKE '%trad%'AND length_ft IS NOT NULL and pitches IS NULL AND length_ft < 230) -- avg single-pitch trad pitch length
-                    WHEN route_type ILIKE '%trad%' AND length_ft IS NULL AND pitches IS NOT NULL -- trad multipitch
-                    THEN (SELECT avg(length_ft/ pitches) FROM routes.Routes r WHERE route_type ILIKE '%trad%' AND length_ft IS NOT NULL and pitches IS NOT NULL) * pitches
-                    WHEN route_type ILIKE '%sport%' AND length_ft IS NULL AND pitches IS NOT NULL -- sport single-pitch
-                    THEN (SELECT avg(length_ft) FROM routes.Routes r WHERE route_type ILIKE '%sport%'AND length_ft IS NOT NULL and pitches IS NULL AND length_ft < 230) -- avg single-pitch sport pitch length
-                    WHEN route_type ILIKE '%sport%' AND length_ft IS NULL AND pitches IS NOT NULL -- sport multipitch
-                    THEN (SELECT avg(length_ft/ pitches) FROM routes.Routes r WHERE route_type ILIKE '%sport%' AND length_ft IS NOT NULL and pitches IS NOT NULL) * pitches
-                    WHEN route_type ILIKE '%boulder%' AND length_ft IS NULL
-                    THEN (SELECT avg(length_ft) FROM routes.Routes r WHERE route_type ILIKE '%boulder%' AND length_ft IS NOT NULL) -- boulder
-                    WHEN route_type ILIKE '%aid%' AND length_ft IS NULL AND pitches IS NOT NULL -- aid multipitch
-                    THEN (SELECT avg(length_ft/ pitches) FROM routes.Routes r WHERE route_type ILIKE '%aid%' AND length_ft IS NOT NULL and pitches IS NOT NULL) * pitches
-                    ELSE (SELECT avg(length_ft) FROM routes.Routes r WHERE route_type ILIKE '%trad%'AND length_ft IS NOT NULL and pitches IS NULL AND length_ft < 230)
-                END AS estimated_length
-        FROM routes.Routes
-        )
-        """
 
 def total_routes(conn, user_id=None):
     query = f"SELECT COUNT(DISTINCT route_id) FROM routes.Ticks t WHERE date::text ILIKE '%2024%' {add_user_filter(user_id)}"
@@ -485,16 +516,10 @@ def regions_sub_areas(conn, user_id=None):
 def top_tags(conn, tag_type, user_id=None):
     
     query = f"""
-        WITH deduped_ticks AS(
-            SELECT *,
-            ROW_NUMBER() OVER (PARTITION BY route_id ORDER BY date DESC) as rn
-            FROM routes.Ticks t
-            WHERE date::text ILIKE '%2024%'
-            {add_user_filter(user_id, 't')}
-        )
+        {get_deduped_ticks_cte(user_id)}
         SELECT tav.mapped_type, tav.mapped_tag tag_value, count(*) as count
         FROM analysis.TagAnalysisView tav 
-        JOIN deduped_ticks dt on dt.route_id = tav.route_id AND dt.rn = 1
+        JOIN deduped_ticks dt on dt.route_id = tav.route_id
         GROUP BY tav.mapped_type, tav.mapped_tag
         ORDER BY count DESC;
     """
@@ -515,9 +540,10 @@ def get_top_first_ascensionists(conn, user_id=None):
     Returns: List of (name, count) tuples
     """
     query = f"""
+    {get_deduped_ticks_cte(user_id)}
     SELECT fa_name, COUNT(*) as fa_count
     FROM analysis.fa
-    JOIN routes.ticks t on t.route_id = fa.route_id
+    JOIN deduped_ticks t on t.route_id = fa.route_id
     WHERE fa_type IN ('FA', 'FFA', 'FCA')
     {add_user_filter(user_id)}
     GROUP BY fa_name
@@ -533,11 +559,12 @@ def get_first_ascensionist_by_decade(conn, name, user_id=None):
     Returns: List of (decade, count) tuples
     """
     query = f"""
+    {get_deduped_ticks_cte(user_id)}
     SELECT 
         CONCAT(FLOOR(fa.year::int/10)*10, 's') as decade,
         COUNT(*) as fa_count
     FROM analysis.fa fa
-    JOIN routes.ticks t on t.route_id = fa.route_id
+    JOIN deduped_ticks t on t.route_id = fa.route_id
     WHERE fa_type IN ('FA', 'FFA', 'FCA')
     AND fa.year IS NOT null and length(fa.year::text) = 4
     {add_fa_name_filter(name)}
@@ -554,12 +581,13 @@ def get_first_ascensionist_areas(conn, name, user_id=None):
     Returns: List of (area_name, count) tuples
     """
     query = f"""
+    {get_deduped_ticks_cte(user_id)}
     SELECT 
         r.main_area as area_name,
         COUNT(*) as fa_count
     FROM analysis.fa fa
     JOIN routes.routes r ON fa.route_id = r.id
-    JOIN routes.ticks t on t.route_id = fa.route_id
+    JOIN deduped_ticks t on t.route_id = fa.route_id
     WHERE fa_type IN ('FA', 'FFA', 'FCA')
     {add_fa_name_filter(name)}
     {add_user_filter(user_id)}
@@ -576,12 +604,13 @@ def get_first_ascensionist_grades(conn, name, user_id=None):
     Returns: List of (grade, count) tuples
     """
     query = f"""
+    {get_deduped_ticks_cte(user_id)}
     SELECT 
         r.yds_rating,
         COUNT(*) as route_count
     FROM analysis.fa fa
     JOIN routes.routes r ON fa.route_id = r.id
-    JOIN routes.ticks t on t.route_id = fa.route_id
+    JOIN deduped_ticks t on t.route_id = fa.route_id
     WHERE fa_type IN ('FA', 'FFA', 'FCA')
     {add_fa_name_filter(name)}
     {add_user_filter(user_id)}
@@ -600,7 +629,8 @@ def get_collaborative_ascensionists(conn, name, user_id=None):
     if name == "All FAs":
         # Query for most frequent partnerships overall
         query = f"""
-        WITH partnerships AS (
+        {get_deduped_ticks_cte(user_id)},
+        partnerships AS (
             SELECT 
                 LEAST(a1.fa_name, a2.fa_name) as climber1,
                 GREATEST(a1.fa_name, a2.fa_name) as climber2,
@@ -609,7 +639,7 @@ def get_collaborative_ascensionists(conn, name, user_id=None):
             JOIN analysis.fa a2 ON a1.route_id = a2.route_id 
                 AND a1.fa_type = a2.fa_type
                 AND a1.fa_name != a2.fa_name
-            JOIN routes.ticks t on t.route_id = a1.route_id
+            JOIN deduped_ticks t on t.route_id = a1.route_id
             WHERE a1.fa_type IN ('FA', 'FFA', 'FCA')
             {add_user_filter(user_id)}
         )

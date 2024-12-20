@@ -738,48 +738,38 @@ def page_first_ascents(user_id):
     # Get data for selectors
     top_fas = metrics.get_top_first_ascensionists(conn, user_id=user_id)
     partnerships = metrics.get_collaborative_ascensionists(conn, "All FAs", user_id)
+    # View type selector
+    view_type = st.radio(
+        "View By:",
+        ["All First Ascents", "Individual First Ascensionist", "Partnership"],
+        horizontal=True,
+        key="fa_view_type"
+    )
 
-    filter_col1, filter_col2, _ = st.columns([1, 0.2, 2])   
-    with filter_col1:
-        # View type selector
-        view_type = st.radio(
-            "View By:",
-            ["All First Ascents", "Individual First Ascensionist", "Partnership"],
-            horizontal=True,
-            key="fa_view_type"
+    # Conditional selector based on view type
+    if view_type == "Individual First Ascensionist":
+        selected_value = st.selectbox(
+            "Select First Ascensionist:",
+            options=[fa[0] for fa in top_fas],
+            key="fa_individual"
         )
-
-        # Conditional selector based on view type
-        if view_type == "Individual First Ascensionist":
-            selected_value = st.selectbox(
-                "Select First Ascensionist:",
-                options=[fa[0] for fa in top_fas],
-                key="fa_individual"
-            )
-            if selected_value != st.session_state.selected_fa:
-                st.session_state.selected_fa = selected_value
-                st.rerun()
-
-        elif view_type == "Partnership":
-            partnership_options = [p[0] for p in partnerships]  # p[0] contains the "Name1 & Name2" string
-            selected_value = st.selectbox(
-                "Select Partnership:",
-                options=partnership_options,
-                key="fa_partnership"
-            )
-            if selected_value != st.session_state.selected_fa:
-                st.session_state.selected_fa = selected_value
-                st.rerun()
-
-        else:  # All First Ascents
-            st.session_state.selected_fa = "All FAs"
-    with filter_col2:
-        st.write("")
-        st.write("")
-        if st.button("↺", help="Reset to All First Ascents"):
-            st.session_state.fa_view_type = "All First Ascents"
-            st.session_state.selected_fa = "All FAs"
+        if selected_value != st.session_state.selected_fa:
+            st.session_state.selected_fa = selected_value
             st.rerun()
+
+    elif view_type == "Partnership":
+        partnership_options = [p[0] for p in partnerships]  # p[0] contains the "Name1 & Name2" string
+        selected_value = st.selectbox(
+            "Select Partnership:",
+            options=partnership_options,
+            key="fa_partnership"
+        )
+        if selected_value != st.session_state.selected_fa:
+            st.session_state.selected_fa = selected_value
+            st.rerun()
+
+    else:  # All First Ascents
+        st.session_state.selected_fa = "All FAs"
 
     # Get data based on selection
     current_selection = st.session_state.selected_fa or "All FAs"
@@ -796,73 +786,135 @@ def page_first_ascents(user_id):
     # Create layout
     col1, col2 = st.columns(2)
     
-    # Areas chart
-    with col1:
-        fig_areas = go.Figure(data=[
-            go.Bar(
-                y=[area[0] for area in areas],
-                x=[area[1] for area in areas],
-                orientation='h',
-                marker_color='#1ed760'
+ # Layout varies by view type
+    if view_type == "All First Ascents":
+        # Two column layout for All First Ascents
+        col1, col2 = st.columns(2)
+        
+        # Decades chart
+        with col1:
+            fig_decades = go.Figure(data=[
+                go.Bar(
+                    x=[decade[0] for decade in decades],
+                    y=[decade[1] for decade in decades],
+                    marker_color='#1ed760'
+                )
+            ])
+            
+            fig_decades.update_layout(
+                title="FAs by Decade",
+                paper_bgcolor='black',
+                plot_bgcolor='black',
+                font=dict(color='white'),
+                xaxis=dict(color='white'),
+                yaxis=dict(color='white', gridcolor='#333333'),
+                height=400
             )
-        ])
+            
+            st.plotly_chart(fig_decades, use_container_width=True)
         
-        fig_areas.update_layout(
-            title="Top Areas",
-            paper_bgcolor='black',
-            plot_bgcolor='black',
-            font=dict(color='white'),
-            xaxis=dict(color='white', gridcolor='#333333'),
-            yaxis=dict(color='white'),
-            height=400
-        )
-        
-        st.plotly_chart(fig_areas, use_container_width=True)
-    
-    # Decades chart
-    with col2:
-        fig_decades = go.Figure(data=[
-            go.Bar(
-                x=[decade[0] for decade in decades],
-                y=[decade[1] for decade in decades],
-                marker_color='#1ed760'
-            )
-        ])
-        
-        fig_decades.update_layout(
-            title="FAs by Decade",
-            paper_bgcolor='black',
-            plot_bgcolor='black',
-            font=dict(color='white'),
-            xaxis=dict(color='white'),
-            yaxis=dict(color='white', gridcolor='#333333'),
-            height=400
-        )
-        
-        st.plotly_chart(fig_decades, use_container_width=True)
-    
-    # Partners and Grades
-    # Partners and Grades
-    col3, col4 = st.columns(2)
-    
-    with col3:
-        # Show partners only for individual FA view
-        if view_type == "Individual First Ascensionist":
-            st.markdown("<h3 class='spotify-header'>Frequent Partners</h3>", unsafe_allow_html=True)
-            partners = metrics.get_collaborative_ascensionists(conn, current_selection, user_id)
-            for partner, count in partners:
+        # Most prolific First Ascensionists
+        with col2:
+            st.markdown("<h3 class='spotify-header'>Most Prolific First Ascensionists</h3>", unsafe_allow_html=True)
+            for fa, count in top_fas:
                 st.markdown(
                     f"""
                     <div class='list-item'>
-                        <span class='item-name'>{partner}</span>
+                        <span class='item-name'>{fa}</span>
                         <span class='item-details'>{count} routes</span>
                     </div>
                     """,
                     unsafe_allow_html=True
                 )
-        elif view_type == "Partnership":
-            st.markdown("<h3 class='spotify-header'>Partnership Details</h3>", unsafe_allow_html=True)
-            # Add any partnership-specific information here
+
+    else:
+        # Layout for Individual FA and Partnership views
+        col1, col2 = st.columns(2)
+        
+        # Decades chart
+        with col1:
+            fig_decades = go.Figure(data=[
+                go.Bar(
+                    x=[decade[0] for decade in decades],
+                    y=[decade[1] for decade in decades],
+                    marker_color='#1ed760'
+                )
+            ])
+            
+            fig_decades.update_layout(
+                title="FAs by Decade",
+                paper_bgcolor='black',
+                plot_bgcolor='black',
+                font=dict(color='white'),
+                xaxis=dict(color='white'),
+                yaxis=dict(color='white', gridcolor='#333333'),
+                height=400
+            )
+            
+            st.plotly_chart(fig_decades, use_container_width=True)
+        
+        # Top Areas
+        with col2:
+            fig_areas = go.Figure(data=[
+                go.Bar(
+                    y=[area[0] for area in areas],
+                    x=[area[1] for area in areas],
+                    orientation='h',
+                    marker_color='#1ed760'
+                )
+            ])
+            
+            fig_areas.update_layout(
+                title="Top Areas",
+                paper_bgcolor='black',
+                plot_bgcolor='black',
+                font=dict(color='white'),
+                xaxis=dict(color='white', gridcolor='#333333'),
+                yaxis=dict(color='white'),
+                height=400
+            )
+            
+            st.plotly_chart(fig_areas, use_container_width=True)
+        
+        # Grade Distribution and Partners (if Individual FA)
+        col3, col4 = st.columns(2)
+        
+        with col3:
+            fig_grades = go.Figure(data=[
+                go.Bar(
+                    x=[grade[0] for grade in grades],
+                    y=[grade[1] for grade in grades],
+                    marker_color='#1ed760'
+                )
+            ])
+            
+            fig_grades.update_layout(
+                title="Grade Distribution",
+                paper_bgcolor='black',
+                plot_bgcolor='black',
+                font=dict(color='white'),
+                xaxis=dict(color='white'),
+                yaxis=dict(color='white', gridcolor='#333333'),
+                height=400
+            )
+            
+            st.plotly_chart(fig_grades, use_container_width=True)
+        
+        # Show Frequent Partners only for Individual FA view
+        if view_type == "Individual First Ascensionist":
+            with col4:
+                st.markdown("<h3 class='spotify-header'>Frequent Partners</h3>", unsafe_allow_html=True)
+                partners = metrics.get_collaborative_ascensionists(conn, current_selection, user_id)
+                for partner, count in partners:
+                    st.markdown(
+                        f"""
+                        <div class='list-item'>
+                            <span class='item-name'>{partner}</span>
+                            <span class='item-details'>{count} routes</span>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
 
 def main():
     
