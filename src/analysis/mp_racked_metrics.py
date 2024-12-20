@@ -4,7 +4,7 @@ import sys
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(project_root)
 
-from src.analysis.ai_analysis_helper_functions import get_grade_group, parse_first_ascent_data
+from src.analysis.ai_analysis_helper_functions import get_grade_group
 from operator import itemgetter
 
 def route_type_filter(route_types):
@@ -33,6 +33,16 @@ def add_user_filter(user_id, table_alias='t'):
         table_alias: Alias of the Ticks table in the query (default 't')
     """
     return f"AND {table_alias}.user_id = '{user_id}'"
+
+def add_fa_name_filter(fa_name, table_alias='fa'):
+    """
+    Add user filtering to a query
+    Args:
+        query: SQL query string (can be empty)
+        user_id: User ID to filter by
+        table_alias: Alias of the Ticks table in the query (default 't')
+    """
+    return f"AND {table_alias}.fa_name = '{fa_name}'" if (fa_name and fa_name != "All FAs") else ""
 
 def get_tick_type_distribution(conn, route_types=None, user_id=None):
     """Get distribution of tick types (Lead, TR, etc.)"""
@@ -479,24 +489,138 @@ def top_tags(conn, tag_type, user_id=None):
 
     return filtered
 
-def process_first_ascents(conn, routes_df):
-    """Process and store first ascent information from routes"""
-    cursor = conn.cursor()
-    
-    # Create first_ascents table if it doesn't exist
-    cursor.execute(queries.CREATE_FIRST_ASCENTS_TABLE)
-    
-    for _, route in routes_df.iterrows():
-        if pd.notna(route['first_ascent']):
-            fas = parse_first_ascent_data(route['first_ascent'])
-            for fa in fas:
-                try:
-                    cursor.execute(
-                        queries.INSERT_FIRST_ASCENT,
-                        (route['id'], fa['name'], fa['type'], fa['year'])
-                    )
-                except Exception as e:
-                    print(f"Error processing FA for route {route['id']}: {e}")
-    
-    conn.commit()
-    cursor.close()
+def get_top_first_ascensionists(conn, user_id=None):
+    f"""
+    Get the most prolific first ascensionists
+    Returns: List of (name, count) tuples
+    """
+    query = f"""
+    SELECT fa_name, COUNT(*) as fa_count
+    FROM analysis.fa
+    JOIN routes.ticks t on t.route_id = fa.route_id
+    WHERE fa_type IN ('FA', 'FFA', 'FCA')
+    {add_user_filter(user_id)}
+    GROUP BY fa_name
+    ORDER BY fa_count desc
+    LIMIT 10
+    """
+    result = conn.query(query)
+    return result.values.tolist()
+
+def get_first_ascensionist_by_decade(conn, name, user_id=None):
+    """
+    Get a first ascensionist's activity by decade
+    Returns: List of (decade, count) tuples
+    """
+    query = f"""
+    SELECT 
+        CONCAT(FLOOR(fa.year::int/10)*10, 's') as decade,
+        COUNT(*) as fa_count
+    FROM analysis.fa fa
+    JOIN routes.ticks t on t.route_id = fa.route_id
+    WHERE fa_type IN ('FA', 'FFA', 'FCA')
+    AND fa.year IS NOT null and length(fa.year::text) = 4
+    {add_fa_name_filter(name)}
+    {add_user_filter(user_id)}
+    GROUP BY FLOOR(fa.year::int/10)*10
+    ORDER BY decade
+    """
+    result = conn.query(query)
+    return result.values.tolist()
+
+def get_first_ascensionist_areas(conn, name, user_id=None):
+    """
+    Get the areas where a first ascensionist was most active
+    Returns: List of (area_name, count) tuples
+    """
+    query = f"""
+    SELECT 
+        r.main_area as area_name,
+        COUNT(*) as fa_count
+    FROM analysis.fa fa
+    JOIN routes.routes r ON fa.route_id = r.id
+    JOIN routes.ticks t on t.route_id = fa.route_id
+    WHERE fa_type IN ('FA', 'FFA', 'FCA')
+    {add_fa_name_filter(name)}
+    {add_user_filter(user_id)}
+    GROUP BY r.main_area
+    ORDER BY fa_count DESC
+    LIMIT 10
+    """
+    result = conn.query(query)
+    return result.values.tolist()
+
+def get_first_ascensionist_grades(conn, name, user_id=None):
+    """
+    Get distribution of grades for a first ascensionist
+    Returns: List of (grade, count) tuples
+    """
+    query = f"""
+    SELECT 
+        r.yds_rating,
+        COUNT(*) as route_count
+    FROM analysis.fa fa
+    JOIN routes.routes r ON fa.route_id = r.id
+    JOIN routes.ticks t on t.route_id = fa.route_id
+    WHERE fa_type IN ('FA', 'FFA', 'FCA')
+    {add_fa_name_filter(name)}
+    {add_user_filter(user_id)}
+    AND r.yds_rating IS NOT NULL
+    GROUP BY r.yds_rating
+    ORDER BY count(*) desc
+    """
+    result = conn.query(query)
+    return result.values.tolist()
+
+def get_collaborative_ascensionists(conn, name, user_id=None):
+    """
+    Find climbers who frequently did first ascents with given climber
+    Returns: List of (partner_name, count) tuples
+    """
+    if name == "All FAs":
+        # Query for most frequent partnerships overall
+        query = f"""
+        WITH partnerships AS (
+            SELECT 
+                LEAST(a1.fa_name, a2.fa_name) as climber1,
+                GREATEST(a1.fa_name, a2.fa_name) as climber2,
+                a1.route_id
+            FROM analysis.fa a1
+            JOIN analysis.fa a2 ON a1.route_id = a2.route_id 
+                AND a1.fa_type = a2.fa_type
+                AND a1.fa_name != a2.fa_name
+            JOIN routes.ticks t on t.route_id = a1.route_id
+            WHERE a1.fa_type IN ('FA', 'FFA', 'FCA')
+            {add_user_filter(user_id)}
+        )
+        SELECT 
+            CONCAT(climber1, ' & ', climber2) as partnership,
+            COUNT(DISTINCT route_id) as partnership_count
+        FROM partnerships
+        GROUP BY climber1, climber2
+        ORDER BY partnership_count DESC
+        LIMIT 10;
+        """
+    else:
+        query = f"""
+        WITH same_routes AS (
+            SELECT DISTINCT a1.route_id, a2.fa_name as partner_name
+            FROM analysis.fa a1
+            JOIN analysis.fa a2 ON a1.route_id = a2.route_id 
+                AND a1.fa_type = a2.fa_type
+                AND a1.fa_name != a2.fa_name
+            JOIN routes.ticks t on t.route_id = a1.route_id
+            WHERE a1.fa_type IN ('FA', 'FFA', 'FCA')
+            {add_fa_name_filter(name,'a1')}
+            {add_user_filter(user_id)}
+        )
+        SELECT 
+            partner_name,
+            COUNT(*) as partnership_count
+        FROM same_routes
+        GROUP BY partner_name
+        ORDER BY partnership_count DESC
+        LIMIT 10;
+        """
+    result = conn.query(query)
+    return result.values.tolist()

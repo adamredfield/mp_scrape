@@ -1,4 +1,4 @@
-def get_top_first_ascensionists(cursor, limit=10, type='FA'):
+def get_top_first_ascensionists(cursor, user_id, limit=10, type='FA'):
     """
     Get the most prolific first ascensionists
     Returns: List of (name, count) tuples
@@ -14,7 +14,7 @@ def get_top_first_ascensionists(cursor, limit=10, type='FA'):
     cursor.execute(query, (type, limit))
     return cursor.fetchall()
 
-def get_first_ascensionist_by_decade(cursor, name, type='FA'):
+def get_first_ascensionist_by_decade(cursor, user_id,  name, type='FA'):
     """
     Get a first ascensionist's activity by decade
     Returns: List of (decade, count) tuples
@@ -30,7 +30,7 @@ def get_first_ascensionist_by_decade(cursor, name, type='FA'):
     GROUP BY FLOOR(year::int/10)*10
     ORDER BY decade
     """
-    cursor.execute(query, (name, type))
+    cursor.execute(query, (name, user_id,  type))
     return cursor.fetchall()
 
 def get_first_ascensionist_areas(cursor, name, limit=10):

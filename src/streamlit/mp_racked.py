@@ -14,7 +14,6 @@ from PIL import Image
 import requests
 from io import BytesIO
 import base64
-import psycopg2
 from src.database import queries
 
 # Page config
@@ -722,42 +721,132 @@ def page_bigwall_routes(user_id):
     except Exception as e:
         st.error(f"Error: {str(e)}")
 
-def first_ascensionist_analysis():
-    st.title("First Ascensionist Analysis")
+def page_first_ascents(user_id):
+    """Page showing first ascent analysis"""
     
-    # Get top first ascensionists
-    cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    cursor.execute(queries.GET_TOP_FIRST_ASCENSIONISTS, (50,))
-    top_fas = cursor.fetchall()
+    st.markdown(get_spotify_style(), unsafe_allow_html=True)
     
-    st.header("Top First Ascensionists")
+    # Header
+    st.markdown("<h2 class='spotify-header'>First Ascent Analysis</h2>", unsafe_allow_html=True)
     
-    # Create a DataFrame for display
-    fa_df = pd.DataFrame(top_fas, columns=['Name', 'Total Ascents', 'FAs', 'FFAs', 'Earliest', 'Latest'])
-    st.dataframe(fa_df)
+    # Get top FAs for the dropdown
+    top_fas = metrics.get_top_first_ascensionists(conn, user_id=user_id)
+    fa_names = ["All FAs"] + [fa[0] for fa in top_fas]
     
-    # Add climber search
-    st.header("Search First Ascensionist")
-    search_name = st.text_input("Enter climber name:")
-    if search_name:
-        cursor.execute(queries.GET_CLIMBER_FIRST_ASCENTS, (f"%{search_name}%",))
-        climber_fas = cursor.fetchall()
-        if climber_fas:
-            climber_df = pd.DataFrame(
-                climber_fas, 
-                columns=['Route', 'Climber', 'Type', 'Year', 'Grade', 'Location']
-            )
-            st.dataframe(climber_df)
+    # Filters
+    filter_col1, filter_col2, _ = st.columns([1, 1, 2])
+    with filter_col1:
+        selected_fa = st.selectbox(
+            "Select First Ascensionist:",
+            options=fa_names 
+        )
+
+    fa_filter = None if selected_fa == "Select All FAs" else selected_fa 
+    
+    if selected_fa:
+        # Get data for selected FA
+        decades = metrics.get_first_ascensionist_by_decade(conn, fa_filter, user_id)
+        areas = metrics.get_first_ascensionist_areas(conn, fa_filter, user_id)
+        grades = metrics.get_first_ascensionist_grades(conn, fa_filter, user_id)
+        partners = metrics.get_collaborative_ascensionists(conn, fa_filter, user_id)
+        
+        # Create layout
+        col1, col2 = st.columns(2)
+        
+        # Areas chart
+        with col1:
+            fig_areas = go.Figure(data=[
+                go.Bar(
+                    y=[area[0] for area in areas],
+                    x=[area[1] for area in areas],
+                    orientation='h',
+                    marker_color='#1ed760'
+                )
+            ])
             
-            # Show decade distribution
-            st.subheader("Ascents by Decade")
-            decades = climber_df['Year'].apply(lambda x: f"{x//10*10}s" if pd.notna(x) else "Unknown")
-            decade_counts = decades.value_counts()
-            st.bar_chart(decade_counts)
-        else:
-            st.write("No ascents found for this climber.")
-    
-    cursor.close()
+            fig_areas.update_layout(
+                title="Top Areas",
+                paper_bgcolor='black',
+                plot_bgcolor='black',
+                font=dict(color='white'),
+                xaxis=dict(color='white', gridcolor='#333333'),
+                yaxis=dict(color='white'),
+                height=400
+            )
+            
+            st.plotly_chart(fig_areas, use_container_width=True)
+        
+        # Decades chart
+        with col2:
+            fig_decades = go.Figure(data=[
+                go.Bar(
+                    x=[decade[0] for decade in decades],
+                    y=[decade[1] for decade in decades],
+                    marker_color='#1ed760'
+                )
+            ])
+            
+            fig_decades.update_layout(
+                title="FAs by Decade",
+                paper_bgcolor='black',
+                plot_bgcolor='black',
+                font=dict(color='white'),
+                xaxis=dict(color='white'),
+                yaxis=dict(color='white', gridcolor='#333333'),
+                height=400
+            )
+            
+            st.plotly_chart(fig_decades, use_container_width=True)
+        
+        # Partners and Grades
+        col3, col4 = st.columns(2)
+        
+        with col3:
+            if selected_fa == "All First Ascensionists":
+                st.markdown("<h3 class='spotify-header'>Frequent Partnerships</h3>", unsafe_allow_html=True)
+                for partnership, count in partners:
+                    st.markdown(
+                        f"""
+                        <div class='list-item'>
+                            <span class='item-name'>{partnership}</span>
+                            <span class='item-details'>{count} routes</span>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+            else:
+                st.markdown("<h3 class='spotify-header'>Frequent Partners</h3>", unsafe_allow_html=True)
+                for partner, count in partners:
+                    st.markdown(
+                        f"""
+                        <div class='list-item'>
+                            <span class='item-name'>{partner}</span>
+                            <span class='item-details'>{count} routes</span>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+        
+        with col4:
+            st.markdown("<h3 class='spotify-header'>Grade Distribution</h3>", unsafe_allow_html=True)
+            fig_grades = go.Figure(data=[
+                go.Bar(
+                    x=[grade[0] for grade in grades],
+                    y=[grade[1] for grade in grades],
+                    marker_color='#1ed760'
+                )
+            ])
+            
+            fig_grades.update_layout(
+                paper_bgcolor='black',
+                plot_bgcolor='black',
+                font=dict(color='white'),
+                xaxis=dict(color='white'),
+                yaxis=dict(color='white', gridcolor='#333333'),
+                height=300
+            )
+            
+            st.plotly_chart(fig_grades, use_container_width=True)
 
 def main():
     
@@ -778,7 +867,7 @@ def main():
         5: lambda: page_areas_breakdown(user_id),
         6: lambda: page_grade_distribution(user_id),
         7: lambda: page_bigwall_routes(user_id),
-        8: lambda: first_ascensionist_analysis()
+        8: lambda: page_first_ascents(user_id)
     }
 
     # Apply styles based on current page
