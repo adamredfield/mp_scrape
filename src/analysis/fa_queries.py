@@ -4,11 +4,11 @@ def get_top_first_ascensionists(cursor, limit=10, type='FA'):
     Returns: List of (name, count) tuples
     """
     query = """
-    SELECT name, COUNT(*) as fa_count
-    FROM route_first_ascents
-    WHERE type = %s
-    GROUP BY name
-    ORDER BY fa_count DESC
+    SELECT fa_name, COUNT(*) as fa_count
+    FROM analysis.fa
+    WHERE fa_type = %s
+    GROUP BY fa_name
+    ORDER BY fa_count desc
     LIMIT %s
     """
     cursor.execute(query, (type, limit))
@@ -23,10 +23,10 @@ def get_first_ascensionist_by_decade(cursor, name, type='FA'):
     SELECT 
         CONCAT(FLOOR(year::int/10)*10, 's') as decade,
         COUNT(*) as fa_count
-    FROM route_first_ascents
-    WHERE name = %s 
-    AND type = %s
-    AND year IS NOT NULL
+    FROM analysis.fa
+    WHERE fa_name = %s 
+    WHERE fa_type = %s
+    WHERE year IS NOT null and length(year::text) = 4
     GROUP BY FLOOR(year::int/10)*10
     ORDER BY decade
     """
@@ -40,13 +40,12 @@ def get_first_ascensionist_areas(cursor, name, limit=10):
     """
     query = """
     SELECT 
-        a.name as area_name,
+        r.main_area as area_name,
         COUNT(*) as fa_count
-    FROM route_first_ascents fa
-    JOIN routes r ON fa.route_id = r.id
-    JOIN areas a ON r.area_id = a.id
-    WHERE fa.name = %s
-    GROUP BY a.name
+    FROM analysis.fa fa
+    JOIN routes.routes r ON fa.route_id = r.id
+    WHERE fa.fa_name = 'Layton Kor'
+    GROUP BY r.main_area
     ORDER BY fa_count DESC
     LIMIT %s
     """
@@ -60,15 +59,15 @@ def get_first_ascensionist_grades(cursor, name, type='FA'):
     """
     query = """
     SELECT 
-        r.grade,
+        r.yds_rating,
         COUNT(*) as route_count
-    FROM route_first_ascents fa
-    JOIN routes r ON fa.route_id = r.id
-    WHERE fa.name = %s
-    AND fa.type = %s
-    AND r.grade IS NOT NULL
-    GROUP BY r.grade
-    ORDER BY r.grade
+    FROM analysis.fa fa
+    JOIN routes.routes r ON fa.route_id = r.id
+    WHERE fa.fa_name = %s
+    --AND fa.type = %s
+    AND r.yds_rating IS NOT NULL
+    GROUP BY r.yds_rating
+    ORDER BY count(*) desc
     """
     cursor.execute(query, (name, type))
     return cursor.fetchall()
@@ -80,13 +79,13 @@ def get_collaborative_ascensionists(cursor, name, limit=10):
     """
     query = """
     WITH same_routes AS (
-        SELECT DISTINCT a1.route_id, a2.name as partner_name
-        FROM route_first_ascents a1
-        JOIN route_first_ascents a2 
+        SELECT DISTINCT a1.route_id, a2.fa_name as partner_name
+        FROM analysis.fa a1
+        JOIN analysis.fa a2 
         ON a1.route_id = a2.route_id 
-        AND a1.type = a2.type
-        AND a1.name != a2.name
-        WHERE a1.name = %s
+        AND a1.fa_type = a2.fa_type
+        AND a1.fa_name != a2.fa_name
+        WHERE a1.fa_name = 'Royal Robbins'
     )
     SELECT 
         partner_name,
