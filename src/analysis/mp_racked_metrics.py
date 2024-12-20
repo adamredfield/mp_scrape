@@ -4,7 +4,7 @@ import sys
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(project_root)
 
-from src.analysis.ai_analysis_helper_functions import get_grade_group
+from src.analysis.ai_analysis_helper_functions import get_grade_group, parse_first_ascent_data
 from operator import itemgetter
 
 def route_type_filter(route_types):
@@ -478,3 +478,25 @@ def top_tags(conn, tag_type, user_id=None):
     })
 
     return filtered
+
+def process_first_ascents(conn, routes_df):
+    """Process and store first ascent information from routes"""
+    cursor = conn.cursor()
+    
+    # Create first_ascents table if it doesn't exist
+    cursor.execute(queries.CREATE_FIRST_ASCENTS_TABLE)
+    
+    for _, route in routes_df.iterrows():
+        if pd.notna(route['first_ascent']):
+            fas = parse_first_ascent_data(route['first_ascent'])
+            for fa in fas:
+                try:
+                    cursor.execute(
+                        queries.INSERT_FIRST_ASCENT,
+                        (route['id'], fa['name'], fa['type'], fa['year'])
+                    )
+                except Exception as e:
+                    print(f"Error processing FA for route {route['id']}: {e}")
+    
+    conn.commit()
+    cursor.close()

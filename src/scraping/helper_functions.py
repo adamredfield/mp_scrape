@@ -13,6 +13,7 @@ from src.database import queries
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 from playwright.sync_api import sync_playwright
+from src.analysis.fa_parsing import parse_fa_data
 
 mp_home_url = "https://www.mountainproject.com"
 
@@ -510,6 +511,7 @@ def process_page(page_number, ticks_url, user_id, retry_count=0):
 
                             route_data.append(current_route_data)
                             route_comments_data.extend(current_route_comments_data)
+                            parse_fa_data(current_route_data['fa'])
 
                             combined_grade = ' '.join(filter(None, [
                                 current_route_data.get('yds_rating') or '',

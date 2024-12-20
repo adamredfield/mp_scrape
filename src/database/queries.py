@@ -139,3 +139,37 @@ def insert_routes_batch(cursor, routes_data):
         print(f"Error inserting routes batch: {str(e)}")
         raise
 
+
+INSERT_FIRST_ASCENT = """
+INSERT INTO analysis.fa (route_id, fa_name, fa_type, year)
+VALUES (%s, %s, %s, %s);
+"""
+
+GET_CLIMBER_FIRST_ASCENTS = """
+SELECT 
+    r.name as route_name,
+    fa.fa_name,
+    fa.ascent_type,
+    fa.year,
+    r.grade,
+    r.location
+FROM analysis.first_ascents fa
+JOIN routes.Routes r ON fa.route_id = r.id
+WHERE fa.climber_name ILIKE %s
+ORDER BY fa.year;
+"""
+
+GET_TOP_FIRST_ASCENSIONISTS = """
+SELECT 
+    climber_name,
+    COUNT(*) as total_ascents,
+    COUNT(CASE WHEN ascent_type = 'FA' THEN 1 END) as fas,
+    COUNT(CASE WHEN ascent_type = 'FFA' THEN 1 END) as ffas,
+    MIN(year) as earliest_ascent,
+    MAX(year) as latest_ascent
+FROM first_ascents
+GROUP BY climber_name
+ORDER BY total_ascents DESC
+LIMIT %s;
+"""
+

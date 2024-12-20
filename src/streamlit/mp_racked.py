@@ -14,6 +14,8 @@ from PIL import Image
 import requests
 from io import BytesIO
 import base64
+import psycopg2
+from src.database import queries
 
 # Page config
 st.set_page_config(
@@ -720,6 +722,43 @@ def page_bigwall_routes(user_id):
     except Exception as e:
         st.error(f"Error: {str(e)}")
 
+def first_ascensionist_analysis():
+    st.title("First Ascensionist Analysis")
+    
+    # Get top first ascensionists
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    cursor.execute(queries.GET_TOP_FIRST_ASCENSIONISTS, (50,))
+    top_fas = cursor.fetchall()
+    
+    st.header("Top First Ascensionists")
+    
+    # Create a DataFrame for display
+    fa_df = pd.DataFrame(top_fas, columns=['Name', 'Total Ascents', 'FAs', 'FFAs', 'Earliest', 'Latest'])
+    st.dataframe(fa_df)
+    
+    # Add climber search
+    st.header("Search First Ascensionist")
+    search_name = st.text_input("Enter climber name:")
+    if search_name:
+        cursor.execute(queries.GET_CLIMBER_FIRST_ASCENTS, (f"%{search_name}%",))
+        climber_fas = cursor.fetchall()
+        if climber_fas:
+            climber_df = pd.DataFrame(
+                climber_fas, 
+                columns=['Route', 'Climber', 'Type', 'Year', 'Grade', 'Location']
+            )
+            st.dataframe(climber_df)
+            
+            # Show decade distribution
+            st.subheader("Ascents by Decade")
+            decades = climber_df['Year'].apply(lambda x: f"{x//10*10}s" if pd.notna(x) else "Unknown")
+            decade_counts = decades.value_counts()
+            st.bar_chart(decade_counts)
+        else:
+            st.write("No ascents found for this climber.")
+    
+    cursor.close()
+
 def main():
     
     user_id = get_user_id(conn)
@@ -738,7 +777,8 @@ def main():
         4: lambda: page_top_routes(user_id),
         5: lambda: page_areas_breakdown(user_id),
         6: lambda: page_grade_distribution(user_id),
-        7: lambda: page_bigwall_routes(user_id)
+        7: lambda: page_bigwall_routes(user_id),
+        8: lambda: first_ascensionist_analysis()
     }
 
     # Apply styles based on current page
