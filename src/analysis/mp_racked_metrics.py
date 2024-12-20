@@ -36,13 +36,33 @@ def add_user_filter(user_id, table_alias='t'):
 
 def add_fa_name_filter(fa_name, table_alias='fa'):
     """
-    Add user filtering to a query
+    Add first ascensionist filtering to a query
     Args:
-        query: SQL query string (can be empty)
-        user_id: User ID to filter by
-        table_alias: Alias of the Ticks table in the query (default 't')
+        fa_name: First ascensionist name or partnership to filter by
+        table_alias: Alias of the FA table in the query (default 'fa')
+    Returns:
+        SQL filter string
     """
-    return f"AND {table_alias}.fa_name = '{fa_name}'" if (fa_name and fa_name != "All FAs") else ""
+    if not fa_name or fa_name == "All FAs":
+        return ""
+    
+    if " & " in str(fa_name):
+        climber1, climber2 = fa_name.split(" & ")
+        # Escape single quotes in names
+        climber1 = climber1.replace("'", "''")
+        climber2 = climber2.replace("'", "''")
+        return f"""
+        AND {table_alias}.route_id IN (
+            SELECT a1.route_id
+            FROM analysis.fa a1
+            JOIN analysis.fa a2 ON a1.route_id = a2.route_id 
+            WHERE a1.fa_type = a2.fa_type
+            AND a1.fa_name = '{climber1}'
+            AND a2.fa_name = '{climber2}'
+        )
+        """
+    
+    return f"AND {table_alias}.fa_name = '{fa_name}'"
 
 def get_tick_type_distribution(conn, route_types=None, user_id=None):
     """Get distribution of tick types (Lead, TR, etc.)"""
