@@ -71,29 +71,3 @@ def get_first_ascensionist_grades(cursor, name, type='FA'):
     """
     cursor.execute(query, (name, type))
     return cursor.fetchall()
-
-def get_collaborative_ascensionists(cursor, name, limit=10):
-    """
-    Find climbers who frequently did first ascents with given climber
-    Returns: List of (partner_name, count) tuples
-    """
-    query = """
-    WITH same_routes AS (
-        SELECT DISTINCT a1.route_id, a2.fa_name as partner_name
-        FROM analysis.fa a1
-        JOIN analysis.fa a2 
-        ON a1.route_id = a2.route_id 
-        AND a1.fa_type = a2.fa_type
-        AND a1.fa_name != a2.fa_name
-        WHERE a1.fa_name = 'Royal Robbins'
-    )
-    SELECT 
-        partner_name,
-        COUNT(*) as partnership_count
-    FROM same_routes
-    GROUP BY partner_name
-    ORDER BY partnership_count DESC
-    LIMIT %s
-    """
-    cursor.execute(query, (name, limit))
-    return cursor.fetchall() 

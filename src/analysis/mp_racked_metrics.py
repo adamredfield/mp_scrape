@@ -90,7 +90,7 @@ def add_user_filter(user_id, table_alias='t'):
     """
     return f"AND {table_alias}.user_id = '{user_id}'"
 
-def add_fa_name_filter(fa_name, table_alias='fa'):
+def add_fa_name_filter(fa_name, use_where=False, table_alias='fa'):
     """
     Add first ascensionist filtering to a query
     Args:
@@ -101,6 +101,8 @@ def add_fa_name_filter(fa_name, table_alias='fa'):
     """
     if not fa_name or fa_name == "All FAs":
         return ""
+
+    prefix = 'WHERE' if use_where else 'AND'
     
     if " & " in str(fa_name):
         climber1, climber2 = fa_name.split(" & ")
@@ -108,7 +110,7 @@ def add_fa_name_filter(fa_name, table_alias='fa'):
         climber1 = climber1.replace("'", "''")
         climber2 = climber2.replace("'", "''")
         return f"""
-        AND {table_alias}.route_id IN (
+        {prefix} {table_alias}.route_id IN (
             SELECT a1.route_id
             FROM analysis.fa a1
             JOIN analysis.fa a2 ON a1.route_id = a2.route_id 
@@ -648,6 +650,7 @@ def get_collaborative_ascensionists(conn, name, user_id=None):
             COUNT(DISTINCT route_id) as partnership_count
         FROM partnerships
         GROUP BY climber1, climber2
+        HAVING COUNT(DISTINCT route_id) > 1
         ORDER BY partnership_count DESC
         LIMIT 10;
         """
@@ -669,8 +672,23 @@ def get_collaborative_ascensionists(conn, name, user_id=None):
             COUNT(*) as partnership_count
         FROM same_routes
         GROUP BY partner_name
+        HAVING COUNT(*) > 1
         ORDER BY partnership_count DESC
         LIMIT 10;
         """
     result = conn.query(query)
     return result.values.tolist()
+
+
+def get_fa_routes(conn, fa_name, user_id):
+    """Get all routes where person was FA."""
+    query = f"""
+    SELECT route_name, grade, area_name
+    FROM first_ascents
+    {add_fa_name_filter(fa_name, use_where=True)}
+    {add_user_filter(user_id)}
+    ORDER BY date DESC
+    """
+    cursor = conn.cursor()
+    cursor.execute(query, (fa_name, user_id))
+    return cursor.fetchall()

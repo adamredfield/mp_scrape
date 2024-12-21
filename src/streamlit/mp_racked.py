@@ -15,7 +15,7 @@ import requests
 from io import BytesIO
 import base64
 from src.database import queries
-
+from src.streamlit.chart_utils import create_bar_chart
 # Page config
 st.set_page_config(
     page_title="Your 2024 Climbing Racked",
@@ -722,57 +722,161 @@ def page_bigwall_routes(user_id):
         st.error(f"Error: {str(e)}")
 
 def page_first_ascents(user_id):
-    """Page showing first ascent analysis"""
-    
-    st.markdown(get_spotify_style(), unsafe_allow_html=True)
-    
-    # Header
-    st.markdown("<h2 class='spotify-header'>First Ascent Analysis</h2>", unsafe_allow_html=True)
-    
+
     # Initialize session states
     if 'fa_view_type' not in st.session_state:
-        st.session_state.fa_view_type = "All First Ascents"
+        st.session_state.fa_view_type = "All FAs"
     if 'selected_fa' not in st.session_state:
         st.session_state.selected_fa = None
 
     # Get data for selectors
     top_fas = metrics.get_top_first_ascensionists(conn, user_id=user_id)
     partnerships = metrics.get_collaborative_ascensionists(conn, "All FAs", user_id)
-    # View type selector
-    view_type = st.radio(
-        "View By:",
-        ["All First Ascents", "Individual First Ascensionist", "Partnership"],
-        horizontal=True,
-        key="fa_view_type"
-    )
 
-    # Conditional selector based on view type
-    if view_type == "Individual First Ascensionist":
-        selected_value = st.selectbox(
-            "Select First Ascensionist:",
-            options=[fa[0] for fa in top_fas],
-            key="fa_individual"
+    st.markdown("""
+        <style>
+            /* Base styles */
+            .block-container {
+                padding-top: 1rem;
+                padding-bottom: 0rem;
+                max-width: 100%;
+            }
+            
+            .stDataFrame {
+                margin-bottom: 5rem !important;  /* Extra space after dataframe */
+            }
+            
+            /* Mobile-friendly header */
+            .spotify-header {
+                font-size: 1.5rem;
+                text-align: center;
+                margin: 0;
+                padding: 0;
+                line-height: 1.2;
+            }
+            
+            /* Radio button container */
+            div.stRadio > div {
+                flex-direction: column;
+                gap: 0.2rem;
+                padding: 0;
+                margin: 0;
+                position: relative;  
+            }
+            
+            /* Selectbox positioning */
+            div.stSelectbox {
+                position: absolute !important;  
+                left: 130px !important;        
+                top: -93px !important;          
+                width: 225px !important;       
+            }
+            
+            /* Hide selectbox label */
+            div.stSelectbox label {
+                display: none;
+            }
+
+            /* Spacing between charts */
+            .element-container:has(.js-plotly-plot) {
+                margin-bottom: 1rem !important;  /* Increased space between charts */
+            }
+            
+            /* Remove margin from last chart */
+            .element-container:has(.js-plotly-plot):last-of-type {
+                margin-bottom: 0 !important;
+            }
+            
+            /* Adjust chart title spacing */
+            .js-plotly-plot .plotly .gtitle {
+                margin-top: 0.5rem !important;
+            }   
+            .list-item {
+                padding: 0.5rem 0;
+                display: flex;
+                justify-content: space-between; 
+                align-items: center;
+                max-width: 65%; 
+                margin: 0 auto; 
+                gap: 1rem; 
+            }
+            .item-name {
+                color: white;
+            }
+        
+            .item-details {
+                color: white;
+                          margin-right: 2rem;  /* Add right margin to move text left */
+            }
+            .list-item:hover {
+                opacity: 0.8;  /* Subtle hover effect */
+            }
+        
+        /* Style for the routes list */
+        .stExpander {
+            border: none !important;
+            background-color: transparent !important;
+        }
+        
+        .route-item {
+            padding: 0.2rem 1rem;
+            color: #888;
+                font-size: 0.9em;
+            }
+         </style>
+            
+    """, unsafe_allow_html=True)
+
+    # Header
+    st.markdown("<h2 class='spotify-header'>Your Top FAs</h2>", unsafe_allow_html=True)
+
+    # Create a container for controls
+    controls = st.container()
+
+    # Create columns with a very narrow middle column
+    left, middle, right = controls.columns([1, 0.1, 1])
+
+    # Radio buttons in left column
+    with left:
+        view_type = st.radio(
+            "",
+            ["All FAs", "Individual FA", "FA Team"],
+            horizontal=False,
+            key="view_type_radio",
+            label_visibility="collapsed"
         )
-        if selected_value != st.session_state.selected_fa:
-            st.session_state.selected_fa = selected_value
-            st.rerun()
 
-    elif view_type == "Partnership":
-        partnership_options = [p[0] for p in partnerships]  # p[0] contains the "Name1 & Name2" string
-        selected_value = st.selectbox(
-            "Select Partnership:",
-            options=partnership_options,
-            key="fa_partnership"
-        )
-        if selected_value != st.session_state.selected_fa:
-            st.session_state.selected_fa = selected_value
-            st.rerun()
+    # Empty middle column for spacing
+    with middle:
+        st.write("")
 
-    else:  # All First Ascents
-        st.session_state.selected_fa = "All FAs"
-
-    # Get data based on selection
-    current_selection = st.session_state.selected_fa or "All FAs"
+    # Selector in right column
+    with right:
+        if view_type == "Individual FA":
+            selected_value = st.selectbox(
+                "",
+                options=[fa[0] for fa in top_fas],
+                key="fa_individual",
+                label_visibility="collapsed"
+            )
+            if 'selected_fa' not in st.session_state or selected_value != st.session_state.selected_fa:
+                st.session_state.selected_fa = selected_value
+                st.rerun()
+        elif view_type == "FA Team":
+            selected_value = st.selectbox(
+                "",
+                options=[p[0] for p in partnerships],
+                key="fa_partnership",
+                label_visibility="collapsed"
+            )
+            if 'selected_fa' not in st.session_state or selected_value != st.session_state.selected_fa:
+                st.session_state.selected_fa = selected_value
+                st.rerun()
+        else:
+            st.session_state.selected_fa = "All FAs"
+   
+        # Get data based on selection
+        current_selection = st.session_state.selected_fa or "All FAs"
     
     # Fetch data for visualizations
     decades = metrics.get_first_ascensionist_by_decade(conn, current_selection, user_id)
@@ -780,141 +884,73 @@ def page_first_ascents(user_id):
     grades = metrics.get_first_ascensionist_grades(conn, current_selection, user_id)
 
     # Only get partners for individual FA view
-    if view_type == "Individual First Ascensionist":
+    if view_type == "Individual FA":
         partners = metrics.get_collaborative_ascensionists(conn, current_selection, user_id)
         
-    # Create layout
-    col1, col2 = st.columns(2)
-    
- # Layout varies by view type
-    if view_type == "All First Ascents":
-        # Two column layout for All First Ascents
-        col1, col2 = st.columns(2)
+    if view_type == "All FAs":
+        # Decades chart
+        create_bar_chart(
+            title="FAs by Decade", 
+            x_data=[decade[0] for decade in decades], 
+            y_data=[decade[1] for decade in decades],
+            orientation='v',
+        )
+
+        # Most prolific First Ascensionists
+        st.markdown("<h3 style='text-align: center;'>Most Prolific FAs</h3>", unsafe_allow_html=True)
+        for fa, count in top_fas:
+            st.markdown(
+                f"""
+                <div class='list-item'>
+                    <span class='item-name'>{fa}</span>
+                    <span class='item-details'>{count} routes</span>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+    else:
+        # Layout for Individual FA and Partnership views
         
         # Decades chart
-        with col1:
-            fig_decades = go.Figure(data=[
-                go.Bar(
-                    x=[decade[0] for decade in decades],
-                    y=[decade[1] for decade in decades],
-                    marker_color='#1ed760'
-                )
-            ])
-            
-            fig_decades.update_layout(
-                title="FAs by Decade",
-                paper_bgcolor='black',
-                plot_bgcolor='black',
-                font=dict(color='white'),
-                xaxis=dict(color='white'),
-                yaxis=dict(color='white', gridcolor='#333333'),
-                height=400
-            )
-            
-            st.plotly_chart(fig_decades, use_container_width=True)
+        create_bar_chart(
+            title="FAs by Decade", 
+            x_data=[decade[0] for decade in decades], 
+            y_data=[decade[1] for decade in decades],
+            orientation='v',
+        )
         
-        # Most prolific First Ascensionists
-        with col2:
-            st.markdown("<h3 class='spotify-header'>Most Prolific First Ascensionists</h3>", unsafe_allow_html=True)
-            for fa, count in top_fas:
+        # Top Areas
+        create_bar_chart(
+            title="Areas Developed by FA", 
+            x_data=[area[0] for area in areas], 
+            y_data=[area[1] for area in areas],
+            orientation='h',
+        )
+        
+        # Grade Distribution
+        create_bar_chart(
+            title="FAs by Grade", 
+            x_data=[grade[0] for grade in grades], 
+            y_data=[grade[1] for grade in grades],
+            orientation='v',
+        )
+        
+        # Show Frequent Partners only for Individual FA view
+        if view_type == "Individual FA":
+            st.markdown("<h3 style='text-align: center;'>Frequent Partners</h3>", unsafe_allow_html=True)
+            st.markdown("<div class='list-container'>", unsafe_allow_html=True)
+            partners = metrics.get_collaborative_ascensionists(conn, current_selection, user_id)
+            for partner, count in partners:
                 st.markdown(
                     f"""
                     <div class='list-item'>
-                        <span class='item-name'>{fa}</span>
+                        <span class='item-name'>{partner}</span>
                         <span class='item-details'>{count} routes</span>
                     </div>
                     """,
                     unsafe_allow_html=True
                 )
-
-    else:
-        # Layout for Individual FA and Partnership views
-        col1, col2 = st.columns(2)
-        
-        # Decades chart
-        with col1:
-            fig_decades = go.Figure(data=[
-                go.Bar(
-                    x=[decade[0] for decade in decades],
-                    y=[decade[1] for decade in decades],
-                    marker_color='#1ed760'
-                )
-            ])
-            
-            fig_decades.update_layout(
-                title="FAs by Decade",
-                paper_bgcolor='black',
-                plot_bgcolor='black',
-                font=dict(color='white'),
-                xaxis=dict(color='white'),
-                yaxis=dict(color='white', gridcolor='#333333'),
-                height=400
-            )
-            
-            st.plotly_chart(fig_decades, use_container_width=True)
-        
-        # Top Areas
-        with col2:
-            fig_areas = go.Figure(data=[
-                go.Bar(
-                    y=[area[0] for area in areas],
-                    x=[area[1] for area in areas],
-                    orientation='h',
-                    marker_color='#1ed760'
-                )
-            ])
-            
-            fig_areas.update_layout(
-                title="Top Areas",
-                paper_bgcolor='black',
-                plot_bgcolor='black',
-                font=dict(color='white'),
-                xaxis=dict(color='white', gridcolor='#333333'),
-                yaxis=dict(color='white'),
-                height=400
-            )
-            
-            st.plotly_chart(fig_areas, use_container_width=True)
-        
-        # Grade Distribution and Partners (if Individual FA)
-        col3, col4 = st.columns(2)
-        
-        with col3:
-            fig_grades = go.Figure(data=[
-                go.Bar(
-                    x=[grade[0] for grade in grades],
-                    y=[grade[1] for grade in grades],
-                    marker_color='#1ed760'
-                )
-            ])
-            
-            fig_grades.update_layout(
-                title="Grade Distribution",
-                paper_bgcolor='black',
-                plot_bgcolor='black',
-                font=dict(color='white'),
-                xaxis=dict(color='white'),
-                yaxis=dict(color='white', gridcolor='#333333'),
-                height=400
-            )
-            
-            st.plotly_chart(fig_grades, use_container_width=True)
-        
-        # Show Frequent Partners only for Individual FA view
-        if view_type == "Individual First Ascensionist":
-            with col4:
-                st.markdown("<h3 class='spotify-header'>Frequent Partners</h3>", unsafe_allow_html=True)
-                partners = metrics.get_collaborative_ascensionists(conn, current_selection, user_id)
-                for partner, count in partners:
-                    st.markdown(
-                        f"""
-                        <div class='list-item'>
-                            <span class='item-name'>{partner}</span>
-                            <span class='item-details'>{count} routes</span>
-                        </div>
-                        """,
-                        unsafe_allow_html=True
-                    )
+            st.markdown("</div>", unsafe_allow_html=True)
 
 def main():
     
@@ -970,3 +1006,4 @@ def main():
 
 if __name__ == "__main__":
     main() 
+
