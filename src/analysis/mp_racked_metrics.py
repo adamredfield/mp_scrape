@@ -34,19 +34,27 @@ def get_deduped_ticks_cte(user_id=None, year='2024'):
     
     Args:
         user_id: Optional user ID to filter by
-        year: Year to filter ticks by (default '2024')
-        table_alias: Alias for the ticks table (default 't')
-    
+        year: Optional year to filter ticks by
     Returns:
         str: SQL CTE for deduped ticks
     """
+
+    conditions = []
+    
+    if year:
+        conditions.append(f"EXTRACT(YEAR FROM t.date) = {year}")
+    
+    if user_id:
+        conditions.append(f"t.user_id = '{user_id}'")
+    
+    # Combine conditions with WHERE if any exist, otherwise omit WHERE
+    where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
     deduped_ticks_cte = f"""
         WITH deduped_ticks_base AS(
                 SELECT *,
                 ROW_NUMBER() OVER (PARTITION BY route_id ORDER BY date DESC) as rn
                 FROM routes.Ticks t
-                {year_filter(year)}
-                {add_user_filter(user_id) if user_id else ''}
+                {where_clause}
             ),
         deduped_ticks AS (  
             SELECT * FROM deduped_ticks_base
@@ -542,7 +550,7 @@ def get_top_first_ascensionists(conn, user_id=None):
     Returns: List of (name, count) tuples
     """
     query = f"""
-    {get_deduped_ticks_cte(user_id)}
+    {get_deduped_ticks_cte(user_id, year=None)}
     SELECT fa_name, COUNT(*) as fa_count
     FROM analysis.fa
     JOIN deduped_ticks t on t.route_id = fa.route_id
@@ -561,7 +569,7 @@ def get_first_ascensionist_by_decade(conn, name, user_id=None):
     Returns: List of (decade, count) tuples
     """
     query = f"""
-    {get_deduped_ticks_cte(user_id)}
+    {get_deduped_ticks_cte(user_id, year=None)}
     SELECT 
         CONCAT(FLOOR(fa.year::int/10)*10, 's') as decade,
         COUNT(*) as fa_count
@@ -583,7 +591,7 @@ def get_first_ascensionist_areas(conn, name, user_id=None):
     Returns: List of (area_name, count) tuples
     """
     query = f"""
-    {get_deduped_ticks_cte(user_id)}
+    {get_deduped_ticks_cte(user_id, year=None)}
     SELECT 
         r.main_area as area_name,
         COUNT(*) as fa_count
@@ -606,7 +614,7 @@ def get_first_ascensionist_grades(conn, name, user_id=None):
     Returns: List of (grade, count) tuples
     """
     query = f"""
-    {get_deduped_ticks_cte(user_id)}
+    {get_deduped_ticks_cte(user_id, year=None)}
     SELECT 
         r.yds_rating,
         COUNT(*) as route_count
@@ -631,7 +639,7 @@ def get_collaborative_ascensionists(conn, name, user_id=None):
     if name == "All FAs":
         # Query for most frequent partnerships overall
         query = f"""
-        {get_deduped_ticks_cte(user_id)},
+        {get_deduped_ticks_cte(user_id, year=None)},
         partnerships AS (
             SELECT 
                 LEAST(a1.fa_name, a2.fa_name) as climber1,
@@ -683,7 +691,7 @@ def get_collaborative_ascensionists(conn, name, user_id=None):
 def get_fa_routes(conn, fa_name, user_id):
     """Get all routes where person was FA."""
     query = f"""
-    {get_deduped_ticks_cte(user_id)}
+    {get_deduped_ticks_cte(user_id,year=None)}
     SELECT CONCAT_WS(' ~ ',
         r.route_name,
         CONCAT_WS(' > ',
@@ -704,5 +712,48 @@ def get_fa_routes(conn, fa_name, user_id):
     {add_user_filter(user_id, table_alias = 't')}
     ORDER BY r.avg_stars DESC
     """
+    print(query)
     result = conn.query(query)
     return result.values.tolist()
+
+
+def get_partnership_routes(conn, fa_name, partner_name, user_id):
+    """
+    Get routes where both climbers were FAs together.
+    
+    Args:
+        conn: Database connection
+        fa_name: Name of the primary FA
+        partner_name: Name of the partner FA
+        user_id: User ID for filtering
+    
+    Returns:
+        List of routes done together
+    """
+    query = f"""
+    {get_deduped_ticks_cte(user_id, year=None)}
+    SELECT
+        CONCAT_WS(' ~ ',
+            r.route_name,
+            CONCAT_WS(' > ',
+                r.main_area
+            ),
+            TRIM(NULLIF(CONCAT_WS(' ',
+                r.yds_rating,
+                r.hueco_rating,
+                r.aid_rating,
+                r.danger_rating,
+                r.commitment_grade
+            ), ''))
+        ) as route_display
+    FROM routes.routes r
+    JOIN analysis.fa fa1 ON r.id = fa1.route_id
+    JOIN analysis.fa fa2 ON r.id = fa2.route_id
+    JOIN deduped_ticks t on t.route_id = r.id
+    WHERE fa1.fa_name = '{fa_name.replace("'", "''")}'
+    AND fa2.fa_name = '{partner_name.replace("'", "''")}'
+    AND fa1.fa_type = fa2.fa_type
+    AND t.user_id = '{user_id}'
+    ORDER BY r.avg_stars DESC
+    """
+    return conn.query(query).values.tolist()

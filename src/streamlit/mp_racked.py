@@ -808,15 +808,28 @@ def page_first_ascents(user_id):
             .route-list {
                 display: none;
                 position: absolute;
-                left: 105%;
+                left: 105%;  /* Position to the right */
                 top: 0;
-                background-color: #1a1a1a;
-                border: 1px solid #333;
-                border-radius: 4px;
+                background-color: rgba(26, 26, 26, 0.98);  /* Slightly transparent */
+                backdrop-filter: blur(8px);  /* Blur effect behind */
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 8px;
                 padding: 1rem;
                 z-index: 1000;
-                width: 400%;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+                width: 400px;
+                max-height: 80vh;
+                overflow-y: auto;
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+            }
+                
+            /* Smooth appearance */
+            .list-item:hover .route-list {
+                display: block;
+                animation: fadeIn 0.2s ease-in-out;
+            }   
+            @keyframes fadeIn {
+                from { opacity: 0; transform: translateX(-10px); }
+                to { opacity: 1; transform: translateX(0); }
             }
             
             /* Show routes on hover */
@@ -824,11 +837,10 @@ def page_first_ascents(user_id):
                 display: block;
             }
             .route-item {
-                padding: 0.4rem 0;
-                color: #aaa;
+                padding: 0.5rem 0;
+                color: rgba(255, 255, 255, 0.9);
                 font-size: 0.95em;
-                white-space: normal;
-                line-height: 1.4;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);  
             }
             .item-name {
                 color: white;
@@ -841,7 +853,32 @@ def page_first_ascents(user_id):
             .list-item:hover {
                 opacity: 0.8;  /* Subtle hover effect */
             }
-        
+                        .streamlit-expander {
+            border: none !important;
+            box-shadow: none !important;
+            background-color: transparent !important;
+        }
+
+        .streamlit-expanderHeader {
+            border-bottom: none !important;
+            color: white !important;
+            font-size: 1em !important;
+            padding: 0.5rem 0 !important;
+        }
+
+        .streamlit-expanderContent {
+            border: none !important;
+            background-color: rgba(255, 255, 255, 0.05) !important;
+            border-radius: 4px !important;
+            margin-left: 1rem !important;
+        }
+
+        /* Style the route items */
+        .route-item {
+                padding: 0.4rem 0.8rem;
+                color: #aaa;
+                font-size: 0.95em;
+            }
 
             
     """, unsafe_allow_html=True)
@@ -918,23 +955,14 @@ def page_first_ascents(user_id):
         # Most prolific First Ascensionists
         st.markdown("<h3 style='text-align: center;'>Most Prolific FAs</h3>", unsafe_allow_html=True)
         st.markdown("<div class='list-container'>", unsafe_allow_html=True)
-        for fa, count in top_fas:
-            # Get routes for this FA
-            routes = metrics.get_fa_routes(conn, fa, user_id)
-            routes_html = "\n".join([f"<div class='route-item'>{route}</div>" for route in routes])
-            
-            st.markdown(
-                f"""
-                <div class='list-item'>
-                    <span class='item-name'>{fa}</span>
-                    <span class='item-details'>{count} routes</span>
-                    <div class='route-list'>
-                        {routes_html if routes_html else "No routes found"}
-                    </div>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
+        for fa, count in top_fas:          
+            with st.expander(f"{fa} - {count} routes"):
+                routes = metrics.get_fa_routes(conn, fa, user_id)
+                for route in routes:
+                    st.markdown(
+                        f"<div class='route-item'>{route[0]}</div>", 
+                        unsafe_allow_html=True
+                    )
         st.markdown("</div>", unsafe_allow_html=True)
     else:
         # Layout for Individual FA and Partnership views
@@ -969,21 +997,50 @@ def page_first_ascents(user_id):
             st.markdown("<div class='list-container'>", unsafe_allow_html=True)
             partners = metrics.get_collaborative_ascensionists(conn, current_selection, user_id)
             for partner, count in partners:
-                routes = metrics.get_fa_routes(conn, partner, user_id)  
-                routes_html = "\n".join([f"<div class='route-item'>{route}</div>" for route in routes])
-                st.markdown(
-                    f"""
-                    <div class='list-item'>
-                        <span class='item-name'>{partner}</span>
-                        <span class='item-details'>{count} routes</span>
-                        <div class='route-list'>
-                            {routes_html}
-                        </div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
+                with st.expander(f"{partner} - {count} routes"):
+                    routes = metrics.get_partnership_routes(conn, current_selection, partner, user_id)
+                    for route in routes:
+                        st.markdown(
+                            f"<div class='route-item'>{route[0]}</div>", 
+                            unsafe_allow_html=True
+                        )
             st.markdown("</div>", unsafe_allow_html=True)
+        
+        if view_type == "FA Team":
+            st.markdown("<h3 style='text-align: center;'>Routes Done Together</h3>", unsafe_allow_html=True)
+            
+            # Split the partnership into individual names
+            climber1, climber2 = current_selection.split(" & ")
+            
+            # Get routes for this partnership
+            partnership_routes = metrics.get_partnership_routes(conn, climber1.strip(), climber2.strip(), user_id)
+            
+            # Create a DataFrame for display
+            if partnership_routes:
+                df = pd.DataFrame(partnership_routes, columns=['Route'])
+                
+                # Style the table
+                st.markdown("""
+                    <style>
+                        .dataframe {
+                            font-size: 0.9em;
+                            margin: 0 auto;
+                            max-width: 800px;
+                        }
+                        .dataframe td {
+                            white-space: normal !important;
+                            padding: 0.5rem !important;
+                        }
+                    </style>
+                """, unsafe_allow_html=True)
+                
+                st.dataframe(
+                    df,
+                    hide_index=True,
+                    use_container_width=True
+                )
+            else:
+                st.info("No routes found for this partnership.")
 
 def main():
     
