@@ -687,8 +687,7 @@ def get_fa_routes(conn, fa_name, user_id):
     SELECT CONCAT_WS(' ~ ',
         r.route_name,
         CONCAT_WS(' > ',
-            r.main_area,
-            r.specific_location
+            r.main_area
         ),
         TRIM(NULLIF(CONCAT_WS(' ',
             r.yds_rating,

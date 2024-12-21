@@ -808,15 +808,15 @@ def page_first_ascents(user_id):
             .route-list {
                 display: none;
                 position: absolute;
-                left: 0;
-                top: 100%;
+                left: 105%;
+                top: 0;
                 background-color: #1a1a1a;
                 border: 1px solid #333;
                 border-radius: 4px;
                 padding: 1rem;
                 z-index: 1000;
-                width: 100%;
-                box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+                width: 400%;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.5);
             }
             
             /* Show routes on hover */
@@ -824,12 +824,11 @@ def page_first_ascents(user_id):
                 display: block;
             }
             .route-item {
-                padding: 0.2rem 0;
-                color: #888;
-                font-size: 0.9em;
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
+                padding: 0.4rem 0;
+                color: #aaa;
+                font-size: 0.95em;
+                white-space: normal;
+                line-height: 1.4;
             }
             .item-name {
                 color: white;
