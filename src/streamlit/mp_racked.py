@@ -791,6 +791,7 @@ def page_first_ascents(user_id):
             .js-plotly-plot .plotly .gtitle {
                 margin-top: 0.5rem !important;
             }   
+            /* List item styles */
             .list-item {
                 padding: 0.5rem 0;
                 display: flex;
@@ -799,6 +800,36 @@ def page_first_ascents(user_id):
                 max-width: 65%; 
                 margin: 0 auto; 
                 gap: 1rem; 
+                position: relative;
+                cursor: pointer;
+            }
+            
+            /* Route list styles */
+            .route-list {
+                display: none;
+                position: absolute;
+                left: 0;
+                top: 100%;
+                background-color: #1a1a1a;
+                border: 1px solid #333;
+                border-radius: 4px;
+                padding: 1rem;
+                z-index: 1000;
+                width: 100%;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+            }
+            
+            /* Show routes on hover */
+            .list-item:hover .route-list {
+                display: block;
+            }
+            .route-item {
+                padding: 0.2rem 0;
+                color: #888;
+                font-size: 0.9em;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
             }
             .item-name {
                 color: white;
@@ -812,18 +843,7 @@ def page_first_ascents(user_id):
                 opacity: 0.8;  /* Subtle hover effect */
             }
         
-        /* Style for the routes list */
-        .stExpander {
-            border: none !important;
-            background-color: transparent !important;
-        }
-        
-        .route-item {
-            padding: 0.2rem 1rem;
-            color: #888;
-                font-size: 0.9em;
-            }
-         </style>
+
             
     """, unsafe_allow_html=True)
 
@@ -898,16 +918,25 @@ def page_first_ascents(user_id):
 
         # Most prolific First Ascensionists
         st.markdown("<h3 style='text-align: center;'>Most Prolific FAs</h3>", unsafe_allow_html=True)
+        st.markdown("<div class='list-container'>", unsafe_allow_html=True)
         for fa, count in top_fas:
+            # Get routes for this FA
+            routes = metrics.get_fa_routes(conn, fa, user_id)
+            routes_html = "\n".join([f"<div class='route-item'>{route}</div>" for route in routes])
+            
             st.markdown(
                 f"""
                 <div class='list-item'>
                     <span class='item-name'>{fa}</span>
                     <span class='item-details'>{count} routes</span>
+                    <div class='route-list'>
+                        {routes_html if routes_html else "No routes found"}
+                    </div>
                 </div>
                 """,
                 unsafe_allow_html=True
             )
+        st.markdown("</div>", unsafe_allow_html=True)
     else:
         # Layout for Individual FA and Partnership views
         
@@ -941,11 +970,16 @@ def page_first_ascents(user_id):
             st.markdown("<div class='list-container'>", unsafe_allow_html=True)
             partners = metrics.get_collaborative_ascensionists(conn, current_selection, user_id)
             for partner, count in partners:
+                routes = metrics.get_fa_routes(conn, partner, user_id)  
+                routes_html = "\n".join([f"<div class='route-item'>{route}</div>" for route in routes])
                 st.markdown(
                     f"""
                     <div class='list-item'>
                         <span class='item-name'>{partner}</span>
                         <span class='item-details'>{count} routes</span>
+                        <div class='route-list'>
+                            {routes_html}
+                        </div>
                     </div>
                     """,
                     unsafe_allow_html=True

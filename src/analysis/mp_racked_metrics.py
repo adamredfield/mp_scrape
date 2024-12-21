@@ -119,8 +119,8 @@ def add_fa_name_filter(fa_name, use_where=False, table_alias='fa'):
             AND a2.fa_name = '{climber2}'
         )
         """
-    
-    return f"AND {table_alias}.fa_name = '{fa_name}'"
+    fa_name = fa_name.replace("'", "''")
+    return f"{prefix} {table_alias}.fa_name = '{fa_name}'"
 
 def get_tick_type_distribution(conn, route_types=None, user_id=None):
     """Get distribution of tick types (Lead, TR, etc.)"""
@@ -569,7 +569,7 @@ def get_first_ascensionist_by_decade(conn, name, user_id=None):
     JOIN deduped_ticks t on t.route_id = fa.route_id
     WHERE fa_type IN ('FA', 'FFA', 'FCA')
     AND fa.year IS NOT null and length(fa.year::text) = 4
-    {add_fa_name_filter(name)}
+    {add_fa_name_filter(name, use_where=False)}
     {add_user_filter(user_id)}
     GROUP BY FLOOR(fa.year::int/10)*10
     ORDER BY decade
@@ -591,7 +591,7 @@ def get_first_ascensionist_areas(conn, name, user_id=None):
     JOIN routes.routes r ON fa.route_id = r.id
     JOIN deduped_ticks t on t.route_id = fa.route_id
     WHERE fa_type IN ('FA', 'FFA', 'FCA')
-    {add_fa_name_filter(name)}
+    {add_fa_name_filter(name, use_where=False)}
     {add_user_filter(user_id)}
     GROUP BY r.main_area
     ORDER BY fa_count DESC
@@ -614,7 +614,7 @@ def get_first_ascensionist_grades(conn, name, user_id=None):
     JOIN routes.routes r ON fa.route_id = r.id
     JOIN deduped_ticks t on t.route_id = fa.route_id
     WHERE fa_type IN ('FA', 'FFA', 'FCA')
-    {add_fa_name_filter(name)}
+    {add_fa_name_filter(name, use_where=False)}
     {add_user_filter(user_id)}
     AND r.yds_rating IS NOT NULL
     GROUP BY r.yds_rating
@@ -664,7 +664,7 @@ def get_collaborative_ascensionists(conn, name, user_id=None):
                 AND a1.fa_name != a2.fa_name
             JOIN routes.ticks t on t.route_id = a1.route_id
             WHERE a1.fa_type IN ('FA', 'FFA', 'FCA')
-            {add_fa_name_filter(name,'a1')}
+            {add_fa_name_filter(name, use_where=False, table_alias='a1')}
             {add_user_filter(user_id)}
         )
         SELECT 
@@ -683,12 +683,27 @@ def get_collaborative_ascensionists(conn, name, user_id=None):
 def get_fa_routes(conn, fa_name, user_id):
     """Get all routes where person was FA."""
     query = f"""
-    SELECT route_name, grade, area_name
-    FROM first_ascents
+    {get_deduped_ticks_cte(user_id)}
+    SELECT CONCAT_WS(' ~ ',
+        r.route_name,
+        CONCAT_WS(' > ',
+            r.main_area,
+            r.specific_location
+        ),
+        TRIM(NULLIF(CONCAT_WS(' ',
+            r.yds_rating,
+            r.hueco_rating,
+            r.aid_rating,
+            r.danger_rating,
+            r.commitment_grade
+        ), ''))
+) as route_display
+    FROM analysis.fa
+    JOIN routes.routes r on r.id = fa.route_id
+    JOIN deduped_ticks t on t.route_id = fa.route_id
     {add_fa_name_filter(fa_name, use_where=True)}
-    {add_user_filter(user_id)}
-    ORDER BY date DESC
+    {add_user_filter(user_id, table_alias = 't')}
+    ORDER BY r.avg_stars DESC
     """
-    cursor = conn.cursor()
-    cursor.execute(query, (fa_name, user_id))
-    return cursor.fetchall()
+    result = conn.query(query)
+    return result.values.tolist()
