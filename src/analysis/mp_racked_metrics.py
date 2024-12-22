@@ -73,20 +73,28 @@ def route_type_filter(route_types):
         type_filter = ''
     return type_filter
 
-def year_filter(year=None, use_where=True, table_alias='t'):
+def year_filter(year=None, year_range=None, use_where=True, table_alias='t'):
     """Generate SQL clause for year filtering
+    
     Args:
-        year: Optional year to filter by. If None, no filter is applied
+        year: Optional single year to filter by
+        year_range: Optional tuple of (start_year, end_year) to filter between
         use_where: If True, starts with WHERE, otherwise starts with AND (default True)
         table_alias: Table alias to use (default 't')
+    
     Returns:
         str: SQL filter clause
     """
-    if not year:
+    if not year and not year_range:
         return ''
         
     prefix = 'WHERE' if use_where else 'AND'
-    return f"{prefix} EXTRACT(YEAR FROM {table_alias}.date) = {year}"
+    
+    if year_range:
+        start_year, end_year = year_range
+        return f"{prefix} EXTRACT(YEAR FROM {table_alias}.date) BETWEEN {start_year} AND {end_year}"
+    else:
+        return f"{prefix} EXTRACT(YEAR FROM {table_alias}.date) = {year}"
 
 def add_user_filter(user_id, table_alias='t'):
     """
@@ -276,11 +284,11 @@ def get_route_type_preferences(conn, user_id=None):
     '''
     return conn.query(query)
 
-def get_bigwall_routes(conn, user_id=None):
+def get_bigwall_routes(conn, user_id=None, route_types=None):
     """Get all bigwall routes"""
     query = f'''
     {estimated_lengths_cte}
-    SELECT  DISTINCT
+    SELECT
         t.date,
         r.route_name,
         TRIM(NULLIF(CONCAT_WS(' ', r.yds_rating, r.hueco_rating, r.aid_rating, r.danger_rating), '')) as grade,
@@ -289,18 +297,54 @@ def get_bigwall_routes(conn, user_id=None):
         CONCAT(r.main_area, ', ', r.region) as area,
         r.main_area,
         r.route_url,
-        r.primary_photo_url
+        r.primary_photo_url,
+        r.route_type,
+        STRING_AGG(DISTINCT NULLIF(CASE 
+            WHEN tav.mapped_type = 'style' AND tav.mapped_tag IS NOT NULL 
+            THEN tav.mapped_tag 
+        END, ''), ', ') as styles,
+        STRING_AGG(DISTINCT NULLIF(CASE 
+            WHEN tav.mapped_type = 'feature' AND tav.mapped_tag IS NOT NULL 
+            THEN tav.mapped_tag 
+        END, ''), ', ') as features,
+        STRING_AGG(DISTINCT NULLIF(CASE 
+            WHEN tav.mapped_type = 'descriptor' AND tav.mapped_tag IS NOT NULL 
+            THEN tav.mapped_tag 
+        END, ''), ', ') as descriptors,
+        STRING_AGG(DISTINCT NULLIF(CASE 
+            WHEN tav.mapped_type = 'rock_type' AND tav.mapped_tag IS NOT NULL 
+            THEN tav.mapped_tag 
+        END, ''), ', ') as rock_type
     FROM routes.Ticks t 
     JOIN routes.Routes r on r.id = t.route_id 
     LEFT JOIN estimated_lengths el on el.id = t.route_id 
-    WHERE EXTRACT(YEAR FROM t.date) = 2024
+    LEFT JOIN analysis.fa fa on fa.route_id = r.id
+    LEFT JOIN analysis.taganalysisview tav on tav.route_id = r.id 
+    {year_filter(year_range=(1999, 2025), use_where=True)}
     {add_user_filter(user_id)}
+    {route_type_filter(route_types)}
     AND (
         r.length_ft >= 1000 
         OR el.estimated_length >= 1000 
         OR r.commitment_grade IN ('IV', 'V', 'VI', 'VII')
     )
-    ORDER BY length DESC;
+    AND r.commitment_grade NOT IN ('I', 'II', 'III')
+    GROUP BY 
+    t.date,
+    r.route_name,
+    r.yds_rating,
+    r.hueco_rating,
+    r.aid_rating,
+    r.danger_rating,
+    r.commitment_grade,
+    r.length_ft,
+    el.estimated_length,
+    r.main_area,
+    r.region,
+    r.route_url,
+    r.primary_photo_url,
+    r.route_type
+    ORDER BY commitment_grade DESC, length DESC;
     '''
     return conn.query(query)
 
@@ -712,7 +756,6 @@ def get_fa_routes(conn, fa_name, user_id):
     {add_user_filter(user_id, table_alias = 't')}
     ORDER BY r.avg_stars DESC
     """
-    print(query)
     result = conn.query(query)
     return result.values.tolist()
 
@@ -757,3 +800,16 @@ def get_partnership_routes(conn, fa_name, partner_name, user_id):
     ORDER BY r.avg_stars DESC
     """
     return conn.query(query).values.tolist()
+
+
+def get_user_year_range(conn, user_id):
+    """Get min and max years from user's tick data"""
+    query = f"""
+    SELECT 
+        EXTRACT(YEAR FROM MIN(date))::integer as min_year,
+        EXTRACT(YEAR FROM MAX(date))::integer as max_year
+    FROM routes.Ticks
+    WHERE user_id = '{user_id}'
+    """
+    result = conn.query(query)
+    return result.iloc[0]['min_year'], result.iloc[0]['max_year']

@@ -2,19 +2,16 @@ import os
 import sys
 import json
 from dotenv import load_dotenv
-import requests
 
-# Load environment variables
 load_dotenv()
 
-# Add project root to Python path
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(project_root)
 
 from src.lambdas.worker import lambda_handler
 
 def test_worker():
-    # Simulate SQS event with JSON-encoded body
+    # Simulate SQS event with JSON
     test_event = {
         'Records': [{
             'body': json.dumps({

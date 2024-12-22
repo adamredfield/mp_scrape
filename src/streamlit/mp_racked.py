@@ -15,13 +15,12 @@ import requests
 from io import BytesIO
 import base64
 from src.database import queries
-from src.streamlit.chart_utils import create_bar_chart
-# Page config
+from src.streamlit.chart_utils import create_bar_chart, create_gradient_bar_chart
 st.set_page_config(
     page_title="Your 2024 Climbing Racked",
     page_icon="🧗‍♂️",
     layout="wide",
-    initial_sidebar_state="collapsed",
+    initial_sidebar_state="auto",
     menu_items={
         'Get Help': None,
         'Report a bug': None,
@@ -190,6 +189,7 @@ def page_most_climbed(user_id):
         detail_text = f"starting on {formatted_date}{suffix}<br><br>{formatted_notes}"
         
         st.markdown(diamond_template(main_text, subtitle, detail_text), unsafe_allow_html=True)
+
 def get_squared_image(url):
     try:
         response = requests.get(url)
@@ -534,41 +534,140 @@ def page_grade_distribution(user_id):
 def page_bigwall_routes(user_id):
     """Page showing bigwall routes climbed"""
     try:
-        df = metrics.get_bigwall_routes(conn, user_id=user_id)
+        df = metrics.get_bigwall_routes(conn,user_id=user_id)
+        print(df['route_type'].unique())
         
         if df.empty:
             st.error("No big wall routes found for 2024")
             return
             
-        # Apply Spotify styling
         st.markdown(get_spotify_style(), unsafe_allow_html=True)
-        
-
-        # Create header and filter section
-        st.markdown("<h2 class='spotify-header'>Wall Rat Stats</h2>", unsafe_allow_html=True)
         st.markdown("""
             <style>
-            .route-container {
-                margin: 0 !important;
-                padding: 0 !important;
-            }
-            .stImage {
-                margin: 0 !important;
-                padding: 0 !important;
-            }
+                /* Base container adjustments */
+                .block-container {
+                    padding-top: 1rem;
+                    padding-bottom: 0;
+                    max-width: 100%;
+                }
+                
+                /* Header styling */
+                .spotify-header {
+                    font-size: 1.5rem;
+                    text-align: center;
+                    margin: 0;
+                    padding: 0;
+                    line-height: 1.2;
+                }
+                
+               /* Remove expander styling */
+                .streamlit-expander {
+                    border: none !important;
+                    box-shadow: none !important;
+                    background-color: transparent !important;
+                }
+                    /* Expander styling */
+                    .streamlit-expanderHeader {
+                        background-color: transparent !important;
+                        font-size: 1em !important;
+                        color: white !important;
+                        padding: 0.5rem !important;
+                    }
+                    
+                    .streamlit-expanderContent {
+                        background-color: rgba(255, 255, 255, 0.05) !important;
+                        border: none !important;
+                        border-radius: 4px !important;
+                    }
+                    
+                    /* Route details styling */
+                    .route-details {
+                        padding: 0.5rem;
+                        font-size: 0.9em;
+                    }
+                
+                .route-image {
+                    margin-top: 0.5rem;
+                    border-radius: 4px;
+                    overflow: hidden;
+                }
+                
+                /* Stats container */
+                .stats-container {
+                    display: flex;
+                    justify-content: center;
+                    gap: 2rem;
+                    margin: 1rem 0;
+                }
+                
+                .stat-box {
+                    text-align: center;
+                }
+                
+                .stat-label {
+                    font-size: 0.9rem;
+                    color: #888;
+                }
+                    
+          
+                .stat-value {
+                    font-size: 1.2rem;
+                    font-weight: bold;
+                    color: white;
+                }
             </style>
         """, unsafe_allow_html=True)
+
+        st.markdown("<h2 class='spotify-header'>Wall Rat Stats 🐀</h2>", unsafe_allow_html=True)
         
-        filter_col1, filter_col2, _ = st.columns([1, 1, 2])
-        with filter_col1:
+        st.markdown("""
+            <style>
+                /* Style the expander header */
+                .streamlit-expanderHeader {
+                    font-size: 0.9em !important;
+                    color: white !important;
+                    background-color: transparent !important;
+                    border: none !important;
+                    padding: 4px 12px !important;
+                    position: fixed !important;
+                    top: 0.5rem !important;
+                    left: 4rem !important;
+                    z-index: 999 !important;
+                }
+                
+                /* Style the arrow */
+                .streamlit-expanderHeader svg {
+                    font-size: 3em !important;
+                    vertical-align: middle !important;
+                }
+                
+                /* Remove expander content styling */
+                .streamlit-expander {
+                    border: none !important;
+                    background-color: transparent !important;
+                }
+                
+                /* Adjust main content padding */
+                .block-container {
+                    padding-top: 3rem !important;
+                }
+            </style>
+        """, unsafe_allow_html=True)
+        with st.expander("Filters"):
+
             available_grades = sorted([g for g in df['commitment_grade'].unique() if pd.notna(g)])
             selected_grades = st.multiselect(
                 'Filter by Commitment Grade:',
                 options=available_grades,
                 key='commitment_grade_filter'
             )
-            
-        with filter_col2:
+
+            route_types = st.multiselect(
+                'Filter by Route Type:',
+                options=['Trad', 'Sport', 'Aid', 'Alpine'],
+                key='route_type_filter'
+            )
+
             min_length = 500
             max_length = int(df['length'].max())
             length_filter = st.slider(
@@ -580,156 +679,134 @@ def page_bigwall_routes(user_id):
                 key='length_filter'
             )
 
+            available_years = sorted(df['date'].dt.year.unique())
+            
+            date_filter_type = st.radio(
+                "Date Range",
+                options=["Single Year", "Custom Range"],
+                horizontal=True
+            )
+
+            if date_filter_type == "Single Year":
+                year_start = year_end = st.selectbox(
+                    'Year',
+                    options=sorted(df['date'].dt.year.unique(), reverse=True),
+                    index=sorted(df['date'].dt.year.unique(), reverse=True).index(2024)
+                )
+            else:
+                col1, col2 = st.columns(2)
+                with col1:
+                    year_start = st.selectbox(
+                        'From', 
+                        options=available_years,
+                        index=0  # Default to earliest year
+                    )   
+                with col2:
+                    valid_end_years = [y for y in available_years if y >= year_start]
+                    year_end = st.selectbox(
+                        'To', 
+                        options=valid_end_years,
+                        index=len(valid_end_years) - 1 
+                    )
+
         filtered_df = df
         if selected_grades:
             filtered_df = filtered_df[filtered_df['commitment_grade'].isin(selected_grades)]
+        if route_types:
+            route_type_mask = filtered_df['route_type'].apply(
+                lambda x: any(rt.lower() in str(x).lower() for rt in route_types)
+            )
+            filtered_df = filtered_df[route_type_mask]
         filtered_df = filtered_df[filtered_df['length'] >= length_filter]
-        # Minimal spacing
-        st.markdown("<div style='height: 0.5rem;'></div>", unsafe_allow_html=True)
+        filtered_df = filtered_df[
+            (filtered_df['date'].dt.year >= year_start) & (filtered_df['date'].dt.year <= year_end)
+        ]
 
-        # Stats right after filters
-        stats_col1, stats_col2, spacer = st.columns([0.5, 1.5, 3])
-        with stats_col1:
-            st.markdown(
-                f"""
-                <div class='total-section' style='margin-left: -20px;'>  
+        st.markdown(
+            f"""
+            <div style="display: flex; justify-content: flex-start; gap: 3rem; margin-top: -2rem;">
+                <div class='total-section' style="margin-left: 1rem;">  
                     <div class='total-label'>Total Big Walls</div>
                     <div class='total-value'>{len(filtered_df)}</div>
                 </div>
-                """,
-                unsafe_allow_html=True
-            )
-        with stats_col2:
-            st.markdown(
-                f"""
-                <div class='total-section' style='margin-left: -40px;'>
+                <div class='total-section'>
                     <div class='total-label'>Total Length</div>
                     <div class='total-value'>{filtered_df['length'].sum():,} ft</div>
                 </div>
-                """,
-                unsafe_allow_html=True
-            )
-
-        # Minimal spacing before routes list
-        st.markdown("<div style='height: 0.5rem;'></div>", unsafe_allow_html=True)
-        
-        # Display routes
-        for i, (_, route) in enumerate(filtered_df.iterrows(), 1):
-                    with st.container():
-                        # More compact columns - adjust the ratio as needed
-                        cols = st.columns([0.4, 3])
-                        
-                        # Photo column
-                        with cols[0]:
-                            if pd.notna(route.primary_photo_url):
-                                img = get_squared_image(route.primary_photo_url)
-                                if img:
-                                    st.image(img, output_format="JPEG")
-                        
-                        # Details column - moved closer to image
-                        with cols[1]:
-                            st.markdown(
-                                f"""
-                                <div class='list-item' style='margin-left: 65px; padding: 0; display: flex; flex-direction: column; justify-content: center; min-height: 60px; transform: translateY(45px);'>  
-                                    <div style='margin-bottom: 4px;'>
-                                        <span class='item-number' style='vertical-align: middle;'>{i}. </span>
-                                        <span class='item-name' style='vertical-align: middle;'>{route.route_name}</span>
-                                    </div>
-                                    <div class='item-details' style='margin: 0; line-height: 1.4;'>
-                                        {route.grade} {route.commitment_grade or ''} • {route.length:,} ft • {route.area}
-                                    </div>
-                                </div>
-                                """,
-                                unsafe_allow_html=True
-                            )
-                    
-        st.markdown("<div style='height: 2rem;'></div>", unsafe_allow_html=True)
-
-        # Create color gradients - multiple shades of Spotify green
-        def generate_color_gradient(n):
-            base_color = '#1ed760'  # Spotify green
-            # Create n different shades by adjusting lightness
-            colors = []
-            for i in range(n):
-                # Adjust the multiplier to control color difference
-                factor = 0.5 + (i * 0.5 / n)  # This will give variations from 50% to 100% brightness
-                hex_color = f'#{int(int(base_color[1:3], 16) * factor):02x}'
-                hex_color += f'{int(int(base_color[3:5], 16) * factor):02x}'
-                hex_color += f'{int(int(base_color[5:7], 16) * factor):02x}'
-                colors.append(hex_color)
-            return colors
-
-        # Create horizontal bar chart with stacked routes
-        fig = go.Figure()
-
-        # Group by area but keep individual routes
-        for area in filtered_df['main_area'].unique():
-            area_routes = filtered_df[filtered_df['main_area'] == area]
-            colors = generate_color_gradient(len(area_routes))
-            
-            for route, color in zip(area_routes.itertuples(), colors):
-                fig.add_trace(go.Bar(
-                    y=[area],                    # Area name
-                    x=[route.length],            # Route length
-                    orientation='h',
-                    name='',                     # No legend entries
-                    showlegend=False,
-                    marker_color=color,          # Different shade for each route
-                    hovertemplate=(
-                        "<b>%{customdata[0]}</b><br>" +
-                        "Grade: %{customdata[1]}<br>" +
-                        "Length: %{x:,} ft<br>" +
-                        "<extra></extra>"
-                    ),
-                    customdata=[[route.route_name, route.grade]]
-                ))
-
-        # Update layout with dark theme
-        fig.update_layout(
-            paper_bgcolor='black',
-            plot_bgcolor='black',
-            title={
-                'text': 'Big Wall Lengths by Area',
-                'y': 0.95,
-                'x': 0.5,
-                'xanchor': 'center',
-                'yanchor': 'top',
-                'font': {'color': 'white', 'size': 20}
-            },
-            xaxis_title="Total Length (Feet)",
-            margin=dict(l=20, r=20, t=50, b=20),
-            height=400,
-            xaxis=dict(
-                color='white',
-                gridcolor='#333333',
-                showgrid=True
-            ),
-            yaxis=dict(
-                color='white',
-                gridcolor='#333333',
-                showgrid=False,
-                categoryorder='total ascending'
-            ),
-            font=dict(
-                color='white'
-            ),
-            barmode='stack'
+            </div>
+            """,
+            unsafe_allow_html=True
         )
 
-        st.plotly_chart(fig, use_container_width=True)
+        # Add spacing before route list
+        st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
+        
+        st.markdown("<div class='list-container'>", unsafe_allow_html=True)
+        for i, (_, route) in enumerate(filtered_df.iterrows(), 1):
+            expander_label = f"{i}. {route.route_name} - {route.grade} {route.commitment_grade or ''}"
+            with st.expander(expander_label):
+                # Route details
+                st.markdown(
+                    f"""
+                    <div class='route-details' style='margin-bottom: 1rem;'>
+                        <div style='color: #aaa;'>
+                            Length: {route.length:,} ft<br>
+                            Area: {route.area}<br>
+                            Styles: {route.styles}<br>
+                            Features: {route.features}<br>
+                            Descriptors: {route.descriptors}<br>
+                            Rock Type: {route.rock_type}<br>
+                            <a href='{route.route_url}' target='_blank' style='color: #1ed760;'>View on Mountain Project</a>
+                        </div>
+                    </div>
+                    """, 
+                    unsafe_allow_html=True
+                )
+                
+                # Photo if available
+                if pd.notna(route.primary_photo_url):
+                    img = get_squared_image(route.primary_photo_url)
+                    if img:
+                        st.markdown(
+                            f"""
+                            <div style="width: 100%;">
+                                <img src="{route.primary_photo_url}" 
+                                    style="width: 100%; 
+                                            object-fit: cover; 
+                                            margin: 0; 
+                                            padding: 0;"
+                                    alt="{route.route_name}">
+                            </div>
+                            """,
+                            unsafe_allow_html=True
+                        )
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        fig = create_gradient_bar_chart(
+        df=filtered_df,
+        x_col='length',
+        y_col='main_area',
+        title='Big Wall Lengths by Area'
+        )
+        st.plotly_chart(fig, use_container_width=True,     config={
+        'scrollZoom': False,
+        'displayModeBar': False,
+    })
+
+
             
     except Exception as e:
         st.error(f"Error: {str(e)}")
 
 def page_first_ascents(user_id):
 
-    # Initialize session states
     if 'fa_view_type' not in st.session_state:
         st.session_state.fa_view_type = "All FAs"
     if 'selected_fa' not in st.session_state:
         st.session_state.selected_fa = None
 
-    # Get data for selectors
+    # Get data for filters
     top_fas = metrics.get_top_first_ascensionists(conn, user_id=user_id)
     partnerships = metrics.get_collaborative_ascensionists(conn, "All FAs", user_id)
 
@@ -879,20 +956,13 @@ def page_first_ascents(user_id):
                 color: #aaa;
                 font-size: 0.95em;
             }
-
-            
     """, unsafe_allow_html=True)
 
-    # Header
-    st.markdown("<h2 class='spotify-header'>Your Top FAs</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 class='spotify-header'>Your Favorite FAs</h2>", unsafe_allow_html=True)
 
-    # Create a container for controls
     controls = st.container()
-
-    # Create columns with a very narrow middle column
     left, middle, right = controls.columns([1, 0.1, 1])
 
-    # Radio buttons in left column
     with left:
         view_type = st.radio(
             "",
@@ -902,11 +972,9 @@ def page_first_ascents(user_id):
             label_visibility="collapsed"
         )
 
-    # Empty middle column for spacing
     with middle:
         st.write("")
 
-    # Selector in right column
     with right:
         if view_type == "Individual FA":
             selected_value = st.selectbox(
@@ -931,20 +999,16 @@ def page_first_ascents(user_id):
         else:
             st.session_state.selected_fa = "All FAs"
    
-        # Get data based on selection
         current_selection = st.session_state.selected_fa or "All FAs"
     
-    # Fetch data for visualizations
     decades = metrics.get_first_ascensionist_by_decade(conn, current_selection, user_id)
     areas = metrics.get_first_ascensionist_areas(conn, current_selection, user_id)
     grades = metrics.get_first_ascensionist_grades(conn, current_selection, user_id)
 
-    # Only get partners for individual FA view
     if view_type == "Individual FA":
         partners = metrics.get_collaborative_ascensionists(conn, current_selection, user_id)
         
     if view_type == "All FAs":
-        # Decades chart
         create_bar_chart(
             title="FAs by Decade", 
             x_data=[decade[0] for decade in decades], 
@@ -952,7 +1016,6 @@ def page_first_ascents(user_id):
             orientation='v',
         )
 
-        # Most prolific First Ascensionists
         st.markdown("<h3 style='text-align: center;'>Most Prolific FAs</h3>", unsafe_allow_html=True)
         st.markdown("<div class='list-container'>", unsafe_allow_html=True)
         for fa, count in top_fas:          
@@ -965,9 +1028,7 @@ def page_first_ascents(user_id):
                     )
         st.markdown("</div>", unsafe_allow_html=True)
     else:
-        # Layout for Individual FA and Partnership views
         
-        # Decades chart
         create_bar_chart(
             title="FAs by Decade", 
             x_data=[decade[0] for decade in decades], 
@@ -975,7 +1036,6 @@ def page_first_ascents(user_id):
             orientation='v',
         )
         
-        # Top Areas
         create_bar_chart(
             title="Areas Developed by FA", 
             x_data=[area[0] for area in areas], 
@@ -983,7 +1043,6 @@ def page_first_ascents(user_id):
             orientation='h',
         )
         
-        # Grade Distribution
         create_bar_chart(
             title="FAs by Grade", 
             x_data=[grade[0] for grade in grades], 
@@ -991,7 +1050,6 @@ def page_first_ascents(user_id):
             orientation='v',
         )
         
-        # Show Frequent Partners only for Individual FA view
         if view_type == "Individual FA":
             st.markdown("<h3 style='text-align: center;'>Frequent Partners</h3>", unsafe_allow_html=True)
             st.markdown("<div class='list-container'>", unsafe_allow_html=True)
@@ -1011,15 +1069,10 @@ def page_first_ascents(user_id):
             
             # Split the partnership into individual names
             climber1, climber2 = current_selection.split(" & ")
-            
-            # Get routes for this partnership
             partnership_routes = metrics.get_partnership_routes(conn, climber1.strip(), climber2.strip(), user_id)
-            
-            # Create a DataFrame for display
             if partnership_routes:
                 df = pd.DataFrame(partnership_routes, columns=['Route'])
                 
-                # Style the table
                 st.markdown("""
                     <style>
                         .dataframe {
@@ -1054,13 +1107,13 @@ def main():
     # Page mapping
     pages = {
         8: lambda: page_total_length(user_id),
-        1: lambda: page_biggest_day(user_id),
+        7: lambda: page_biggest_day(user_id),
         2: lambda: page_total_routes(user_id),
         3: lambda: page_most_climbed(user_id),
         4: lambda: page_top_routes(user_id),
         5: lambda: page_areas_breakdown(user_id),
         6: lambda: page_grade_distribution(user_id),
-        7: lambda: page_bigwall_routes(user_id),
+        1: lambda: page_bigwall_routes(user_id),
         0: lambda: page_first_ascents(user_id)
     }
 

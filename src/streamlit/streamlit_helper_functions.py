@@ -68,13 +68,12 @@ def verify_user_exists(conn, user_id):
     exists = check_if_user_exists(conn, user_id)
     if exists:
         latest_insert, latest_route, tick_date = get_latest_tick(conn, user_id)
-        info_msg.info(f"Your ticks up to {tick_date.strftime('%Y-%m-%d')} are already in the database.\n\n"
+        info_msg.info(f"Your ticks up to {tick_date.strftime('%Y-%m-%d')} are collected.\n\n"
                 f"Your data was last updated on {latest_insert.strftime('%Y-%m-%d')}")
         details_msg.write(f"""
             Have you climbed and logged additional routes since {latest_route}?  \n    
-            We want your data to be as accurate as possible.  \n
-            Please only refresh if you have climbed and logged additional routes.  \n
-            Data collection isn't free for the creator of this app. 🙏
+            We want your data to be as fresh as possible.  \n
+            Please only refresh if you have climbed since.  \n
         """)
 
         with button_cols:
@@ -115,8 +114,6 @@ def get_user_id(conn):
     if 'data_status' not in st.session_state:
         st.session_state.data_status = None
 
-    status_container = st.empty()
-
     # First check if we're in an update
     if ('waiting_for_update' in st.session_state and 
         st.session_state.waiting_for_update):
@@ -124,8 +121,20 @@ def get_user_id(conn):
         return None
 
     if st.session_state.user_id is None:
-        st.title("Mountain Project Racked")
-        
+        st.markdown("""
+        <style>
+            .centered-title {
+                text-align: center;
+                padding: 0rem 0;
+                font-size: 2.5rem;
+                font-weight: bold;
+                line-height: 1.2;
+                margin-bottom: 2rem;
+            }
+        </style>
+        <div class='centered-title'>Mountain Project Racked</div>
+    """, unsafe_allow_html=True)    
+
         col1, col2 = st.columns([2,1])
         with col1:
             user_input = st.text_input(

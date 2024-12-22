@@ -255,14 +255,15 @@ def parse_route_type(route_details_string):
 
     # Split the string by commas
     parts = [p.strip() for p in route_details_string.split(',')]
-    valid_types = ['Trad', 'Sport', 'Aid', 'Boulder']
+    valid_types = ['Trad', 'Sport', 'Aid', 'Boulder', 'Alpine', 'Mixed', 'Ice', 'Snow', 'TR']
     found_types = []
 
     # Process parts until we hit a length, pitch, or grade indicator to get type(s)
     for part in parts:
         if not any(indicator in part.lower() for indicator in ['ft', 'pitch', 'grade']):
-            if part in valid_types:
-                found_types.append(part)
+            for valid_type in valid_types:
+                if valid_type in part:
+                    found_types.append(valid_type)
             continue
 
         # Match route length (e.g., "500 ft (152 m)")

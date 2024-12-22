@@ -24,7 +24,6 @@ def test_fa_processing():
         
         routes = cursor.fetchall()
         
-        # Process each route
         print("\nProcessing First Ascents...")
         print("-" * 50)
         
@@ -49,7 +48,6 @@ def test_fa_processing():
                 except Exception as e:
                     print(f"  Error inserting into database: {e}")
         
-        # Commit changes and show some results
         conn.commit()
         
         print("\nSample of processed data:")
