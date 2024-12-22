@@ -16,6 +16,8 @@ from io import BytesIO
 import base64
 from src.database import queries
 from src.streamlit.chart_utils import create_bar_chart, create_gradient_bar_chart
+from src.streamlit.filters import render_filters
+
 st.set_page_config(
     page_title="Your 2024 Climbing Racked",
     page_icon="🧗‍♂️",
@@ -143,12 +145,167 @@ def image_to_base64(pil_image):
     return f"data:image/jpeg;base64,{img_str}"
 
 def page_total_routes(user_id):
-    """Second page showing total routes"""
-    total_routes = metrics.total_routes(conn, user_id=user_id)
+    """Combined page showing total routes and most repeated route"""
     
-    main_text = f"You climbed {total_routes:,} routes<br>this year"
-    subtitle = "And one route again, and again, and again..."
-    st.markdown(diamond_template(main_text, subtitle), unsafe_allow_html=True)
+    years_query = f"""
+        SELECT DISTINCT EXTRACT(YEAR FROM date)::int as year
+        FROM routes.Ticks
+        WHERE user_id = '{user_id}'
+        ORDER BY year
+    """
+    available_years_df = conn.query(years_query)
+    years_df = pd.DataFrame({'date': pd.to_datetime(available_years_df['year'], format='%Y')})
+
+    filters = render_filters(years_df, filters_to_include=['date'])
+
+    total_routes_df = metrics.total_routes(conn, user_id=user_id, year_start=filters['year_start'], year_end=filters['year_end'])
+    route_data = metrics.most_climbed_route(conn, user_id=user_id, year_start=filters['year_start'], year_end=filters['year_end'])
+    
+    st.markdown(get_spotify_style(), unsafe_allow_html=True)
+    
+    st.markdown("""
+            <style>
+                
+            .intro-text {
+                color: white;
+                font-size: 2rem;
+                text-align: center;
+                margin-bottom: 2rem;
+                line-height: 1.4;
+            }
+            .route-card {
+                background: #282828;
+                border-radius: 8px;
+                padding: 1.5rem;
+                margin-bottom: 1.5rem;
+            }
+            
+            .route-title {
+                color: white;
+                font-size: 1.5rem;
+                margin-bottom: 1rem;
+            }
+            
+            .stat-number {
+                color: #1ed760;
+                font-size: 3.5rem;
+                font-weight: bold;
+                margin-bottom: 0.5rem;
+            }
+            
+            .stat-label {
+                color: #b3b3b3;
+                font-size: 1.1rem;
+                margin-bottom: 1rem;
+            }
+            
+            .date-text {
+                color: #b3b3b3;
+                margin-bottom: 1.5rem;
+            }
+
+                        .journey-title {
+                color: #1ed760;
+                font-size: 1.2rem;
+                margin: 1.5rem 0 1rem 0;
+            }
+            
+            .ascent-container {
+                background: #181818;
+                border-radius: 6px;
+                padding: 1rem;
+                margin-bottom: 0.8rem;
+            }
+            
+            .ascent-number {
+                color: #1ed760;
+                font-weight: 500;
+                margin-bottom: 0.3rem;
+            }
+            
+            .ascent-note {
+                color: #b3b3b3;
+            }
+            </style>
+        """, unsafe_allow_html=True)
+    
+    st.markdown('<div class="content-container">', unsafe_allow_html=True)
+    
+    date_text = (f"in {filters['year_start']}" 
+                if filters['year_start'] == filters['year_end']
+                else f"between {filters['year_start']} and {filters['year_end']}")
+    
+    total_routes_count = total_routes_df['count'].sum() if not total_routes_df.empty else 0
+    
+    if not route_data.empty:
+
+        times_climbed = route_data['times_climbed']
+        formatted_date = route_data['first_climbed'].strftime('%b %d')
+        day = route_data['first_climbed'].day
+        suffix = 'th' if 11 <= day <= 13 else {1: 'st', 2: 'nd', 3: 'rd'}.get(day % 10, 'th')
+        length = route_data['length']
+        total_length = length * times_climbed
+
+
+        # Intro text
+        st.markdown(f"""
+            <div class="intro-text">
+                Out of {total_routes_count} routes {date_text}<br>
+                You had a favorite!
+            </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown("""
+        <style>
+            .stat-container {
+                display: flex;
+                align-items: baseline;
+                gap: 0.5rem;
+                margin-bottom: 0.5rem;
+            }
+            
+            .stat-number {
+                color: #1ed760;
+                font-size: 1.5rem;  /* Reduced from 3.5rem */
+                font-weight: bold;
+            }
+            
+            .stat-label {
+                color: #b3b3b3;
+                font-size: 1.3rem;
+            }
+        </style>
+    """, unsafe_allow_html=True)
+
+        st.markdown(f"""
+            <div class="route-card">
+                <div class="route-title">{route_data['route_name']} ~ {route_data['grade']}</div>
+                <div class="stat-container">
+                    <span class="stat-number">{times_climbed}</span>
+                    <span class="stat-label">Laps Starting on {formatted_date}{suffix}</span>
+                    <div class="stat-number">{total_length}</div>
+                    <span class="stat-label">Total Feet Climbed!</span>
+                </div>
+        """, unsafe_allow_html=True)
+        
+        
+        # Process notes
+        if route_data['notes']:
+            st.markdown("### Your Journey")
+            note_list = route_data['notes'].split(" | ")
+            note_list.reverse()
+            
+            for i, note in enumerate(note_list[::-1]):
+                if note.strip():
+                    st.markdown(f"""
+                        <div class="ascent-container">
+                            <div class="ascent-number">Ascent #{i+1}</div>
+                            <div class="ascent-note">{note.strip()}</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+
+
+
 
 def page_most_climbed(user_id):
     """Page showing most repeated route"""

@@ -366,24 +366,33 @@ def get_length_climbed(conn, area_type="main_area", year=None, user_id=None):
     """
     return conn.query(query).itertuples(index=False)
 
-def total_routes(conn, user_id=None):
-    query = f"SELECT COUNT(DISTINCT route_id) FROM routes.Ticks t WHERE date::text ILIKE '%2024%' {add_user_filter(user_id)}"
-    return conn.query(query).iloc[0,0]
+def total_routes(conn, user_id=None, year_start=None, year_end=None):
+    query = f"""
+    SELECT
+        date,
+        COUNT(DISTINCT route_id)
+    FROM routes.Ticks t
+    {year_filter(year_range=(year_start, year_end), use_where=True)}
+    {add_user_filter(user_id)}
+    GROUP BY date
+    """
+    return conn.query(query)
 
-def most_climbed_route(conn, user_id=None):
+def most_climbed_route(conn, user_id=None, year_start=None, year_end=None):
     query = f"""
         {estimated_lengths_cte}
         SELECT DISTINCT     
-        (r.route_name || ' ~ ' || r.specific_location || ' - ' || 
-  		TRIM(NULLIF(CONCAT_WS(' ', r.yds_rating, r.hueco_rating, r.aid_rating, r.danger_rating, r.commitment_grade), '')) ||
-        ' - ' || CAST(COALESCE(r.length_ft, el.estimated_length) AS INTEGER)::text || ' ft') as routes,
+        r.route_name,
+        r.specific_location,
+        TRIM(NULLIF(CONCAT_WS(' ', r.yds_rating, r.hueco_rating, r.aid_rating, r.danger_rating, r.commitment_grade), '')) grade,
+        CAST(COALESCE(r.length_ft, el.estimated_length) AS INTEGER) as length,
         STRING_AGG(t.note, ' | ') notes,
         min(t.date) first_climbed,
         COUNT(*) times_climbed
         FROM routes.Ticks t
         JOIN routes.Routes r ON t.route_id = r.id
         LEFT JOIN estimated_lengths el on el.id = t.route_id 
-        WHERE EXTRACT(YEAR FROM t.date) = 2024
+        {year_filter(year_range=(year_start, year_end), use_where=True)}
         {add_user_filter(user_id)}
         GROUP BY r.route_name, r.specific_location, r.yds_rating, r.hueco_rating, 
                  r.aid_rating, r.danger_rating, r.commitment_grade, el.estimated_length, r.length_ft
@@ -393,15 +402,9 @@ def most_climbed_route(conn, user_id=None):
     result = conn.query(query)
     if result.empty:
         return None
-    
-    row = result.iloc[0]
-    route_parts = row[0].split(' ~ ')
-    if len(route_parts) == 2:
-        route_name, rest = route_parts
-        location_parts = rest.split('>')
-        clean_location = location_parts[-1].strip() if '>' in rest else rest
-        clean_route = f"{route_name} ~ {clean_location}"
-        return (clean_route,) + tuple(row[1:])
+
+    return result.iloc[0]
+
 
 def top_rated_routes(conn, user_id=None):
     query = f"""
