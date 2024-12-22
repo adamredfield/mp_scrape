@@ -380,25 +380,54 @@ def total_routes(conn, user_id=None, year_start=None, year_end=None):
 
 def most_climbed_route(conn, user_id=None, year_start=None, year_end=None):
     query = f"""
-        {estimated_lengths_cte}
-        SELECT DISTINCT     
+        {estimated_lengths_cte},
+        route_tags AS (
+            SELECT 
+                route_id,
+                STRING_AGG(DISTINCT NULLIF(CASE 
+                    WHEN mapped_type = 'style' THEN mapped_tag 
+                    END, ''), ', ') as styles,
+                STRING_AGG(DISTINCT NULLIF(CASE 
+                    WHEN mapped_type = 'feature' THEN mapped_tag 
+                    END, ''), ', ') as features,
+                STRING_AGG(DISTINCT NULLIF(CASE 
+                    WHEN mapped_type = 'descriptor' THEN mapped_tag 
+                END, ''), ', ') as descriptors,
+                STRING_AGG(DISTINCT NULLIF(CASE 
+                    WHEN mapped_type = 'rock_type' THEN mapped_tag 
+                END, ''), ', ') as rock_type
+        FROM analysis.taganalysisview
+        GROUP BY route_id
+    )
+    SELECT DISTINCT     
         r.route_name,
         r.specific_location,
         TRIM(NULLIF(CONCAT_WS(' ', r.yds_rating, r.hueco_rating, r.aid_rating, r.danger_rating, r.commitment_grade), '')) grade,
         CAST(COALESCE(r.length_ft, el.estimated_length) AS INTEGER) as length,
-        STRING_AGG(t.note, ' | ') notes,
+        array_agg(t.date ORDER BY t.date) as dates,
+        array_agg(t.type ORDER BY t.date) as types,
+        array_agg(t.note ORDER BY t.date) as notes,
+        rt.styles,
+        rt.features,
+        rt.descriptors,
+        rt.rock_type,
         min(t.date) first_climbed,
-        COUNT(*) times_climbed
+        COUNT(*) times_climbed,
+        r.primary_photo_url,
+        r.route_url
         FROM routes.Ticks t
         JOIN routes.Routes r ON t.route_id = r.id
-        LEFT JOIN estimated_lengths el on el.id = t.route_id 
+        LEFT JOIN estimated_lengths el on el.id = t.route_id
+		LEFT JOIN route_tags rt on rt.route_id = r.id	
         {year_filter(year_range=(year_start, year_end), use_where=True)}
         {add_user_filter(user_id)}
         GROUP BY r.route_name, r.specific_location, r.yds_rating, r.hueco_rating, 
-                 r.aid_rating, r.danger_rating, r.commitment_grade, el.estimated_length, r.length_ft
+                 r.aid_rating, r.danger_rating, r.commitment_grade, el.estimated_length, r.length_ft,
+                 r.primary_photo_url, r.route_url, rt.styles, rt.features, rt.descriptors, rt.rock_type
         ORDER BY COUNT(*) DESC
         LIMIT 1
     """
+    print(query)
     result = conn.query(query)
     if result.empty:
         return None

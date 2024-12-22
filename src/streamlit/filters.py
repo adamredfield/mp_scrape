@@ -96,7 +96,7 @@ def date_filter(df):
             )
         return year_start, year_end
 
-def render_filters(df, filters_to_include=None):
+def render_filters(df, filters_to_include=None, filter_title="Filters"):
     """
     Render filter expander with specified filters
     
@@ -118,7 +118,7 @@ def render_filters(df, filters_to_include=None):
     }
     
     results = {}
-    with st.expander("Filters"):
+    with st.expander(filter_title):
         for filter_name in filters_to_include:
             if filter_name in filter_functions:
                 result = filter_functions[filter_name](df)

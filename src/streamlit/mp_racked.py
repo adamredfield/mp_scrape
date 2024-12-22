@@ -4,17 +4,12 @@ import sys
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(project_root)
 
-from src.streamlit.streamlit_helper_functions import get_user_id
+from src.streamlit.streamlit_helper_functions import get_user_id, image_to_base64, get_squared_image
 from styles import get_all_styles, wrapped_template, diamond_template, get_wrapped_styles, get_diamond_styles, get_routes_styles, get_spotify_style
 import streamlit as st
 import src.analysis.mp_racked_metrics as metrics
 import pandas as pd
 import plotly.graph_objects as go
-from PIL import Image
-import requests
-from io import BytesIO
-import base64
-from src.database import queries
 from src.streamlit.chart_utils import create_bar_chart, create_gradient_bar_chart
 from src.streamlit.filters import render_filters
 
@@ -138,46 +133,49 @@ def page_biggest_day(user_id):
     except Exception as e:
         st.error(f"Error: {str(e)}")
 
-def image_to_base64(pil_image):
-    buffered = BytesIO()
-    pil_image.save(buffered, format="JPEG")
-    img_str = base64.b64encode(buffered.getvalue()).decode()
-    return f"data:image/jpeg;base64,{img_str}"
-
-def page_total_routes(user_id):
+def page_most_climbed_route(user_id):
     """Combined page showing total routes and most repeated route"""
     
     years_query = f"""
         SELECT DISTINCT EXTRACT(YEAR FROM date)::int as year
         FROM routes.Ticks
         WHERE user_id = '{user_id}'
+        and length(EXTRACT(YEAR FROM date)::text) = 4
         ORDER BY year
     """
     available_years_df = conn.query(years_query)
     years_df = pd.DataFrame({'date': pd.to_datetime(available_years_df['year'], format='%Y')})
 
-    filters = render_filters(years_df, filters_to_include=['date'])
-
-    total_routes_df = metrics.total_routes(conn, user_id=user_id, year_start=filters['year_start'], year_end=filters['year_end'])
-    route_data = metrics.most_climbed_route(conn, user_id=user_id, year_start=filters['year_start'], year_end=filters['year_end'])
+    filters = render_filters(years_df, filters_to_include=['date'], filter_title="Choose your year")
+    if filters['year_start'] is not None and filters['year_end'] is not None:
+        total_routes_df = metrics.total_routes(conn, user_id=user_id, year_start=filters['year_start'], year_end=filters['year_end'])
+        route_data = metrics.most_climbed_route(conn, user_id=user_id, year_start=filters['year_start'], year_end=filters['year_end'])
     
+
     st.markdown(get_spotify_style(), unsafe_allow_html=True)
     
     st.markdown("""
             <style>
-                
+            
+            .block-container {
+                padding-top: 3rem !important; 
+            }
+
             .intro-text {
                 color: white;
-                font-size: 2rem;
+                font-size: 1.75rem;
                 text-align: center;
-                margin-bottom: 2rem;
                 line-height: 1.4;
+                margin-top: -5.5rem;
+                margin-bottom: .5rem;
             }
+
             .route-card {
                 background: #282828;
                 border-radius: 8px;
                 padding: 1.5rem;
-                margin-bottom: 1.5rem;
+                margin-bottom: 2.5rem;
+                margin-top: 1rem;
             }
             
             .route-title {
@@ -185,46 +183,89 @@ def page_total_routes(user_id):
                 font-size: 1.5rem;
                 margin-bottom: 1rem;
             }
+                
+            .location-text {
+                color: #b3b3b3;
+                font-size: 1.1rem;
+                margin-top: -1rem;
+                margin-bottom: .5rem;
+            }
+                
+            .route-link,
+            .route-link:link,
+            .route-link:visited,
+            .route-link:active {
+                color: white !important;
+                text-decoration: underline !important;
+            }
+            
+            .route-link:hover {
+                color: white !important;
+                text-decoration: underline !important;
+            }
+            
+            .grade-text {
+                color: white;
+            }
+                
+            .stat-container {
+                display: flex;
+                align-items: baseline;
+                gap: 0.5rem;
+                margin-bottom: -1rem;
+            }
             
             .stat-number {
                 color: #1ed760;
-                font-size: 3.5rem;
-                font-weight: bold;
-                margin-bottom: 0.5rem;
+                font-size: 1.5rem; 
+                margin-bottom: 1rem;
             }
             
             .stat-label {
                 color: #b3b3b3;
-                font-size: 1.1rem;
-                margin-bottom: 1rem;
-            }
-            
-            .date-text {
-                color: #b3b3b3;
-                margin-bottom: 1.5rem;
+                font-size: 1.3rem;
             }
 
-                        .journey-title {
-                color: #1ed760;
-                font-size: 1.2rem;
-                margin: 1.5rem 0 1rem 0;
+            .streamlit-expanderHeader {
+                font-size: 1.3rem !important;
+                padding: 1rem !important;
+                margin-top: 2rem !important; 
+            }
+            
+            .journey-title {
+                color: white;
+                font-size: 1.5rem;
+                margin: 0rem 1rem 1rem;
+                text-align: center;
             }
             
             .ascent-container {
                 background: #181818;
                 border-radius: 6px;
                 padding: 1rem;
-                margin-bottom: 0.8rem;
-            }
-            
+                margin-bottom: 1rem;
+            }        
             .ascent-number {
                 color: #1ed760;
                 font-weight: 500;
                 margin-bottom: 0.3rem;
             }
+            .ascent-header {
+                display: flex;
+                align-items: baseline;
+                gap: 0.5rem;
+                margin-bottom: 0.3rem;
+            }
+            
+            .ascent-date {
+                color: #b3b3b3;
+                font-size: 1rem;
+            }
             
             .ascent-note {
                 color: #b3b3b3;
+                font-size: 1rem;
+                margin-left: 0rem;
             }
             </style>
         """, unsafe_allow_html=True)
@@ -246,64 +287,24 @@ def page_total_routes(user_id):
         length = route_data['length']
         total_length = length * times_climbed
         formatted_total_length = "{:,}".format(total_length)
+        squared_image = get_squared_image(route_data['primary_photo_url'])
+        route_url = route_data['route_url']
 
+        needs_break = "between" in date_text.lower()
 
         # Intro text
         st.markdown(f"""
             <div class="intro-text">
-                Out of {total_routes_count} routes {date_text}<br>
-                You had a favorite!
-            </div>
-        """, unsafe_allow_html=True)
-
-        st.markdown("""
-        <style>
-                    
-        .block-container {
-            padding-top: 3rem !important; 
-        }
+                Out of {total_routes_count} routes{' <br>' if needs_break else ' '}{date_text}<br>
+                You couldn't get enough of """, unsafe_allow_html=True)
         
-        .intro-text {
-            color: white;
-            font-size: 2rem;
-            text-align: center;
-            line-height: 1.4;
-            margin-top: -5.5rem;
-            margin-bottom: 1rem;
-        }
-            .stat-container {
-                display: flex;
-                align-items: baseline;
-                gap: 0.5rem;
-                margin-bottom: -1rem;
-            }
-            
-            .stat-number {
-                color: #1ed760;
-                font-size: 1.5rem;  /* Reduced from 3.5rem */
-                font-weight: bold;
-            }
-            
-            .stat-label {
-                color: #b3b3b3;
-                font-size: 1.3rem;
-            }
-            .location-text {
-                color: #b3b3b3;
-                font-size: 1.1rem;
-                margin-bottom: .5rem;
-            }
-            .route-title {
-                color: white;
-                font-size: 1.5rem;
-                margin-bottom: 0.2rem;
-            }
-        </style>
-    """, unsafe_allow_html=True)
-
+        # Route card
         st.markdown(f"""
             <div class="route-card">
-                <div class="route-title">{route_data['route_name']} ~ {route_data['grade']}</div>
+                <div class="route-title">
+                    <a href="{route_data['route_url']}" target="_blank" class="route-link">{route_data['route_name']}</a> 
+                    ~ {route_data['grade']}
+                </div>
                 <div class="location-text">{route_data['specific_location']}</div>
                 <div class="stat-container">
                     <span class="stat-number">{times_climbed}</span>
@@ -313,88 +314,89 @@ def page_total_routes(user_id):
                     <span class="stat-number">{formatted_total_length}</span>
                     <span class="stat-label">Total Feet Climbed!</span>
         """, unsafe_allow_html=True)
-        
-        
-        # Process notes
-        if route_data['notes']:
-            st.markdown("### Your Journey")
-            note_list = route_data['notes'].split(" | ")
-            note_list.reverse()
+
+        with st.expander("🏷️ Route Tags"):
+            # Check if any tags exist
+            has_tags = any(route_data.get(tag_type) for tag_type in ['styles', 'features', 'descriptors', 'rock_type'])
             
-            for i, note in enumerate(note_list[::-1]):
-                if note.strip():
+            if not has_tags:
+                st.markdown("<div class='no-tags'>No tags available for this route</div>", unsafe_allow_html=True)
+            else:
+                # Only show categories that exist and have tags
+                if route_data.get('styles'):
                     st.markdown(f"""
-                        <div class="ascent-container">
-                            <div class="ascent-number">Ascent #{i+1}</div>
-                            <div class="ascent-note">{note.strip()}</div>
+                        <div class="tag-category">
+                            <div class="tag-header">
+                                <span class="tag-icon">⚡</span>
+                                <span class="tag-title">Style</span>
+                            </div>
+                            <div class="tag-list">{route_data['styles']}</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                    
+                if route_data.get('features'):
+                    st.markdown(f"""
+                        <div class="tag-category">
+                            <div class="tag-header">
+                                <span class="tag-icon">🏔️</span>
+                                <span class="tag-title">Features</span>
+                            </div>
+                            <div class="tag-list">{route_data['features']}</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                    
+                if route_data.get('descriptors'):
+                    st.markdown(f"""
+                        <div class="tag-category">
+                            <div class="tag-header">
+                                <span class="tag-icon">📝</span>
+                                <span class="tag-title">Descriptors</span>
+                            </div>
+                            <div class="tag-list">{route_data['descriptors']}</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                    
+                if route_data.get('rock_type'):
+                    st.markdown(f"""
+                        <div class="tag-category">
+                            <div class="tag-header">
+                                <span class="tag-icon">🪨</span>
+                                <span class="tag-title">Rock Type</span>
+                            </div>
+                            <div class="tag-list">{route_data['rock_type']}</div>
                         </div>
                     """, unsafe_allow_html=True)
 
+        with st.expander("Click to initiate nostalgia sequence &nbsp;&nbsp;&nbsp;&nbsp;🕹️ &nbsp;&nbsp; 🎮 "):
+            if route_data['primary_photo_url']:
+                col1, col2, col3 = st.columns([1,2,1])
+                with col2:
+                    st.markdown(f"""
+                        <div class="photo-container">
+                            <img src="{image_to_base64(squared_image)}" class="route-photo" />
+                        </div>
+                    """, unsafe_allow_html=True)
+        
+        
+        # Process notes
+        if route_data is not None:
+            ascents = list(zip(route_data['dates'], 
+                    route_data['types'], 
+                    route_data['notes']))
+            st.markdown('<div class="journey-title">Your Journey Dialing it in</div>', unsafe_allow_html=True)
 
+            for i, (date, tick_type, note) in enumerate(ascents, 1):
 
-
-def page_most_climbed(user_id):
-    """Page showing most repeated route"""
-    route_data = metrics.most_climbed_route(conn, user_id=user_id)
-    
-    if route_data:
-        route_name = route_data[0]
-        notes = route_data[1]
-        first_date = route_data[2]
-        times_climbed = route_data[3]
-
-        formatted_date = first_date.strftime('%b %d')
-        day = first_date.day
-
-        if day in [1, 21, 31]:
-            suffix = 'st'
-        elif day in [2, 22]:
-            suffix = 'nd'
-        elif day in [3, 23]:
-            suffix = 'rd'
-        else:
-            suffix = 'th'
-
-        note_list = notes.split(" | ") if notes else []
-        note_list.reverse()
-        
-        formatted_notes = ""
-        if note_list:
-            formatted_notes = "Let's relive some memories:<br><br>"
-            formatted_notes += "<br>".join([
-                f'<div style="max-width: 1000px;">Ascent #{i+1}: "{note.strip()}"</div>'
-                for i, note in enumerate(note_list)
-                if note.strip()
-            ])
-        
-        main_text = f"Your most climbed route was<br>{route_name}"
-        subtitle = f"You climbed it {times_climbed} times"
-        detail_text = f"starting on {formatted_date}{suffix}<br><br>{formatted_notes}"
-        
-        st.markdown(diamond_template(main_text, subtitle, detail_text), unsafe_allow_html=True)
-
-def get_squared_image(url):
-    try:
-        response = requests.get(url)
-        img = Image.open(BytesIO(response.content))
-        
-        # Get the largest dimension
-        max_dim = max(img.width, img.height)
-        
-        # Create a square black background of the largest dimension
-        square_img = Image.new('RGB', (max_dim, max_dim), (0, 0, 0))
-        
-        # Calculate position to paste (center)
-        paste_x = (max_dim - img.width) // 2
-        paste_y = (max_dim - img.height) // 2
-        
-        # Paste original onto square background
-        square_img.paste(img, (paste_x, paste_y))
-        return square_img
-        
-    except Exception as e:
-        print(f"Error loading image from {url}: {e}")
-        return None
+                date_type_text = f"{date.strftime('%B %d, %Y')}{f' ({tick_type})' if tick_type else ''}"
+                st.markdown(f"""
+                    <div class="ascent-container">
+                        <div class="ascent-header">
+                            <span class="ascent-number">Ascent #{i}</span>
+                            <span class="ascent-date">{date_type_text}</span>
+                        </div>
+                        <div class="ascent-note">{note if note else ''}</div>
+                    </div>
+                """, unsafe_allow_html=True)
 
 def page_top_routes(user_id):
     """Page showing top rated routes and tags"""
@@ -836,6 +838,7 @@ def page_bigwall_routes(user_id):
                 }
             </style>
         """, unsafe_allow_html=True)
+        
         with st.expander("Filters"):
 
             available_grades = sorted([g for g in df['commitment_grade'].unique() if pd.notna(g)])
@@ -1289,15 +1292,21 @@ def main():
 
     # Page mapping
     pages = {
-        8: lambda: page_total_length(user_id),
-        7: lambda: page_biggest_day(user_id),
-        2: lambda: page_total_routes(user_id),
-        3: lambda: page_most_climbed(user_id),
-        4: lambda: page_top_routes(user_id),
-        5: lambda: page_areas_breakdown(user_id),
-        6: lambda: page_grade_distribution(user_id),
-        1: lambda: page_bigwall_routes(user_id),
-        0: lambda: page_first_ascents(user_id)
+        0: lambda: page_most_climbed_route(user_id),
+        1: lambda: page_first_ascents(user_id),
+        2: lambda: page_bigwall_routes(user_id),
+
+
+
+        #8: lambda: page_total_length(user_id),
+        #7: lambda: page_biggest_day(user_id),
+
+        #0: lambda: page_most_climbed(user_id),
+        5: lambda: page_top_routes(user_id),
+        4: lambda: page_areas_breakdown(user_id),
+        3: lambda: page_grade_distribution(user_id),
+
+
     }
 
     # Apply styles based on current page

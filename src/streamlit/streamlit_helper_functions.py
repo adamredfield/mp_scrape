@@ -4,6 +4,10 @@ from datetime import datetime
 import json
 import boto3
 import random
+from PIL import Image
+import requests
+from io import BytesIO
+import base64
 
 sqs = boto3.client('sqs',
         region_name=st.secrets["aws"]["region"],
@@ -351,3 +355,32 @@ def verify_data_inserted(conn, user_id):
     result = conn.query(verify_query, params={"user_id": user_id}, ttl=0)
     tick_count = result.iloc[0,0]
     return tick_count
+
+def image_to_base64(pil_image):
+    buffered = BytesIO()
+    pil_image.save(buffered, format="JPEG")
+    img_str = base64.b64encode(buffered.getvalue()).decode()
+    return f"data:image/jpeg;base64,{img_str}"
+
+def get_squared_image(url):
+    try:
+        response = requests.get(url)
+        img = Image.open(BytesIO(response.content))
+        
+        # Get the largest dimension
+        max_dim = max(img.width, img.height)
+        
+        # Create a square black background of the largest dimension
+        square_img = Image.new('RGB', (max_dim, max_dim), (0, 0, 0))
+        
+        # Calculate position to paste (center)
+        paste_x = (max_dim - img.width) // 2
+        paste_y = (max_dim - img.height) // 2
+        
+        # Paste original onto square background
+        square_img.paste(img, (paste_x, paste_y))
+        return square_img
+        
+    except Exception as e:
+        print(f"Error loading image from {url}: {e}")
+        return None
