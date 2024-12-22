@@ -1,6 +1,3 @@
-import streamlit as st
-
-# Styling
 STYLES = {
     'base': """
         footer {visibility: hidden;}

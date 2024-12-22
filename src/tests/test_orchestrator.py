@@ -11,12 +11,11 @@ load_dotenv()
 
 
 def test_orchestrator():
-    # Use the exact event we just tried in Lambda
+    # test event
     test_event = {
         "user_id": "200832950/stevie-morris"
     }
     
-    # Simulate Lambda context
     test_context = None
     
     try:

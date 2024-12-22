@@ -17,7 +17,6 @@ def test_proxy_connection():
     
     print("Testing proxy connection...")
     try:
-        # Test with ipify
         response = requests.get(
             'https://api.ipify.org?format=json',
             proxies={

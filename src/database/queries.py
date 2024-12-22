@@ -138,4 +138,3 @@ def insert_routes_batch(cursor, routes_data):
     except Exception as e:
         print(f"Error inserting routes batch: {str(e)}")
         raise
-
