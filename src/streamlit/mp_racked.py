@@ -245,6 +245,7 @@ def page_total_routes(user_id):
         suffix = 'th' if 11 <= day <= 13 else {1: 'st', 2: 'nd', 3: 'rd'}.get(day % 10, 'th')
         length = route_data['length']
         total_length = length * times_climbed
+        formatted_total_length = "{:,}".format(total_length)
 
 
         # Intro text
@@ -257,11 +258,24 @@ def page_total_routes(user_id):
 
         st.markdown("""
         <style>
+                    
+        .block-container {
+            padding-top: 3rem !important; 
+        }
+        
+        .intro-text {
+            color: white;
+            font-size: 2rem;
+            text-align: center;
+            line-height: 1.4;
+            margin-top: -5.5rem;
+            margin-bottom: 1rem;
+        }
             .stat-container {
                 display: flex;
                 align-items: baseline;
                 gap: 0.5rem;
-                margin-bottom: 0.5rem;
+                margin-bottom: -1rem;
             }
             
             .stat-number {
@@ -274,18 +288,30 @@ def page_total_routes(user_id):
                 color: #b3b3b3;
                 font-size: 1.3rem;
             }
+            .location-text {
+                color: #b3b3b3;
+                font-size: 1.1rem;
+                margin-bottom: .5rem;
+            }
+            .route-title {
+                color: white;
+                font-size: 1.5rem;
+                margin-bottom: 0.2rem;
+            }
         </style>
     """, unsafe_allow_html=True)
 
         st.markdown(f"""
             <div class="route-card">
                 <div class="route-title">{route_data['route_name']} ~ {route_data['grade']}</div>
+                <div class="location-text">{route_data['specific_location']}</div>
                 <div class="stat-container">
                     <span class="stat-number">{times_climbed}</span>
                     <span class="stat-label">Laps Starting on {formatted_date}{suffix}</span>
-                    <div class="stat-number">{total_length}</div>
-                    <span class="stat-label">Total Feet Climbed!</span>
                 </div>
+                <div class="stat-container">
+                    <span class="stat-number">{formatted_total_length}</span>
+                    <span class="stat-label">Total Feet Climbed!</span>
         """, unsafe_allow_html=True)
         
         
