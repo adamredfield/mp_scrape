@@ -315,15 +315,19 @@ def page_grade_distribution(user_id, conn):
                 'displayModeBar': False, 
                 'doubleClick': False,    
                 'dragmode': True,        
-                'responsive': True,       
+                'responsive': True,
+                'showAxisDragHandles': False,
+                'showAxisRangeEntryBoxes': False,
+                'showTips': False,  
                 'modeBarButtonsToRemove': [
-                    'zoom',
+            'zoom',
                     'pan',
                     'select',
                     'lasso2d',
                     'zoomIn2d',
                     'zoomOut2d',
                     'autoScale2d',
+                    'resetScale2d'
                 ]
             },
             on_select="rerun",
