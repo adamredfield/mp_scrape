@@ -25,6 +25,10 @@ def main():
     if user_id:
         st.session_state['user_id'] = user_id
         st.session_state['conn'] = conn
+        st.session_state['authenticated'] = True
+    else:
+        st.session_state['authenticated'] = False
+    
    
 if __name__ == "__main__":
     main() 

@@ -1,5 +1,10 @@
 import streamlit as st
 
+if 'authenticated' not in st.session_state or not st.session_state['authenticated']:
+    st.warning('⚠️ Please enter your Mountain Project URL or User ID on the home page first.')
+    st.stop()
+
+
 st.set_page_config(
     page_title="Your 2024 Climbing Racked",
     page_icon="🧗‍♂️"
