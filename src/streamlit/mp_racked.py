@@ -19,17 +19,20 @@ sys.path.append(project_root)
 from src.streamlit.streamlit_helper_functions import get_user_id
 
 def main():
+
+    if 'authenticated' not in st.session_state:
+        st.session_state['authenticated'] = False
+
     conn = st.connection('postgresql', type='sql')
     
-    user_id = get_user_id(conn)
-    if user_id:
-        st.session_state['user_id'] = user_id
-        st.session_state['conn'] = conn
-        st.session_state['authenticated'] = True
-    else:
-        st.session_state['authenticated'] = False
-    
-   
+    if not st.session_state['authenticated']:
+        user_id = get_user_id(conn)
+        if user_id:
+            st.session_state['user_id'] = user_id
+            st.session_state['conn'] = conn
+            st.session_state['authenticated'] = True
+            st.switch_page("pages/grade_distribution.py")
+
 if __name__ == "__main__":
     main() 
 
