@@ -20,7 +20,6 @@ from src.streamlit.chart_utils import create_gradient_bar_chart
 user_id = st.session_state.user_id
 conn = st.connection('postgresql', type='sql')
 
-"""Page showing bigwall routes climbed"""
 try:
     df = metrics.get_bigwall_routes(conn,user_id=user_id)
     print(df['route_type'].unique())

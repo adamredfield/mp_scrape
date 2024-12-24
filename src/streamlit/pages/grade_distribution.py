@@ -219,7 +219,7 @@ st.markdown("""
         margin-top: 1rem !important;
     }
     .stExpander {
-        margin-top: -3rem !important;
+        margin-top: -2rem !important;
         margin-bottom: 2rem !important;
     }
             
@@ -278,17 +278,6 @@ sends_df, falls_df = get_chart_data(
 
 ordered_grades = sends_df['grade'].tolist()
 
-"""
-st.markdown(
-    f'''
-    <div class='total-section'>
-        <div class='total-label'>Most Common Grade</div>
-        <div class='total-value'>{most_common_grade}</div>
-    </div>
-    ''',
-    unsafe_allow_html=True
-)
-"""
 st.markdown("""
 <style>
 .chart-title {

@@ -20,8 +20,6 @@ import pandas as pd
 user_id = st.session_state.user_id
 conn = st.connection('postgresql', type='sql')
 
-"""Combined page showing total routes and most repeated route"""
-
 years_query = f"""
     SELECT DISTINCT EXTRACT(YEAR FROM date)::int as year
     FROM routes.Ticks
