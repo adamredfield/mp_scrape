@@ -131,7 +131,10 @@ def create_figure(sends_df, falls_df, ordered_grades):
             zerolinewidth=0.5,
             tickmode='array',
             ticktext=tick_texts,
-            tickvals=tick_vals
+            tickvals=tick_vals,
+                    fixedrange=True,     # Disable x-axis zoom
+        rangeslider=None,    # Remove rangeslider
+        constrain='domain'   # Constrain axis
         ),
         yaxis=dict(
             title='Grade',
@@ -142,8 +145,13 @@ def create_figure(sends_df, falls_df, ordered_grades):
             type='category',
             tickmode='array',
             ticktext=ordered_grades[::-1],
-            tickvals=ordered_grades[::-1]
+            tickvals=ordered_grades[::-1],
+                    fixedrange=True,     # Disable y-axis zoom
+        constrain='domain'   # Constrain axis
         ),
+            dragmode=False,         # Disable dragging
+        clickmode='event',      # Enable only clicks
+        hovermode='closest',     # Simplify hover behavior
         height=600
     )
     return fig
@@ -265,8 +273,6 @@ def page_grade_distribution(user_id, conn):
 
     ordered_grades = sends_df['grade'].tolist()
 
-    most_common_grade = metrics.top_grade(conn,level=grade_grain, user_id=user_id)
-
     """
     st.markdown(
         f'''
@@ -304,10 +310,25 @@ def page_grade_distribution(user_id, conn):
         selected = st.plotly_chart(
             fig,
             use_container_width=True,
-            config={'displayModeBar': False},
-            on_select="rerun",  # Enable selection events
-            key="grade_dist_chart"
-        )
+            config={
+                'scrollZoom': False,
+                'displayModeBar': False, 
+                'doubleClick': False,    
+                'dragmode': True,        
+                'responsive': True,       
+                'modeBarButtonsToRemove': [
+                    'zoom',
+                    'pan',
+                    'select',
+                    'lasso2d',
+                    'zoomIn2d',
+                    'zoomOut2d',
+                    'autoScale2d',
+                ]
+            },
+            on_select="rerun",
+                        key="grade_dist_chart"
+                    )
 
         # Handle selection events
     if selected and selected.selection and len(selected.selection.points) > 0:
