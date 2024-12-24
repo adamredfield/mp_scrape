@@ -4,7 +4,7 @@ import sys
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(project_root)
 
-import src.analysis.mp_racked_metrics as metrics
+import src.analysis.fa_queries as fa_queries
 import streamlit as st
 import pandas as pd
 from src.streamlit.chart_utils import create_bar_chart
@@ -16,8 +16,8 @@ def page_first_ascents(user_id, conn):
     if 'selected_fa' not in st.session_state:
         st.session_state.selected_fa = None
 
-    top_fas = metrics.get_top_first_ascensionists(conn, user_id=user_id)
-    partnerships = metrics.get_collaborative_ascensionists(conn, "All FAs", user_id)
+    top_fas = fa_queries.get_top_first_ascensionists(conn, user_id=user_id)
+    partnerships = fa_queries.get_collaborative_ascensionists(conn, "All FAs", user_id)
 
     st.markdown("""
         <style>
@@ -208,12 +208,12 @@ def page_first_ascents(user_id, conn):
    
         current_selection = st.session_state.selected_fa or "All FAs"
     
-    decades = metrics.get_first_ascensionist_by_decade(conn, current_selection, user_id)
-    areas = metrics.get_first_ascensionist_areas(conn, current_selection, user_id)
-    grades = metrics.get_first_ascensionist_grades(conn, current_selection, user_id)
+    decades = fa_queries.get_first_ascensionist_by_decade(conn, current_selection, user_id)
+    areas = fa_queries.get_first_ascensionist_areas(conn, current_selection, user_id)
+    grades = fa_queries.get_first_ascensionist_grades(conn, current_selection, user_id)
 
     if view_type == "Individual FA":
-        partners = metrics.get_collaborative_ascensionists(conn, current_selection, user_id)
+        partners = fa_queries.get_collaborative_ascensionists(conn, current_selection, user_id)
         
     if view_type == "All FAs":
         create_bar_chart(
@@ -227,7 +227,7 @@ def page_first_ascents(user_id, conn):
         st.markdown("<div class='list-container'>", unsafe_allow_html=True)
         for fa, count in top_fas:          
             with st.expander(f"{fa} - {count} routes"):
-                routes = metrics.get_fa_routes(conn, fa, user_id)
+                routes = fa_queries.get_fa_routes(conn, fa, user_id)
                 for route in routes:
                     st.markdown(
                         f"<div class='route-item'>{route[0]}</div>", 
@@ -260,10 +260,10 @@ def page_first_ascents(user_id, conn):
         if view_type == "Individual FA":
             st.markdown("<h3 style='text-align: center;'>Frequent Partners</h3>", unsafe_allow_html=True)
             st.markdown("<div class='list-container'>", unsafe_allow_html=True)
-            partners = metrics.get_collaborative_ascensionists(conn, current_selection, user_id)
+            partners = fa_queries.get_collaborative_ascensionists(conn, current_selection, user_id)
             for partner, count in partners:
                 with st.expander(f"{partner} - {count} routes"):
-                    routes = metrics.get_partnership_routes(conn, current_selection, partner, user_id)
+                    routes = fa_queries.get_partnership_routes(conn, current_selection, partner, user_id)
                     for route in routes:
                         st.markdown(
                             f"<div class='route-item'>{route[0]}</div>", 
@@ -276,7 +276,7 @@ def page_first_ascents(user_id, conn):
             
             # Split the partnership into individual names
             climber1, climber2 = current_selection.split(" & ")
-            partnership_routes = metrics.get_partnership_routes(conn, climber1.strip(), climber2.strip(), user_id)
+            partnership_routes = fa_queries.get_partnership_routes(conn, climber1.strip(), climber2.strip(), user_id)
             if partnership_routes:
                 df = pd.DataFrame(partnership_routes, columns=['Route'])
                 

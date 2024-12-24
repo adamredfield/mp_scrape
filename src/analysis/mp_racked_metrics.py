@@ -146,18 +146,80 @@ def get_grade_distribution(conn, route_types=None, level='base', year_start=None
 def grade_sort_key(grade):
     # Handle V grades
     if grade.startswith('V'):
+        if grade == 'V-easy':
+            return (1000, -1, 2)  # Sort below V0
+        
+        grade = grade[1:]  # Remove 'V' prefix
+        base_part = ''
+        modifier = ''
+        
+        # Handle range grades (V0-1, V2-3, etc) and modifiers
+        if '-' in grade:
+            parts = grade.split('-')
+            try:
+                # Handle ranges like V0-1
+                if len(parts) == 2 and parts[1].isdigit():
+                    base_grade = int(parts[0])
+                    return (1000, base_grade, 2.5)
+                # Handle minus modifier (V1-)
+                elif parts[1] == '':
+                    base_grade = int(parts[0])
+                    return (1000, base_grade, 1)
+            except ValueError:
+                return (1000, 0, 0)
+        
+        # Handle plus grades and plain grades
+        if '+' in grade:
+            try:
+                base_grade = int(grade.replace('+', ''))
+                return (1000, base_grade, 3)
+            except ValueError:
+                return (1000, 0, 0)
+        
+        # Plain V grade
         try:
-            return (1000, int(grade[1:]))  # Put V grades at the top
-        except (ValueError, IndexError):
-            return (1000, 0)
-    
-    # Aid grades
+            base_grade = int(grade)
+            return (1000, base_grade, 2)
+        except ValueError:
+            return (1000, 0, 0)
+        
     if grade.startswith('A') or grade.startswith('C'):
+        base_part = ''
+        modifier = ''
+        
+        # Get the prefix (A or C)
+        prefix = grade[0]
+        
+        # Skip the A or C prefix
+        grade = grade[1:]
+        
+        # Extract base grade and modifier
+        for i, char in enumerate(grade):
+            if char.isdigit():
+                base_part += char
+            else:
+                modifier = grade[i:]
+                break
+        
         try:
-            return (2000, int(grade[1:]))  # Put aid grades at the end
-        except (ValueError, IndexError):
-            return (2000, 0)
-    
+            base_grade = int(base_part)
+            
+            # Aid grade modifier values
+            aid_modifier_values = {
+                '-': 1, 
+                '': 2,
+                '+': 3 
+            }
+            
+            modifier_val = aid_modifier_values.get(modifier, 2)
+            
+            # A harder than C
+            prefix_value = 3000 if prefix == 'A' else 2000
+            
+            return (prefix_value, base_grade, modifier_val)
+        except ValueError:
+            return (2000, 0, 0)
+        
     # YDS grades
     if grade.startswith('5.'):
         cleaned_grade = grade.replace('5.', '')

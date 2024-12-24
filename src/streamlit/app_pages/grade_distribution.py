@@ -10,8 +10,6 @@ import pandas as pd
 from src.streamlit.styles import get_spotify_style
 import plotly.graph_objects as go
 from src.streamlit.filters import render_filters
-from streamlit_plotly_events import plotly_events
-import json
 
 @st.cache_data
 def get_chart_data(_conn, user_id, grade_grain, route_type, year_start, year_end):
@@ -58,7 +56,7 @@ def create_figure(sends_df, falls_df, ordered_grades):
         'Alpine': '#B71C1C'    # Material Design red (darkest)
     }
     
-    # clean sends
+    # sends
     for route_type in sends_df['route_type'].unique():
         mask = sends_df['route_type'] == route_type
         fig.add_trace(go.Bar(
@@ -89,7 +87,7 @@ def create_figure(sends_df, falls_df, ordered_grades):
     # Get the maximum absolute value from the data
     max_val = max(abs(min(fig.data[0].x)), max(fig.data[0].x))
     
-    # Automatically determine tick interval based on max value
+    # Tick interval based on max value
     if max_val <= 10:
         tick_interval = 2
     elif max_val <= 30:
@@ -113,14 +111,14 @@ def create_figure(sends_df, falls_df, ordered_grades):
         plot_bgcolor='rgba(0,0,0,0)',
         showlegend=True,
         legend={
-        'orientation': 'h',
-        'yanchor': 'bottom',
-        'y': 1.02,
-        'xanchor': 'center',
-        'x': 0.4,
-        'font': {'color': 'white'},
-        'groupclick': 'toggleitem',
-        'itemsizing': 'constant'
+            'orientation': 'h',
+            'yanchor': 'bottom',
+            'y': 1.02,
+            'xanchor': 'center',
+            'x': 0.4,
+            'font': {'color': 'white'},
+            'groupclick': 'toggleitem', 
+            'itemsizing': 'constant'
         },
         xaxis=dict(
             title='Number of Climbs',
@@ -132,9 +130,9 @@ def create_figure(sends_df, falls_df, ordered_grades):
             tickmode='array',
             ticktext=tick_texts,
             tickvals=tick_vals,
-                    fixedrange=True,     # Disable x-axis zoom
-        rangeslider=None,    # Remove rangeslider
-        constrain='domain'   # Constrain axis
+            fixedrange=True, 
+            rangeslider=dict(visible=False),
+            constrain='domain'
         ),
         yaxis=dict(
             title='Grade',
@@ -146,12 +144,12 @@ def create_figure(sends_df, falls_df, ordered_grades):
             tickmode='array',
             ticktext=ordered_grades[::-1],
             tickvals=ordered_grades[::-1],
-                    fixedrange=True,     # Disable y-axis zoom
-        constrain='domain'   # Constrain axis
+            fixedrange=True,
+            constrain='domain'
         ),
-            dragmode=False,         # Disable dragging
-        clickmode='event',      # Enable only clicks
-        hovermode='closest',     # Simplify hover behavior
+        dragmode=False,
+        clickmode='event',
+        hovermode='closest',
         height=600
     )
     return fig
@@ -300,10 +298,8 @@ def page_grade_distribution(user_id, conn):
 
     fig = create_figure(sends_df, falls_df, ordered_grades)
 
-  # Create containers
     chart_container = st.container()
     details_container = st.container()
-
 
     with chart_container:
         # Enable selection events
@@ -320,7 +316,7 @@ def page_grade_distribution(user_id, conn):
                 'showAxisRangeEntryBoxes': False,
                 'showTips': False,  
                 'modeBarButtonsToRemove': [
-            'zoom',
+                    'zoom',
                     'pan',
                     'select',
                     'lasso2d',
@@ -334,10 +330,9 @@ def page_grade_distribution(user_id, conn):
                         key="grade_dist_chart"
                     )
 
-        # Handle selection events
+    # Handle selection events
     if selected and selected.selection and len(selected.selection.points) > 0:
             point = selected.selection.points[0]
-            
             
             # Check if we have the expected data
             if all(key in point for key in ['y', 'x', 'curve_number']):
@@ -357,7 +352,6 @@ def page_grade_distribution(user_id, conn):
                     year_end=end_date
                 )
 
-                
                 with details_container:
                     st.write(f"### {grade} {selected_route_type} {'Sends' if is_send else 'Falls'}")
                     
