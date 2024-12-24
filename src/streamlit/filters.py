@@ -32,7 +32,7 @@ def get_filter_style():
         </style>
     """
 
-def grade_filter(df):
+def commitment_grade_filter(df):
     """Commitment grade filter"""
     available_grades = sorted([g for g in df['commitment_grade'].unique() if pd.notna(g)])
     return st.multiselect(
@@ -41,7 +41,30 @@ def grade_filter(df):
         key='commitment_grade_filter'
     )
 
-def type_filter(df):
+def grade_type_filter(df=None):
+    """Filter for different grade types (YDS, Hueco, Aid)"""
+    return st.selectbox(
+        "Grade Type",
+        options=['All Grades', 'YDS', 'Hueco', 'Aid'],
+        format_func=lambda x: {
+            'All Grades': 'All Grades',
+            'YDS': 'Rope Grades (YDS)',
+            'Hueco': 'Boulder Grades (V Scale)',
+            'Aid': 'Aid Grades (A/C)'
+        }.get(x, x),
+        key='grade_type_filter'
+    )
+
+def grade_grain_filter(df=None):
+    """Grade filter"""
+    return st.selectbox(
+            "Grade Detail Level",
+            options=['base', 'granular', 'original'],
+            format_func=lambda x: x.title(),
+            key='grade_grain_filter'
+        )
+
+def type_filter():
     """Route type filter"""
     return st.multiselect(
         'Filter by Route Type:',
@@ -96,7 +119,22 @@ def date_filter(df):
             )
         return year_start, year_end
 
-def render_filters(df, filters_to_include=None, filter_title="Filters"):
+def route_type_filter(df=None):
+    """Filter for different climbing types"""
+    return st.selectbox(
+        "Climbing Type",
+        options=['All', 'Boulder', 'Aid', 'Sport', 'Trad'],
+        format_func=lambda x: {
+            'All': 'All Types',
+            'Boulder': 'Boulder',
+            'Aid': 'Aid',
+            'Sport': 'Sport',
+            'Trad': 'Trad'
+        }.get(x, x),
+        key='climbing_type_filter'
+    )
+
+def render_filters(df=None, filters_to_include=None, filter_title="Filters"):
     """
     Render filter expander with specified filters
     
@@ -111,10 +149,12 @@ def render_filters(df, filters_to_include=None, filter_title="Filters"):
         filters_to_include = ['grade', 'type', 'length', 'date']
     
     filter_functions = {
-        'grade': grade_filter,
+        'commitment_grade': commitment_grade_filter,
+        'grade_grain': grade_grain_filter,
         'type': type_filter,
         'length': length_filter,
-        'date': date_filter
+        'date': date_filter,
+        'route_type': route_type_filter
     }
     
     results = {}

@@ -10,6 +10,11 @@ import pandas as pd
 from src.streamlit.styles import get_spotify_style
 import plotly.graph_objects as go
 
+st.set_page_config(
+    page_title="Your 2024 Climbing Racked",
+    page_icon="🧗‍♂️"
+)
+
 def page_areas_breakdown(user_id, conn):
     states = metrics.states_climbed(conn, user_id=user_id)
     sub_areas = metrics.sub_areas_climbed(conn, user_id=user_id)
