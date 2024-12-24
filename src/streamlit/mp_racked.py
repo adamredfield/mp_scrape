@@ -29,13 +29,13 @@ st.set_page_config(
     }
 )
 
-conn = st.connection('postgresql', type='sql')
-
-# Initialize session state
-if 'page' not in st.session_state:
-    st.session_state.page = 0
-
 def main():
+
+    conn = st.connection('postgresql', type='sql')
+
+    # Initialize session state
+    if 'page' not in st.session_state:
+        st.session_state.page = 0
     
     user_id = get_user_id(conn)
     if not user_id:
@@ -46,16 +46,14 @@ def main():
 
     # Page mapping
     pages = {
-        0: lambda: page_most_climbed_route(user_id, conn),
+        3: lambda: page_most_climbed_route(user_id, conn),
         1: lambda: page_first_ascents(user_id, conn),
         2: lambda: page_bigwall_routes(user_id, conn),
-        3: lambda: page_grade_distribution(user_id, conn),
+        0: lambda: page_grade_distribution(user_id, conn),
         4: lambda: page_areas_breakdown(user_id, conn)
         #8: lambda: page_total_length(user_id),
         #7: lambda: page_biggest_day(user_id),
         #5: lambda: page_top_routes(user_id),
-
-
     }
 
     # Apply styles based on current page

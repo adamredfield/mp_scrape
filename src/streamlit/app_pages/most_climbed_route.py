@@ -21,10 +21,11 @@ def page_most_climbed_route(user_id, conn):
         and length(EXTRACT(YEAR FROM date)::text) = 4
         ORDER BY year
     """
+    
     available_years_df = conn.query(years_query)
     years_df = pd.DataFrame({'date': pd.to_datetime(available_years_df['year'], format='%Y')})
 
-    filters = render_filters(years_df, filters_to_include=['date'], filter_title="Choose your year")
+    filters = render_filters(years_df, filters_to_include=['date'], filter_title="Choose your filters")
     if filters['year_start'] is not None and filters['year_end'] is not None:
         total_routes_df = metrics.total_routes(conn, user_id=user_id, year_start=filters['year_start'], year_end=filters['year_end'])
         route_data = metrics.most_climbed_route(conn, user_id=user_id, year_start=filters['year_start'], year_end=filters['year_end'])

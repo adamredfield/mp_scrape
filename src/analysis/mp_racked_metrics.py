@@ -6,7 +6,7 @@ sys.path.append(project_root)
 
 from src.analysis.ai_analysis_helper_functions import get_grade_group
 from operator import itemgetter
-
+import pandas as pd
 estimated_lengths_cte = f"""
         WITH estimated_lengths AS (
         SELECT  id,
@@ -155,8 +155,46 @@ def get_tick_type_distribution(conn, route_types=None, user_id=None):
     """
     return conn.query(query)
 
-def get_grade_distribution(conn, route_types=None, level='base', year=None, user_id=None):
+def get_raw_grade_data(conn, user_id=None, tick_type=None):
+    """Get raw grade data for debugging"""
+    tick_filter = "AND t.type = 'Lead / Fell/Hung'" if tick_type == 'fall' else ""
+    
+    query = f"""
+    SELECT 
+        r.route_name,
+        r.yds_rating as grade,
+        r.route_type,
+        t.type as tick_type,
+        COUNT(*) as count
+    FROM routes.Routes r
+    JOIN routes.Ticks t ON r.id = t.route_id
+    WHERE r.yds_rating = '5.0'
+    {tick_filter}
+    {add_user_filter(user_id)}
+    GROUP BY r.route_name, r.yds_rating, r.route_type, t.type
+    """
+    return conn.query(query)
+
+def get_grade_distribution(conn, route_types=None, level='base', year_start=None, year_end=None, user_id=None, tick_type='send'):
     """Get distribution of sends by grade with configurable grouping and route"""
+
+    send_filter = """
+    (
+        r.route_type ILIKE '%Aid%' -- All aid climbs count as sends
+        OR t.type = 'Solo'
+        OR t.type != 'Lead / Fell/Hung'
+    )
+    """
+
+    falls_filter = """
+    (
+        r.route_type NOT ILIKE '%Aid%'  -- Exclude aid climbs from falls
+        AND t.type = 'Lead / Fell/Hung'  
+        AND t.type != 'Solo'
+    )
+    """
+
+    tick_filter = send_filter if tick_type == 'send' else falls_filter
 
     grade_column = """
     CASE 
@@ -165,35 +203,37 @@ def get_grade_distribution(conn, route_types=None, level='base', year=None, user
     ELSE r.yds_rating END"""
 
     query = f"""
-    SELECT 
-        {grade_column} AS grade,
-        COUNT(*) as count,
-        ROUND(COUNT(*) * 100.0 / (
-            SELECT COUNT(*)
-            FROM routes.Ticks t
-            JOIN routes.Routes r2 ON t.route_id = r2.id
-            WHERE r2.route_type IS NOT NULL
-            AND (
-                (r2.route_type NOT ILIKE '%Aid%' AND t.type != 'Lead / Fell/Hung')  -- Filter out fell/hung for non-aid
-                OR (r2.route_type ILIKE '%Aid%')                                     -- Keep all ticks for aid
-            )
-            {route_type_filter(route_types)}
-            {year_filter(year, use_where=False)}
-            {add_user_filter(user_id)}
-        ), 2) as percentage
-    FROM routes.Routes r
-    JOIN routes.Ticks t ON r.id = t.route_id
-    WHERE {grade_column} IS NOT NULL
-    AND (
-        (r.route_type NOT ILIKE '%Aid%' AND t.type != 'Lead / Fell/Hung') -- only include fell / hung for aid routes
-        OR (r.route_type ILIKE '%Aid%')
+    WITH base_data AS (
+        SELECT 
+            {grade_column} AS grade,
+            CASE 
+                WHEN r.route_type ILIKE '%Alpine%' THEN 'Alpine'
+                WHEN r.route_type ILIKE '%Aid%' THEN 'Aid'
+                WHEN r.route_type ILIKE '%Trad%' THEN 'Trad'
+                WHEN r.route_type ILIKE '%Sport%' THEN 'Sport'
+                WHEN r.route_type ILIKE '%TR%' THEN 'TR'
+                ELSE r.route_type 
+            END AS route_type,
+            1 as count  -- Count each climb once
+        FROM routes.Routes r
+        JOIN routes.Ticks t ON r.id = t.route_id
+        WHERE {grade_column} IS NOT NULL
+        AND {tick_filter}
+        {route_type_filter(route_types)}
+        {year_filter(year_range=(year_start, year_end), use_where=False)}
+        {add_user_filter(user_id)}
     )
-    {route_type_filter(route_types)}
-    {year_filter(year, use_where=False)}
-    {add_user_filter(user_id)}
-    GROUP BY grade
-    ORDER BY COUNT(*) DESC;
+    SELECT 
+        grade,
+        route_type,
+        SUM(count) as count,
+        ROUND(SUM(count) * 100.0 / SUM(SUM(count)) OVER(), 2) as percentage
+    FROM base_data
+    GROUP BY grade, route_type
+    ORDER BY grade DESC;
     """
+
+    print(query)
 
     results =  conn.query(query)
 
@@ -202,26 +242,167 @@ def get_grade_distribution(conn, route_types=None, level='base', year=None, user
     for _, row in results.iterrows():
         grade = row['grade']
         count = row['count']
+        route_type = row['route_type']
         grouped_grade = get_grade_group(grade, level)
-        if grouped_grade in grouped_grades:
-            grouped_grades[grouped_grade] += count
-        else:
-            grouped_grades[grouped_grade] = count
 
-    total_count = sum(grouped_grades.values())
+        if grouped_grade not in grouped_grades:
+            grouped_grades[grouped_grade] = {}
 
-    filtered_results = [
-        {
-            'Grade': grade,
-            'Count': count,
-            'Percentage': round(count * 100.0 / total_count, 2)
-        }
-        for grade, count in grouped_grades.items()
-    ]
+        if route_type not in grouped_grades[grouped_grade]:
+            grouped_grades[grouped_grade][route_type] = 0
+
+        grouped_grades[grouped_grade][route_type] += count
+
+    total_count = sum(
+        sum(type_counts.values()) 
+        for type_counts in grouped_grades.values()
+    )
+
+    filtered_results = []
+    for grade, type_counts in grouped_grades.items():
+        for route_type, count in type_counts.items():
+            filtered_results.append({
+                'grade': grade,
+                'count': count,
+                'route_type': route_type,
+                'percentage': round(count * 100.0 / total_count, 2)
+            })
     
-    filtered_results.sort(key = itemgetter('Count'), reverse = True)
+    filtered_results.sort(key=lambda x: (grade_sort_key(x['grade']), x['route_type']))
     
     return filtered_results
+
+
+def grade_sort_key(grade):
+    # Handle V grades
+    if grade.startswith('V'):
+        try:
+            return (1000, int(grade[1:]))  # Put V grades at the top
+        except (ValueError, IndexError):
+            return (1000, 0)
+    
+    # Aid grades
+    if grade.startswith('A') or grade.startswith('C'):
+        try:
+            return (2000, int(grade[1:]))  # Put aid grades at the end
+        except (ValueError, IndexError):
+            return (2000, 0)
+    
+    # YDS grades
+    if grade.startswith('5.'):
+        cleaned_grade = grade.replace('5.', '')
+        
+        if len(cleaned_grade) == 1:  # e.g. 5.9
+            return (100, int(cleaned_grade), 0)
+        
+  # Grades with letters or modifiers
+        base_part = ''
+        modifier = ''
+        
+        # Get base grade
+        for i, char in enumerate(cleaned_grade):
+            if char.isdigit():
+                base_part += char
+            else:
+                modifier = cleaned_grade[i:]
+                break
+        
+        base_grade = int(base_part)
+        
+        # Order modifiers: -, a, b, c, d, +
+        modifier_values = {
+            '-': 1,
+            'a': 2,
+            'a/b': 2.5,
+            'b': 3,
+            'b/c': 4,
+            '': 4,
+            'c': 5,
+            'c/d': 5.5,
+            'd': 6,
+            '+': 7
+        }
+        
+        modifier_val = modifier_values.get(modifier.lower(), 0)
+        return (100, base_grade, modifier_val)
+    
+    return (0, 0, 0)
+
+def get_route_details(conn, grade, route_type, tick_type='send', user_id=None, grade_grain='base', year_start=None, year_end=None):
+    """Get detailed route information for a specific grade and type"""
+
+    route_type_case = """
+    CASE 
+        WHEN r.route_type ILIKE '%Alpine%' THEN 'Alpine'
+        WHEN r.route_type ILIKE '%Aid%' THEN 'Aid'
+        WHEN r.route_type ILIKE '%Trad%' THEN 'Trad'
+        WHEN r.route_type ILIKE '%Sport%' THEN 'Sport'
+        WHEN r.route_type ILIKE '%TR%' THEN 'TR'
+        ELSE r.route_type 
+    END
+    """
+
+    send_filter = """
+    (
+        r.route_type ILIKE '%Aid%'
+        OR t.type = 'Solo'
+        OR t.type != 'Lead / Fell/Hung'
+    )
+    """
+
+    falls_filter = """
+    (
+        r.route_type NOT ILIKE '%Aid%'
+        AND t.type = 'Lead / Fell/Hung'
+        AND t.type != 'Solo'
+    )
+    """
+
+    tick_filter = send_filter if tick_type == 'send' else falls_filter
+
+    grade_column = """
+    CASE 
+        WHEN r.route_type ILIKE '%Boulder%' THEN r.hueco_rating 
+        WHEN r.route_type ILIKE '%Aid%' THEN r.aid_rating 
+    ELSE r.yds_rating END"""
+
+    query = f"""
+    WITH route_data AS (
+        SELECT 
+            r.route_name,
+            r.main_area,
+            r.route_type,
+            {route_type_case} as calculated_type,
+            t.date,
+            t.type as tick_type,
+            r.pitches,
+            {grade_column} as original_grade,
+            r.route_url
+        FROM routes.Routes r
+        JOIN routes.Ticks t ON r.id = t.route_id
+        WHERE {tick_filter}
+        AND {route_type_case} = :route_type
+        AND {grade_column} IS NOT NULL
+        {add_user_filter(user_id)}
+        {year_filter(year_range=(year_start, year_end), use_where=False)}
+    )
+    SELECT * from route_data
+    """
+    
+    params = {
+        'route_type': route_type
+    }
+    
+    results = conn.query(query, params=params)
+    df = pd.DataFrame(results)
+
+    if not df.empty:
+        df['grouped_grade'] = df['original_grade'].fillna('').apply(
+            lambda x: get_grade_group(str(x), grade_grain) if x else None
+        )
+        df = df[df['grouped_grade'] == grade]
+        df = df.drop(['grouped_grade', 'calculated_type'], axis=1)
+    return df
 
 def get_highest_rated_climbs(conn, selected_styles=None, route_types=None, year=None, tag_type=None, user_id=None):
     """Get highest rated climbs"""
@@ -433,7 +614,6 @@ def most_climbed_route(conn, user_id=None, year_start=None, year_end=None):
         return None
 
     return result.iloc[0]
-
 
 def top_rated_routes(conn, user_id=None):
     query = f"""
