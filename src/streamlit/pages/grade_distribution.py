@@ -1,15 +1,6 @@
 import streamlit as st
-
-if 'authenticated' not in st.session_state or not st.session_state['authenticated']:
-    st.warning('⚠️ Please enter your Mountain Project URL or User ID on the home page first.')
-    st.stop()
-
-
-st.set_page_config(
-    page_title="Your 2024 Climbing Racked",
-    page_icon="🧗‍♂️"
-)
-
+import plotly.graph_objects as go
+import pandas as pd
 import os
 import sys
 
@@ -17,10 +8,9 @@ project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(project_root)
 
 import src.analysis.mp_racked_metrics as metrics
-import pandas as pd
 from src.streamlit.styles import get_spotify_style
-import plotly.graph_objects as go
 from src.streamlit.filters import render_filters
+from src.analysis.filters_ctes import available_years
 
 user_id = st.session_state.user_id
 conn = st.connection('postgresql', type='sql')
@@ -251,15 +241,7 @@ st.markdown("""
 
 st.markdown(get_spotify_style(), unsafe_allow_html=True)
 
-years_query = f"""
-    SELECT DISTINCT EXTRACT(YEAR FROM date)::int as year
-    FROM routes.Ticks
-    WHERE user_id = '{user_id}'
-    and length(EXTRACT(YEAR FROM date)::text) = 4
-    ORDER BY year
-"""
-available_years_df = conn.query(years_query)
-years_df = pd.DataFrame({'date': pd.to_datetime(available_years_df['year'], format='%Y')})
+years_df = available_years(conn, user_id)
 
 filters = render_filters(
     df=years_df,
@@ -282,20 +264,6 @@ sends_df, falls_df = get_chart_data(
 )
 
 ordered_grades = sends_df['grade'].tolist()
-
-st.markdown("""
-<style>
-.chart-title {
-    margin-top: -2rem !important;  # Adjust this value as needed
-    margin-bottom: 1rem;
-    text-align: center;
-    color: white;
-    font-size: 24px;
-    font-weight: bold;
-}
-</style>
-<div class="chart-title">Your Grade Distribution</div>
-""", unsafe_allow_html=True)
 
 fig = create_figure(sends_df, falls_df, ordered_grades)
 

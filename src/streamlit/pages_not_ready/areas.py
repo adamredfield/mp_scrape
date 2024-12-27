@@ -69,15 +69,15 @@ def page_areas_breakdown(user_id, conn):
                 """,
                 unsafe_allow_html=True
             )
-        st.markdown(
-            f"""
-            <div class='total-section'>
-                <div class='total-label'>Total Areas</div>
-                <div class='total-value'>{total_areas}</div>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
+            st.markdown(f"""
+                <div class="area-section">
+                    <div class="section-title">{title}</div>
+                    {areas_html}
+                    <div class="total-count">
+                        Total {area_type[1]}: {total_count}
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
     
     # Add spacing before the chart section
     st.markdown("<div style='height: 2rem;'></div>", unsafe_allow_html=True)

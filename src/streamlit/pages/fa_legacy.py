@@ -1,15 +1,5 @@
 import streamlit as st
-
-if 'authenticated' not in st.session_state or not st.session_state['authenticated']:
-    st.warning('⚠️ Please enter your Mountain Project URL or User ID on the home page first.')
-    st.stop()
-
-
-st.set_page_config(
-    page_title="Your 2024 Climbing Racked",
-    page_icon="🧗‍♂️"
-)
-
+import pandas as pd
 import os
 import sys
 
@@ -17,7 +7,6 @@ project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(project_root)
 
 import src.analysis.fa_queries as fa_queries
-import pandas as pd
 from src.streamlit.chart_utils import create_bar_chart
 
 user_id = st.session_state.user_id
@@ -54,8 +43,8 @@ st.markdown("""
         div.stRadio > div {
             flex-direction: column;
             gap: 0.2rem;
-            padding: 0;
-            margin: 0;
+            padding: 0rem;
+            margin: 1rem;
             position: relative;  
         }
         
@@ -71,15 +60,15 @@ st.markdown("""
         }
 
         .element-container:has(.js-plotly-plot) {
-            margin-bottom: 1rem !important;  /* Increased space between charts */
+            margin-bottom: 2rem !important;  /* Increased space between charts */
         }
         
         .element-container:has(.js-plotly-plot):last-of-type {
-            margin-bottom: 0 !important;
+            margin-bottom: -2 !important;
         }
         
         .js-plotly-plot .plotly .gtitle {
-            margin-top: 0.5rem !important;
+            margin-top: 0rem !important;
         }   
             
         .list-item {
@@ -176,8 +165,6 @@ st.markdown("""
             padding: 0.5rem !important;
         }
     """, unsafe_allow_html=True)
-
-st.markdown("<h2 class='spotify-header'>Your Favorite FAs</h2>", unsafe_allow_html=True)
 
 controls = st.container()
 left, middle, right = controls.columns([1, 0.1, 1])
