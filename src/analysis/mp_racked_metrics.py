@@ -334,7 +334,10 @@ def get_route_details(conn, grade, route_type, tick_type='send', user_id=None, g
         df = df.drop(['grouped_grade', 'calculated_type'], axis=1)
     return df
 
-def get_highest_rated_climbs(conn, selected_styles=None, route_types=None, year=None, tag_type=None, user_id=None):
+def get_highest_rated_climbs(conn, selected_styles=None, route_types=None, year_start=None, year_end=None, tag_type=None, user_id=None):
+
+    print('Debug years in get_highest_rated_climbs:', year_start, year_end)
+
     """Get highest rated climbs"""
     style_filter = ""
     if selected_styles:
@@ -345,9 +348,11 @@ def get_highest_rated_climbs(conn, selected_styles=None, route_types=None, year=
         style_filter = f"HAVING {' AND '.join(style_conditions)}"
 
     query = f"""
-    {get_deduped_ticks_cte(user_id)}
+    {get_deduped_ticks_cte(user_id=user_id, year_start=year_start, year_end=year_end)}
     SELECT 
-        DISTINCT concat(r.route_name, ' ~ ', r.main_area, ' > ', r.specific_location,' - ', 
+        DISTINCT r.route_name,
+        r.main_area,
+        concat(r.route_name, ' ~ ', r.main_area, ' > ', r.specific_location,' - ', 
         TRIM(NULLIF(CONCAT_WS(' ', r.yds_rating, r.hueco_rating, r.aid_rating,r.danger_rating, r.commitment_grade), ''))) routes,
         TRIM(NULLIF(CONCAT_WS(' ', 
             r.yds_rating,
@@ -366,7 +371,7 @@ def get_highest_rated_climbs(conn, selected_styles=None, route_types=None, year=
     JOIN deduped_ticks t ON r.id = t.route_id
     WHERE r.num_votes >= 10
     {route_type_filter(route_types)}
-    {year_filter(year, use_where=False)}
+    {year_filter(year_range=(year_start, year_end), use_where=False)}
     {add_user_filter(user_id)}
     GROUP BY r.route_name, r.main_area, r.specific_location, r.yds_rating, r.hueco_rating, 
              r.aid_rating, r.danger_rating, r.commitment_grade, r.avg_stars, r.num_votes,
@@ -526,39 +531,12 @@ def most_climbed_route(conn, user_id=None, year_start=None, year_end=None):
 
     return result.iloc[0]
 
-def top_rated_routes(conn, user_id=None):
-    query = f"""
-        SELECT r.route_name, r.avg_stars
-        FROM routes.Routes r
-        JOIN routes.Ticks t ON t.route_id = r.id
-        WHERE EXTRACT(YEAR FROM t.date) = 2024
-        {add_user_filter(user_id)}
-        ORDER BY r.avg_stars DESC
-        LIMIT 5
-    """
-    return conn.query(query)
-
 def days_climbed(conn, user_id=None):
     query = f"""
         SELECT COUNT(DISTINCT date)
         FROM routes.Ticks
         WHERE date::text ILIKE '%2024%'
         {add_user_filter(user_id)}
-    """
-    return conn.query(query).iloc[0,0]
-
-def top_climbing_style(conn, user_id=None):
-    query = """
-        SELECT rat.tag_value, count(*)
-        from analysis.RouteAnalysis ra
-        JOIN analysis.RouteAnalysisTags rat on rat.analysis_id = ra.id
-        JOIN analysis.RouteAnalysisTagsReasoning ratr on ratr.analysis_id = rat.analysis_id AND rat.tag_type = ratr.tag_type
-        JOIN routes.Ticks t on t.route_id = ra.route_id 
-        WHERE rat.tag_type = 'style' AND t.date ILIKE '%2024%'
-        {add_user_filter(user_id)}
-        GROUP BY rat.tag_value 
-        ORDER BY count(*) desc
-        LIMIT 1;
     """
     return conn.query(query).iloc[0,0]
 
@@ -695,10 +673,10 @@ def regions_sub_areas(conn, user_id=None, year_start=None, year_end=None):
     """
     return conn.query(query).iloc[0,0]
 
-def top_tags(conn, tag_type, user_id=None):
+def top_tags(conn, tag_type, user_id=None, year_start=None, year_end=None):
     
     query = f"""
-        {get_deduped_ticks_cte(user_id)}
+        {get_deduped_ticks_cte(user_id=user_id, year_start=year_start, year_end=year_end)}
         SELECT tav.mapped_type, tav.mapped_tag tag_value, count(*) as count
         FROM analysis.TagAnalysisView tav 
         JOIN deduped_ticks dt on dt.route_id = tav.route_id

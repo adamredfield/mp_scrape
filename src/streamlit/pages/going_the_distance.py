@@ -509,7 +509,7 @@ try:
                         with col1:
                             st.markdown("### Verify Single-Day Ascent")
 
-                            st.markdown("#### 🚨 Big Fucking Wall detected 🚨")
+                            st.markdown("##### 🚨 Big Fucking Wall Detected 🚨")
 
                             st.markdown("""
                             Please confirm if you climbed it IAD (In a Day).

@@ -21,33 +21,14 @@ estimated_lengths_cte = f"""
         )
         """
 
-def get_deduped_ticks_cte(user_id=None, year='2024'):
-    """
-    Creates a CTE for deduped ticks with optional user and year filtering
-    
-    Args:
-        user_id: Optional user ID to filter by
-        year: Optional year to filter ticks by
-    Returns:
-        str: SQL CTE for deduped ticks
-    """
-
-    conditions = []
-    
-    if year:
-        conditions.append(f"EXTRACT(YEAR FROM t.date) = {year}")
-    
-    if user_id:
-        conditions.append(f"t.user_id = '{user_id}'")
-    
-    # Combine conditions with WHERE if any exist, otherwise omit WHERE
-    where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+def get_deduped_ticks_cte(user_id=None, year_start=None, year_end=None):
     deduped_ticks_cte = f"""
         WITH deduped_ticks_base AS(
                 SELECT *,
                 ROW_NUMBER() OVER (PARTITION BY route_id ORDER BY date DESC) as rn
                 FROM routes.Ticks t
-                {where_clause}
+                {year_filter(year_range=(year_start, year_end), use_where=True)}
+                {add_user_filter(user_id)}
             ),
         deduped_ticks AS (  
             SELECT * FROM deduped_ticks_base

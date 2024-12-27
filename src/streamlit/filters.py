@@ -1,5 +1,12 @@
 import streamlit as st
 import pandas as pd
+import os
+import sys
+
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+sys.path.append(project_root)
+
+import src.analysis.mp_racked_metrics as metrics
 
 def get_filter_style():
     return """
@@ -138,7 +145,45 @@ def route_type_filter(df=None):
         key='climbing_type_filter'
     )
 
-def render_filters(df=None, filters_to_include=None, filter_title="Filters"):
+def route_tag_filter(df=None, conn=None, user_id=None, year_start=None, year_end=None):  
+    # Combined filter for characteristic type and its corresponding tags 
+    st.write("Route Characteristics") 
+
+    tag_type = st.radio(
+        "",
+        options=[
+            'style', 'feature', 'descriptor', 'rock_type'
+        ],
+        format_func=lambda x: {
+            'style': 'Styles',
+            'feature': 'Features',
+            'descriptor': 'Route Descriptors',
+            'rock_type': 'Rock Types'
+        }.get(x, x.title()),
+        key='tag_type_filter',
+        label_visibility="collapsed",
+        horizontal=True  # Make it horizontal
+    )
+
+    tag_data = metrics.top_tags(
+        conn, 
+        tag_type, 
+        user_id=user_id,
+        year_start=year_start,
+        year_end=year_end
+    )
+    tag_df = pd.DataFrame(tag_data, columns=['Type', 'Tag', 'Count']).head(10)
+    
+    # Select tags using multiselect
+    selected_tags = st.multiselect(
+        f"Filter by {tag_type.replace('_', ' ').title()}",
+        options=tag_df['Tag'].tolist(),
+        key='style_filter'
+    )
+    
+    return tag_type, selected_tags
+
+def render_filters(df=None, filters_to_include=None, filter_title="Filters", conn=None, user_id=None):
     """
     Render filter expander with specified filters
     
@@ -163,12 +208,23 @@ def render_filters(df=None, filters_to_include=None, filter_title="Filters"):
     
     results = {}
     with st.expander(filter_title):
+
+        if 'date' in filters_to_include:
+            year_start, year_end = filter_functions['date'](df)
+            results['year_start'] = year_start
+            results['year_end'] = year_end
+        if 'route_tag' in filters_to_include:
+            tag_type, selected_tags = route_tag_filter(
+                df=df,
+                conn=conn,
+                user_id=user_id,
+                year_start=results.get('year_start'),
+                year_end=results.get('year_end')
+            )
+            results['tag_type'] = tag_type
+            results['selected_tags'] = selected_tags
         for filter_name in filters_to_include:
-            if filter_name in filter_functions:
-                result = filter_functions[filter_name](df)
-                if filter_name == 'date':
-                    results['year_start'], results['year_end'] = result
-                else:
-                    results[filter_name] = result
+            if filter_name not in ['date', 'route_tag'] and filter_name in filter_functions:
+                results[filter_name] = filter_functions[filter_name](df)
     
     return results
