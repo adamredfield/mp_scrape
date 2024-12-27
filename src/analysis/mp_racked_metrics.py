@@ -650,9 +650,8 @@ def states_climbed(conn, user_id=None, year_start=None, year_end=None):
         SELECT region, count(distinct date) days_out, count(*) routes
         FROM routes.Routes r
         JOIN routes.Ticks t on t.route_id = r.id
-        WHERE date::text ILIKE '%2024%'
+        {year_filter(year_range=(year_start, year_end), use_where=True)}
         {add_user_filter(user_id)}
-        {year_filter(year_range=(year_start, year_end), use_where=False)}
         GROUP BY region
         ORDER BY days_out desc;
     """
@@ -665,11 +664,11 @@ def sub_areas_climbed(conn, user_id=None, year_start=None, year_end=None):
         SELECT sub_area , count(distinct date) days_out, count(*) routes
         FROM routes.Routes r
         JOIN routes.Ticks t on t.route_id = r.id
-        WHERE date::text ILIKE '%2024%'
+        {year_filter(year_range=(year_start, year_end), use_where=True)}
         {add_user_filter(user_id)}
-        {year_filter(year_range=(year_start, year_end), use_where=False)}
         GROUP BY sub_area 
-        ORDER BY days_out desc;
+        ORDER BY days_out desc
+        Limit 10;
     """
     result = conn.query(query)
     
@@ -680,9 +679,9 @@ def regions_climbed(conn, user_id=None, year_start=None, year_end=None):
         SELECT count(distinct region)
         FROM routes.Routes r
         JOIN routes.Ticks t on t.route_id = r.id
-        WHERE date::text ILIKE '%2024%'
+        {year_filter(year_range=(year_start, year_end), use_where=True)}
         {add_user_filter(user_id)}
-        {year_filter(year_range=(year_start, year_end), use_where=False)}
+        Limit 10
     """
     return conn.query(query).iloc[0,0]
 
@@ -691,9 +690,8 @@ def regions_sub_areas(conn, user_id=None, year_start=None, year_end=None):
         SELECT count(distinct sub_area)
         FROM routes.Routes r
         JOIN routes.Ticks t on t.route_id = r.id
-        WHERE date::text ILIKE '%2024%'
+        {year_filter(year_range=(year_start, year_end), use_where=True)}
         {add_user_filter(user_id)}
-        {year_filter(year_range=(year_start, year_end), use_where=False)}
     """
     return conn.query(query).iloc[0,0]
 

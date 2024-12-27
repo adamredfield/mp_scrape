@@ -175,7 +175,7 @@ try:
     filters = render_filters(
     df=years_df,
     filters_to_include=['date'],
-    filter_title="Filter your data") 
+    filter_title="Choose your year range") 
 
     start_year = filters.get('year_start')
     end_year = filters.get('year_end')
@@ -203,26 +203,76 @@ try:
             unsafe_allow_html=True
         )
 
-    tab1, tab2, tab3 = st.tabs(
-        ["📍 Areas", "📅 Biggest Day", "📊 Length Analysis"])
+    st.markdown("""
+    <style>
+        /* Add space between tabs */
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 100px;
+            justify-content: center !important;
+        }
+        
+        /* If needed, also adjust the container padding */
+        .stTabs {
+            padding: 0 12px;  /* Add horizontal padding to the tab container */
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
+    tab1, tab2 = st.tabs(
+        ["📍 Areas", "📅 Biggest Day"])
     
     with tab1:
-        st.markdown("Group Areas By", unsafe_allow_html=True)
+        st.markdown("""
+            <div style='
+                text-align: center;
+                color: white;
+                margin-bottom: 5px;
+            '>
+                Group Areas By
+            </div>
+        """, unsafe_allow_html=True)
         
         # Add spacing between "Group Areas By" and radio buttons
         st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
-    
-        # Add filter for both table and chart
-        area_type = st.radio(
-            "",
-            options=[
-                ('region', 'States/Regions'),
-                ('sub_area', 'Sub Areas')
-            ],
-            format_func=lambda x: x[1],
-            key='area_filter_type',
-            horizontal=True 
-        )
+
+        st.markdown("""
+            <style>
+                /* Target the specific radio group container */
+                [data-testid="element-container"] div[data-testid="stHorizontalRadioGroup"] {
+                    display: flex;
+                    justify-content: center;
+                    width: 100%;
+                }
+                
+                /* Also target the parent elements */
+                [data-testid="element-container"] {
+                    display: flex;
+                    justify-content: center;
+                }
+                
+                /* And the radio options container */
+                div[role="radiogroup"] {
+                    display: flex;
+                    justify-content: center;
+                    width: 100%;
+                }
+            </style>
+        """, unsafe_allow_html=True)
+
+        container = st.container()
+        with container:
+            area_type = st.radio(
+                "",
+                options=[
+                    ('region', 'States/Regions'),
+                    ('sub_area', 'Sub Areas')
+                ],
+                format_func=lambda x: x[1],
+                key='area_filter_type',
+                horizontal=True 
+            )
+
+        st.markdown("</div>", unsafe_allow_html=True)
 
         # Get data based on selected filter
         if area_type[0] == 'region':
@@ -361,13 +411,15 @@ try:
             xaxis=dict(
                 color='white',
                 gridcolor='#333333',
-                showgrid=True
+                showgrid=True,
+                fixedrange=True
             ),
             yaxis=dict(
                 color='white',
                 gridcolor='#333333',
                 showgrid=False,
-                categoryorder='total ascending'
+                categoryorder='total ascending',
+                fixedrange=True
             ),
             font=dict(
                 color='white'
@@ -582,11 +634,6 @@ try:
         except Exception as e:
             st.error(f"Error: {str(e)}")
                 
-        
-    with tab3:
-        # Your length analysis code here
-        # ... your existing length analysis and chart ...
-        pass
 
 except Exception as e:
     st.error(f"Error: {str(e)}")
