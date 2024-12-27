@@ -1,19 +1,12 @@
 import streamlit as st
-
-st.set_page_config(
-    page_title="Stats Overview - Mountain Project Racked",
-    page_icon="📊",
-    layout="wide"
-)
-
+import pandas as pd
 import os
 import sys
-import pandas as pd
-import plotly.graph_objects as go
 
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(project_root)
 
+from src.analysis.filters_ctes import available_years
 import src.analysis.mp_racked_metrics as metrics
 from src.streamlit.streamlit_helper_functions import image_to_base64, get_squared_image
 from src.streamlit.styles import get_spotify_style
@@ -27,15 +20,11 @@ def get_day_type(length):
     for name, (threshold, emoji) in sorted_achievements:
         if length >= threshold:
             return f"{name} {emoji}"
-    
-    return "Cragging Day 🧗‍♂️"  # Fallback
 
 st.markdown(get_spotify_style(), unsafe_allow_html=True)
 
-# Then add page-specific styles
 st.markdown("""
     <style>
-        /* Stats Overview page specific styles */
         .stat-card {
             background: rgba(30, 215, 96, 0.1);
             border: 1px solid rgba(30, 215, 96, 0.2);
@@ -137,15 +126,7 @@ user_id = st.session_state.user_id
 conn = st.session_state.conn
 
 try:
-    years_query = f"""
-    SELECT DISTINCT EXTRACT(YEAR FROM date)::int as year
-    FROM routes.Ticks
-    WHERE user_id = '{user_id}'
-    and length(EXTRACT(YEAR FROM date)::text) = 4
-    ORDER BY year
-    """
-    available_years_df = conn.query(years_query)
-    years_df = pd.DataFrame({'date': pd.to_datetime(available_years_df['year'], format='%Y')})
+    years_df = available_years(conn, user_id)
 
     filters = render_filters(
     df=years_df,
@@ -274,11 +255,11 @@ try:
                             st.markdown("""
                                 The biggest day found includes a BIGWALL.
                                 
-                                Please confirm if it was completed in a single day.
+                                Please confirm if you climbed it In a Day.
                                 
-                                If yes, BEASTMODE and carry on.
+                                If yes, you are a legend. Pound a piton. Drink a Cobra.
                                 
-                                If not, we'll check your next biggest day.
+                                If not, you are mortal. Let's check your next biggest day.
                             """)
 
                             response = st.radio(

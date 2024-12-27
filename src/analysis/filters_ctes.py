@@ -1,3 +1,5 @@
+import pandas as pd
+
 estimated_lengths_cte = f"""
         WITH estimated_lengths AS (
         SELECT  id,
@@ -128,3 +130,16 @@ def add_fa_name_filter(fa_name, use_where=False, table_alias='fa'):
         """
     fa_name = fa_name.replace("'", "''")
     return f"{prefix} {table_alias}.fa_name = '{fa_name}'"
+
+
+def available_years(conn,user_id):
+    years_query = f"""
+    SELECT DISTINCT EXTRACT(YEAR FROM date)::int as year
+    FROM routes.Ticks
+    WHERE user_id = '{user_id}'
+    and length(EXTRACT(YEAR FROM date)::text) = 4
+    ORDER BY year
+    """
+    available_years_df = conn.query(years_query)
+    years_df = pd.DataFrame({'date': pd.to_datetime(available_years_df['year'], format='%Y')})
+    return years_df

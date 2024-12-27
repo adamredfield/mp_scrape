@@ -1,15 +1,5 @@
 import streamlit as st
-
-if 'authenticated' not in st.session_state or not st.session_state['authenticated']:
-    st.warning('⚠️ Please enter your Mountain Project URL or User ID on the home page first.')
-    st.stop()
-
-
-st.set_page_config(
-    page_title="Your 2024 Climbing Racked",
-    page_icon="🧗‍♂️"
-)
-
+import pandas as pd
 import os
 import sys
 
@@ -17,7 +7,6 @@ project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(project_root)
 
 import src.analysis.fa_queries as fa_queries
-import pandas as pd
 from src.streamlit.chart_utils import create_bar_chart
 
 user_id = st.session_state.user_id

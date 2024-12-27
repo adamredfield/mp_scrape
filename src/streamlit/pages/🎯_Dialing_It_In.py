@@ -1,15 +1,4 @@
 import streamlit as st
-
-
-if 'authenticated' not in st.session_state or not st.session_state['authenticated']:
-    st.warning('⚠️ Please enter your Mountain Project URL or User ID on the home page first.')
-    st.stop()
-
-st.set_page_config(
-    page_title="Your 2024 Climbing Racked",
-    page_icon="🧗‍♂️"
-)
-
 import os
 import sys
 
@@ -20,21 +9,12 @@ from src.streamlit.streamlit_helper_functions import image_to_base64, get_square
 from src.streamlit.filters import render_filters
 from src.streamlit.styles import get_spotify_style
 import src.analysis.mp_racked_metrics as metrics
-import pandas as pd
+from src.analysis.filters_ctes import available_years
 
 user_id = st.session_state.user_id
 conn = st.connection('postgresql', type='sql')
 
-years_query = f"""
-    SELECT DISTINCT EXTRACT(YEAR FROM date)::int as year
-    FROM routes.Ticks
-    WHERE user_id = '{user_id}'
-    and length(EXTRACT(YEAR FROM date)::text) = 4
-    ORDER BY year
-"""
-
-available_years_df = conn.query(years_query)
-years_df = pd.DataFrame({'date': pd.to_datetime(available_years_df['year'], format='%Y')})
+years_df = available_years(conn, user_id)
 
 filters = render_filters(years_df, filters_to_include=['date'], filter_title="Choose your filters")
 if filters['year_start'] is not None and filters['year_end'] is not None:
