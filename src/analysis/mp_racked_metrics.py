@@ -645,13 +645,14 @@ def top_grade(conn, level, user_id=None):
     
     return max(grouped_grades.items(), key=itemgetter(1))[0]  
 
-def states_climbed(conn, user_id=None):
+def states_climbed(conn, user_id=None, year_start=None, year_end=None):
     query = f"""
         SELECT region, count(distinct date) days_out, count(*) routes
         FROM routes.Routes r
         JOIN routes.Ticks t on t.route_id = r.id
         WHERE date::text ILIKE '%2024%'
         {add_user_filter(user_id)}
+        {year_filter(year_range=(year_start, year_end), use_where=False)}
         GROUP BY region
         ORDER BY days_out desc;
     """
@@ -659,13 +660,14 @@ def states_climbed(conn, user_id=None):
     
     return result.values.tolist()
 
-def sub_areas_climbed(conn, user_id=None):
+def sub_areas_climbed(conn, user_id=None, year_start=None, year_end=None):
     query = f"""
         SELECT sub_area , count(distinct date) days_out, count(*) routes
         FROM routes.Routes r
         JOIN routes.Ticks t on t.route_id = r.id
         WHERE date::text ILIKE '%2024%'
         {add_user_filter(user_id)}
+        {year_filter(year_range=(year_start, year_end), use_where=False)}
         GROUP BY sub_area 
         ORDER BY days_out desc;
     """
@@ -673,23 +675,25 @@ def sub_areas_climbed(conn, user_id=None):
     
     return result.values.tolist()
 
-def regions_climbed(conn, user_id=None):
+def regions_climbed(conn, user_id=None, year_start=None, year_end=None):
     query = f"""
         SELECT count(distinct region)
         FROM routes.Routes r
         JOIN routes.Ticks t on t.route_id = r.id
         WHERE date::text ILIKE '%2024%'
         {add_user_filter(user_id)}
+        {year_filter(year_range=(year_start, year_end), use_where=False)}
     """
     return conn.query(query).iloc[0,0]
 
-def regions_sub_areas(conn, user_id=None):
+def regions_sub_areas(conn, user_id=None, year_start=None, year_end=None):
     query = f"""
         SELECT count(distinct sub_area)
         FROM routes.Routes r
         JOIN routes.Ticks t on t.route_id = r.id
         WHERE date::text ILIKE '%2024%'
         {add_user_filter(user_id)}
+        {year_filter(year_range=(year_start, year_end), use_where=False)}
     """
     return conn.query(query).iloc[0,0]
 

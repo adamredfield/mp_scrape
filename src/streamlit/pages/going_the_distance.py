@@ -12,6 +12,9 @@ from src.streamlit.streamlit_helper_functions import image_to_base64, get_square
 from src.streamlit.styles import get_spotify_style
 from src.streamlit.filters import render_filters
 
+import plotly.graph_objects as go
+
+
 def get_day_type(length):
     # Sort achievements by length requirement
     sorted_achievements = sorted(day_types.items(), key=lambda x: x[1][0], reverse=True)
@@ -25,6 +28,30 @@ st.markdown(get_spotify_style(), unsafe_allow_html=True)
 
 st.markdown("""
     <style>
+        /* Target verification radio buttons */
+        [data-testid="stVerticalBlock"] [role="radiogroup"] {
+            margin-top: -46px !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+        }
+        
+        /* Ensure this doesn't affect the filter radio buttons */
+        [data-testid="stExpander"] [role="radiogroup"] {
+            margin-top: 0 !important;
+            padding-top: initial !important;
+            padding-bottom: initial !important;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+    <style>
+            
+        [data-testid="stExpander"] {
+            margin-top: -20px !important;
+            margin-bottom: 20px !important;
+        }
+            
         .stat-card {
             background: rgba(30, 215, 96, 0.1);
             border: 1px solid rgba(30, 215, 96, 0.2);
@@ -37,7 +64,7 @@ st.markdown("""
         .stat-card h3 {
             color: #888;
             font-size: 1rem;
-            margin-bottom: 1rem;
+            margin-bottom: 0rem;
         }
         
         .big-number {
@@ -101,6 +128,23 @@ st.markdown("""
             }
         }
         
+        [data-testid="stTabs"] {
+            margin-top: 2rem !important;
+        }
+        .total-section {
+            background: rgba(30, 215, 96, 0.1);
+            border-radius: 8px;
+            flex: 1;
+            padding: 0.5rem;
+            min-width: 200px;
+            margin-top: -10px;  /* Add this line to pull cards up */
+        }
+
+        /* Also adjust the container margin */
+        [data-testid="stTabs"] {
+            margin-top: 1rem !important;  /* Reduce from 2rem to 1rem */
+        }
+        
         /* Mobile responsiveness */
         @media (max-width: 768px) {
             .total-section {
@@ -158,19 +202,179 @@ try:
             """,
             unsafe_allow_html=True
         )
-    
-    # Add spacing
-    st.markdown("<br>", unsafe_allow_html=True)
-    
 
     tab1, tab2, tab3 = st.tabs(
         ["📍 Areas", "📅 Biggest Day", "📊 Length Analysis"])
     
     with tab1:
-        # Your areas breakdown code here
-        states = metrics.states_climbed(conn, user_id=user_id)
-        sub_areas = metrics.sub_areas_climbed(conn, user_id=user_id)
-        # ... rest of your areas code ...
+        st.markdown("Group Areas By", unsafe_allow_html=True)
+        
+        # Add spacing between "Group Areas By" and radio buttons
+        st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
+    
+        # Add filter for both table and chart
+        area_type = st.radio(
+            "",
+            options=[
+                ('region', 'States/Regions'),
+                ('sub_area', 'Sub Areas')
+            ],
+            format_func=lambda x: x[1],
+            key='area_filter_type',
+            horizontal=True 
+        )
+
+        # Get data based on selected filter
+        if area_type[0] == 'region':
+            areas_data = metrics.states_climbed(conn, user_id=user_id, year_start=start_year, year_end=end_year)
+            total_count = metrics.regions_climbed(conn, user_id=user_id, year_start=start_year, year_end=end_year)
+            title = "Top States/Regions"
+        else:
+            areas_data = metrics.sub_areas_climbed(conn, user_id=user_id, year_start=start_year, year_end=end_year)
+            total_count = metrics.regions_sub_areas(conn, user_id=user_id, year_start=start_year, year_end=end_year)
+            title = "Top Areas"
+            
+        st.markdown("""
+            <style>
+                .area-section {
+                    background: #282828;
+                    border-radius: 8px;
+                    padding: 1rem;
+                    margin-bottom: 2rem;
+                }
+                
+                .section-title {
+                    color: white;
+                    font-size: 1.3rem;
+                    margin-bottom: 1rem;
+                    text-align: center;
+                }
+                
+                .list-item {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: baseline;
+                    margin-bottom: 0.5rem;
+                    padding: 0.5rem;
+                    border-radius: 4px;
+                    max-width: 400px;  /* Add this to control width */
+                    margin-left: auto;
+                    margin-right: auto;
+                }
+                
+                .list-item:hover {
+                    background: rgba(255, 255, 255, 0.1);
+                }
+                
+                .rank {
+                    color: #1ed760;
+                    margin-right: 0.5rem;
+                }
+                
+                .name {
+                    color: white;
+                    flex-grow: 1;
+                }
+                
+                .stats {
+                    color: #b3b3b3;
+                    font-size: 0.8rem;
+                    text-align: right;
+                }
+                
+                .total-count {
+                    text-align: center;
+                    color: #1ed760;
+                    font-size: 1.2rem;
+                    margin-top: 1rem;
+                    padding-top: 0.5rem;
+                    border-top: 1px solid rgba(255, 255, 255, 0.1);
+                }
+
+                [data-testid="stRadio"] {
+                    margin-bottom: -25px !important;
+                }
+        """, unsafe_allow_html=True)
+
+        # Create the areas HTML string
+        for i, (area, days, routes) in enumerate(areas_data[:5], 1):
+            st.markdown(
+                f"""
+                <div class='list-item'>
+                    <div>
+                        <span class='item-number'>{i}. </span>
+                        <span class='item-name'>{area}</span>
+                    </div>
+                    <div class='item-details'>{days} days • {routes} routes</div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+        st.markdown(
+            f"""
+            <div style='text-align: center; padding: 12px; color: white; font-size: 1.4rem;'>
+                Total {title.split()[1]}: <span style='color: #1ed760;'>{total_count}</span>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        # Get length data and create chart
+        length_data = metrics.get_length_climbed(
+            conn, 
+            area_type=area_type[0],
+            year_start=filters['year_start'],
+            year_end=filters['year_end'],
+            user_id=user_id
+        )
+        length_df = pd.DataFrame(length_data, columns=['Year', 'Location', 'Length'])
+        
+        st.markdown("<div style='margin-top: 40px;'></div>", unsafe_allow_html=True)
+
+            # Create horizontal bar chart
+        fig = go.Figure(data=[
+            go.Bar(
+                y=length_df['Location'],
+                x=length_df['Length'],
+                orientation='h',
+                marker_color='#1ed760',
+            )
+        ])
+        
+        # Update layout
+        fig.update_layout(
+            paper_bgcolor='black',
+            plot_bgcolor='black',
+            title={
+                'text': f'Length Climbed by {area_type[1]}',
+                'y': 0.95,
+                'x': 0.5,
+                'xanchor': 'center',
+                'yanchor': 'top',
+                'font': {'color': 'white', 'size': 20}
+            },
+            xaxis_title="Distance Climbed (Feet)",
+            yaxis_title=None,
+            margin=dict(l=5, r=5, t=50, b=20),
+            height=400,
+            xaxis=dict(
+                color='white',
+                gridcolor='#333333',
+                showgrid=True
+            ),
+            yaxis=dict(
+                color='white',
+                gridcolor='#333333',
+                showgrid=False,
+                categoryorder='total ascending'
+            ),
+            font=dict(
+                color='white'
+            )
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
     
     with tab2:
         try:
@@ -251,42 +455,42 @@ try:
                     
                         col1, col2 = st.columns([2,1])
                         with col1:
-                            st.markdown(f"""
-                                <h2 style='
-                                    color: white;
-                                    font-size: 24px;
-                                    margin-bottom: 30px;
-                                '>
-                                    Verify Single-Day Ascent
-                                </h2>
-                                
-                                <div style='
-                                    color: white;
-                                    font-size: 18px;
-                                    line-height: 1.6;
-                                    margin-bottom: 32px;
-                                '>
-                                    <p style='margin-bottom: 16px;'>🚨 Big Fucking Wall detected 🚨</p>
-                                    <p style='margin-bottom: 16px;'>Please confirm if you climbed it IAD (In a Day).</p>
-                                    <p style='margin-bottom: 16px;'>If yes...Pound a piton. Drink a Cobra.</p>
-                                    <p style='margin-bottom: 24px;'>If not...who doesn't love sleeping on El Cap.</p>
-                                </div>
-                                
-                                <div style='
-                                    font-size: 20px;
-                                    color: white;
-                                    margin-bottom: 16px;
-                                '>
-                                    Did you climb {route_name} IAD on {date.strftime('%m-%d-%y')}?
-                                </div>
+                            st.markdown("### Verify Single-Day Ascent")
+
+                            st.markdown("#### 🚨 Big Fucking Wall detected 🚨")
+
+                            st.markdown("""
+                            Please confirm if you climbed it IAD (In a Day).
+
+                            If yes...Pound a piton. Drink a Cobra.
+
+                            If not...who doesn't love sleeping on El Cap.
+                            """)
+
+                            st.markdown(f"Did you climb **{route_name}** IAD on **{date.strftime('%m-%d-%y')}**?")
+                            st.markdown("""
+                                <style>
+                                    [data-testid="stRadio"] {
+                                        margin-top:0px !important;
+                                    }
+                                </style>
                             """, unsafe_allow_html=True)
 
                             response = st.radio(
                                 "",  # Empty label since we're showing it above
                                 options=["Yes", "No"],
-                                key=f"verify_{date.strftime('%Y%m%d')}",
-                                label_visibility="collapsed"
+                                key=f"verify_{date.strftime('%Y%m%d')}"
                             )
+
+                            st.markdown("""
+                                <style>
+                                    /* Add space above the confirm button */
+                                    [data-testid="stButton"] {
+                                        margin-top: 20px !important;
+                                        padding-top: 10px !important;
+                                    }
+                                </style>
+                            """, unsafe_allow_html=True)
 
                             if st.button("Confirm"):
                                 if response == "Select an option":
@@ -312,34 +516,28 @@ try:
                         
                     st.markdown(
                         f"""
-                        <div style="display: flex; justify-content: center; gap: 0.5rem; margin: 0.5rem;">
-                            <div class='total-section'>
-                                <div class='stat-group'>
-                                    <div class='stat-item'>
-                                        <div class='total-label'>Total Length</div>
-                                        <div class='total-value'>{total_length:,} ft</div>
-                                    </div>
-                                    <div class='stat-item'>
-                                        <div class='total-label'>Routes</div>
-                                        <div class='total-value'>{num_routes}</div>
-                                    </div>
-                                    <div class='stat-item'>
-                                        <div class='achievement-text'>{get_day_type(total_length)}</div>
-                                    </div>
-                                </div>
+                        <div style="display: flex; justify-content: center; gap: 1rem; margin: 0.5rem;">
+                            <div style="flex: 1; text-align: center;">
+                                <div style="color: #1ed760; margin-bottom: 0.5rem;">Total Length</div>
+                                <div style="color: white; font-size: 1.5rem; font-weight: bold;">{total_length:,} ft</div>
+                                <div style="color: #1ed760; margin-top: 0.5rem;">Routes</div>
+                                <div style="color: white; font-size: 1.5rem; font-weight: bold;">{num_routes}</div>
                             </div>
-                            <div class='total-section'>
-                                <div class='stat-group'>
-                                    <div class='stat-item'>
-                                        <div class='total-label'>Date</div>
-                                        <div class='total-value'>{formatted_date}</div>
-                                    </div>
-                                    <div class='stat-item'>
-                                        <div class='total-label'>Area</div>
-                                        <div class='total-value area-value' style="font-size: 1rem;">{areas}</div>
-                                    </div>
-                                </div>
+                            <div style="flex: 1; text-align: center;">
+                                <div style="color: #1ed760; margin-bottom: 0.5rem;">Date</div>
+                                <div style="color: white; font-size: 1.5rem; font-weight: bold;">{formatted_date}</div>
+                                <div style="color: #1ed760; margin-top: 0.5rem;">Area</div>
+                                <div style="color: white; font-size: 1.25rem;">{areas}</div>
                             </div>
+                        </div>
+                        <div style="text-align: center; margin: 1.5rem 0;">
+                            <div style="
+                                color: white;
+                                font-size: 1.2rem;
+                                font-weight: 500;
+                                letter-spacing: 0.5px;
+                                opacity: 0.9;
+                            ">{get_day_type(total_length)}</div>
                         </div>
                         """,
                         unsafe_allow_html=True

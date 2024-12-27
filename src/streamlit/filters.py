@@ -88,12 +88,16 @@ def length_filter(df):
 def date_filter(df):
     """Date range filter"""
     available_years = sorted(df['date'].dt.year.unique())
-    
+
+
     date_filter_type = st.radio(
         "Date Range",
         options=["Single Year", "Custom Range"],
-        horizontal=True
+        horizontal=True,
+        key="single_year_date_range_radio",
     )
+    
+    st.session_state.date_filter_type = date_filter_type
 
     if date_filter_type == "Single Year":
         year = st.selectbox(
