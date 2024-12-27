@@ -43,8 +43,8 @@ st.markdown("""
         div.stRadio > div {
             flex-direction: column;
             gap: 0.2rem;
-            padding: 0;
-            margin: 0;
+            padding: 0rem;
+            margin: 1rem;
             position: relative;  
         }
         
@@ -60,15 +60,15 @@ st.markdown("""
         }
 
         .element-container:has(.js-plotly-plot) {
-            margin-bottom: 1rem !important;  /* Increased space between charts */
+            margin-bottom: 2rem !important;  /* Increased space between charts */
         }
         
         .element-container:has(.js-plotly-plot):last-of-type {
-            margin-bottom: 0 !important;
+            margin-bottom: -2 !important;
         }
         
         .js-plotly-plot .plotly .gtitle {
-            margin-top: 0.5rem !important;
+            margin-top: 0rem !important;
         }   
             
         .list-item {
@@ -165,8 +165,6 @@ st.markdown("""
             padding: 0.5rem !important;
         }
     """, unsafe_allow_html=True)
-
-st.markdown("<h2 class='spotify-header'>Your Favorite FAs</h2>", unsafe_allow_html=True)
 
 controls = st.container()
 left, middle, right = controls.columns([1, 0.1, 1])

@@ -251,21 +251,41 @@ try:
                     
                         col1, col2 = st.columns([2,1])
                         with col1:
-                            st.markdown("### Verify Single-Day Ascent")
-                            st.markdown("""
-                                The biggest day found includes a BIGWALL.
+                            st.markdown(f"""
+                                <h2 style='
+                                    color: white;
+                                    font-size: 24px;
+                                    margin-bottom: 30px;
+                                '>
+                                    Verify Single-Day Ascent
+                                </h2>
                                 
-                                Please confirm if you climbed it In a Day.
+                                <div style='
+                                    color: white;
+                                    font-size: 18px;
+                                    line-height: 1.6;
+                                    margin-bottom: 32px;
+                                '>
+                                    <p style='margin-bottom: 16px;'>🚨 Big Fucking Wall detected 🚨</p>
+                                    <p style='margin-bottom: 16px;'>Please confirm if you climbed it IAD (In a Day).</p>
+                                    <p style='margin-bottom: 16px;'>If yes...Pound a piton. Drink a Cobra.</p>
+                                    <p style='margin-bottom: 24px;'>If not...who doesn't love sleeping on El Cap.</p>
+                                </div>
                                 
-                                If yes, you are a legend. Pound a piton. Drink a Cobra.
-                                
-                                If not, you are mortal. Let's check your next biggest day.
-                            """)
+                                <div style='
+                                    font-size: 20px;
+                                    color: white;
+                                    margin-bottom: 16px;
+                                '>
+                                    Did you climb {route_name} IAD on {date.strftime('%m-%d-%y')}?
+                                </div>
+                            """, unsafe_allow_html=True)
 
                             response = st.radio(
-                                f"Was {route_name} completed in a single day?",
-                                options=["Select an option", "Yes", "No"],
-                                key=f"verify_{date.strftime('%Y%m%d')}"
+                                "",  # Empty label since we're showing it above
+                                options=["Yes", "No"],
+                                key=f"verify_{date.strftime('%Y%m%d')}",
+                                label_visibility="collapsed"
                             )
 
                             if st.button("Confirm"):

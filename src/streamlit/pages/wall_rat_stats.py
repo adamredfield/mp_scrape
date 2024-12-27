@@ -116,8 +116,6 @@ try:
                 
         </style>
     """, unsafe_allow_html=True)
-
-    st.markdown("<h2 class='spotify-header'>Wall Rat Stats 🐀</h2>", unsafe_allow_html=True)
     
     with st.expander("Filters"):
 

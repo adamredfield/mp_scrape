@@ -265,20 +265,6 @@ sends_df, falls_df = get_chart_data(
 
 ordered_grades = sends_df['grade'].tolist()
 
-st.markdown("""
-<style>
-.chart-title {
-    margin-top: -2rem !important;  # Adjust this value as needed
-    margin-bottom: 1rem;
-    text-align: center;
-    color: white;
-    font-size: 24px;
-    font-weight: bold;
-}
-</style>
-<div class="chart-title">Your Grade Distribution</div>
-""", unsafe_allow_html=True)
-
 fig = create_figure(sends_df, falls_df, ordered_grades)
 
 chart_container = st.container()

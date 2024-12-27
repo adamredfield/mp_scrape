@@ -45,21 +45,24 @@ if not st.session_state['authenticated']:
 
 pg = st.navigation({
     "Overview": [
-        st.Page("pages/📊_Grade_Distribution.py", 
+        st.Page("pages/grade_distribution.py", 
                 title="Grade Distribution", 
-                icon=":material/analytics:", 
+                icon="📊", 
                 default=True),
-        st.Page("pages/🏃_Going_the_Distance.py", 
+        st.Page("pages/going_the_distance.py", 
                 title="Going the Distance", 
-                icon=":material/directions_run:"),
+                icon="🏃"),
     ],
     "Analysis": [
-        st.Page("pages/🐀 _Wall_Rat_Stats.py", 
-                title="Stats Overview", 
-                icon=":material/trending_up:"),
-        st.Page("pages/⚡_FA_Legacy.py", 
-                title="Goals", 
-                icon=":material/flag:"),
+        st.Page("pages/wall_rat_stats.py", 
+                title="Wall Rat Stats", 
+                icon="🐀"),
+        st.Page("pages/fa_legacy.py", 
+                title="FA Legacy", 
+                icon="⚡"),
+        st.Page("pages/dialing_it_in.py", 
+                title="Dialing It In", 
+                icon="🎯"),
     ],
 })
 
