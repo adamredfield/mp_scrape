@@ -441,7 +441,7 @@ def get_bigwall_routes(conn, user_id=None, route_types=None):
     '''
     return conn.query(query)
 
-def get_length_climbed(conn, area_type="main_area", year=None, user_id=None):
+def get_length_climbed(conn, area_type="main_area", user_id=None, year_start=None, year_end=None):
     query = f"""
     {estimated_lengths_cte}
     SELECT 
@@ -452,7 +452,7 @@ def get_length_climbed(conn, area_type="main_area", year=None, user_id=None):
     JOIN routes.Ticks t ON r.id = t.route_id
     LEFT JOIN estimated_lengths el on el.id = r.id
     WHERE t.date IS NOT NULL AND EXTRACT(YEAR FROM t.date) >= 1999
-    {year_filter(year, use_where=False)}
+    {year_filter(year_range=(year_start, year_end), use_where=False)}
     {add_user_filter(user_id)}
     GROUP BY year, r.{area_type}
     ORDER BY year DESC, length_climbed DESC;

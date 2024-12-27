@@ -137,8 +137,6 @@ user_id = st.session_state.user_id
 conn = st.session_state.conn
 
 try:
-
-
     years_query = f"""
     SELECT DISTINCT EXTRACT(YEAR FROM date)::int as year
     FROM routes.Ticks
@@ -153,13 +151,16 @@ try:
     df=years_df,
     filters_to_include=['date'],
     filter_title="Filter your data") 
+
+    start_year = filters.get('year_start')
+    end_year = filters.get('year_end')
     
     # Create three columns for the top stats
     col1, col2, col3 = st.columns(3)
     
     # Column 1: Total Length
     with col1:
-        length_data = metrics.get_length_climbed(conn, year='2024', user_id=user_id)
+        length_data = metrics.get_length_climbed(conn, user_id=user_id, year_start=start_year, year_end=end_year)
         length_df = pd.DataFrame(length_data, columns=['Year', 'Location', 'Length'])
         total_length = length_df['Length'].sum()
         el_caps = total_length / 3000
@@ -180,8 +181,9 @@ try:
     # Add spacing
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # Detailed sections in tabs
-    tab1, tab2, tab3 = st.tabs(["📍 Areas", "📅 Biggest Day", "📊 Length Analysis"])
+
+    tab1, tab2, tab3 = st.tabs(
+        ["📍 Areas", "📅 Biggest Day", "📊 Length Analysis"])
     
     with tab1:
         # Your areas breakdown code here
@@ -191,6 +193,17 @@ try:
     
     with tab2:
         try:
+            if 'previous_filter_state' not in st.session_state:
+                st.session_state.previous_filter_state = (None, None)
+
+            current_filter_state = (start_year, end_year)   
+
+            if current_filter_state != st.session_state.previous_filter_state:
+                st.session_state.current_day_index = 0
+                st.session_state.needs_verification = True
+                st.session_state.shown_big_day_prompts = False
+                st.session_state.previous_filter_state = current_filter_state
+
             day_types = {
                 # Regular achievements
                 "Cragging Day": (0, "🧗‍♂️"),        
@@ -219,9 +232,6 @@ try:
             if 'needs_verification' not in st.session_state:
                 st.session_state.needs_verification = True
 
-            start_year = filters.get('year_start')
-            end_year = filters.get('year_end')
-
             biggest_days = metrics.biggest_climbing_day(
                 conn, 
                 user_id=user_id,
@@ -242,42 +252,51 @@ try:
                 route_list = routes.split(" | ")
                 num_routes = len(route_list)
 
+                route_details_list = []
+                for route, url, photo in zip(route_list, route_urls, photo_urls):
+                    route_parts = route.split(" ~ ")
+                    route_name = route_parts[0]
+                    route_details = route_parts[1] if len(route_parts) > 1 else ""
+                    route_details_list.append((route_name, route_details, url, photo))
+
                 major_routes_exist = any(grade.strip() in ["V", "VI", "VII"] for grade in commitment_grades)
           
                 if st.session_state.needs_verification and major_routes_exist:
                     major_route = next((route for route, grade in zip(route_list, commitment_grades) 
-                                        if grade.strip() in ["V", "VI"]), None)
+                                        if grade.strip() in ["V", "VI", "VII"]), None)
                     
                     if major_route:
                         route_name = major_route.split(" ~ ")[0]
+                    
+                        col1, col2 = st.columns([2,1])
+                        with col1:
+                            st.markdown("### Verify Single-Day Ascent")
+                            st.markdown("""
+                                The biggest day found includes a BIGWALL.
+                                
+                                Please confirm if it was completed in a single day.
+                                
+                                If yes, BEASTMODE and carry on.
+                                
+                                If not, we'll check your next biggest day.
+                            """)
 
-                        st.markdown("### Verify Single-Day Ascent")
-                        st.markdown("""
-                            The biggest day found includes a BIGWALL.
-                            
-                            Please confirm if it was completed in a single day.
-                            
-                            If yes, BEASTMODE and carry on.
-                            
-                            If not, we'll check your next biggest day.
-                        """)
+                            response = st.radio(
+                                f"Was {route_name} completed in a single day?",
+                                options=["Select an option", "Yes", "No"],
+                                key=f"verify_{date.strftime('%Y%m%d')}"
+                            )
 
-                        response = st.radio(
-                            f"Was {route_name} completed in a single day?",
-                            options=["Select an option", "Yes", "No"],
-                            key=f"verify_{date.strftime('%Y%m%d')}"
-                        )
-
-                        if st.button("Confirm"):
-                            if response == "Select an option":
-                                st.warning("Please select Yes or No.")
-                            elif response == "No":
-                                st.session_state.current_day_index += 1
-                                st.rerun()
-                            else: 
-                                st.session_state.needs_verification = False
-                                st.session_state.shown_big_day_prompts = True
-                                st.rerun()
+                            if st.button("Confirm"):
+                                if response == "Select an option":
+                                    st.warning("Please select Yes or No.")
+                                elif response == "No":
+                                    st.session_state.current_day_index += 1
+                                    st.rerun()
+                                else: 
+                                    st.session_state.needs_verification = False
+                                    st.session_state.shown_big_day_prompts = True
+                                    st.rerun()
 
                     else: # response == "Yes"
                         st.session_state.shown_big_day_prompts = True   
@@ -289,11 +308,6 @@ try:
                         formatted_date = date.strftime(f'%B %d{suffix}')
                     else:
                         formatted_date = date.strftime('%B %d, %Y')
-                                
-                    for route, url, photo in zip(route_list, route_urls, photo_urls):
-                        route_parts = route.split(" ~ ")
-                        route_name = route_parts[0]
-                        route_details = route_parts[1] if len(route_parts) > 1 else ""
                         
                     st.markdown(
                         f"""
@@ -332,13 +346,7 @@ try:
                     # Add spacing
                     st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
                     
-                    # Display routes in expanders
-                    route_list = routes.split(" | ")
-                    for i, (route, url, photo) in enumerate(zip(route_list, route_urls, photo_urls), 1):
-                        route_parts = route.split(" ~ ")
-                        route_name = route_parts[0]
-                        route_details = route_parts[1] if len(route_parts) > 1 else ""
-                        
+                    for i, (route_name, route_details, url, photo) in enumerate(route_details_list, 1):    
                         with st.expander(f"{i}. {route_name}"):
                             st.markdown(
                                 f"""
