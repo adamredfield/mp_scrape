@@ -351,3 +351,50 @@ def get_spotify_style():
         }
         </style>
     """
+
+
+def get_navigation_style():
+    return """
+        <style>
+            /* Style for the sidebar toggle area */
+            .st-emotion-cache-1q1n0ol {
+                color: #1ed760 !important;
+                font-size: 1rem !important;
+                position: relative;
+            }
+            
+            /* Add "Page Navigation" text */
+            .st-emotion-cache-1q1n0ol::after {
+                content: 'Page Navigation';
+                position: absolute;
+                left: 50px;
+                top: 50%;
+                transform: translateY(-50%);
+                color: #1ed760;
+                font-size: 1rem;
+                font-weight: 500;
+            }
+            
+            /* Hover effect */
+            .st-emotion-cache-1q1n0ol:hover::after {
+                color: white;
+            }
+            
+            /* Style the sidebar itself */
+            section[data-testid="stSidebar"] {
+                background-color: rgba(0, 0, 0, 0.2);
+                border-right: 1px solid rgba(30, 215, 96, 0.2);
+            }
+            
+            /* Style sidebar nav items */
+            .st-emotion-cache-pkbazv {
+                color: #1ed760 !important;
+                transition: all 0.3s ease;
+            }
+            
+            .st-emotion-cache-pkbazv:hover {
+                background-color: rgba(30, 215, 96, 0.2) !important;
+                transform: translateX(5px);
+            }
+        </style>
+    """

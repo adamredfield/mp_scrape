@@ -104,8 +104,6 @@ def get_grade_distribution(conn, route_types=None, level='base', year_start=None
     ORDER BY grade DESC;
     """
 
-    print(query)
-
     results =  conn.query(query)
 
     grouped_grades = {}
@@ -522,7 +520,6 @@ def most_climbed_route(conn, user_id=None, year_start=None, year_end=None):
         ORDER BY COUNT(*) DESC
         LIMIT 1
     """
-    print(query)
     result = conn.query(query)
     if result.empty:
         return None
@@ -565,7 +562,8 @@ def top_climbing_style(conn, user_id=None):
     """
     return conn.query(query).iloc[0,0]
 
-def biggest_climbing_day(conn, user_id=None):
+def biggest_climbing_day(conn, user_id=None, year_start=None, year_end=None):
+
     query = f"""
         {estimated_lengths_cte}
         SELECT  t.date,
@@ -578,6 +576,7 @@ def biggest_climbing_day(conn, user_id=None):
                           CAST(coalesce(r.length_ft,el.estimated_length) AS INT),' ft'
                     ), ' | '
                 ) routes,
+                STRING_AGG(COALESCE(r.commitment_grade, 'None'), ' | ') commitment_grades,
                 CAST(ROUND(SUM(COALESCE(r.length_ft, el.estimated_length)),0) AS INTEGER) total_length,
                 STRING_AGG(DISTINCT CONCAT(r.main_area, ', ', r.region), ' & ') areas,
                 STRING_AGG(r.route_url, ' | ') route_urls,
@@ -585,28 +584,30 @@ def biggest_climbing_day(conn, user_id=None):
         FROM routes.Ticks t 
         JOIN routes.Routes r on r.id = t.route_id 
         LEFT JOIN estimated_lengths el on el.id = t.route_id 
-        WHERE EXTRACT(YEAR FROM t.date) = 2024
+        {year_filter(year_range=(year_start, year_end), use_where=True)}
         {add_user_filter(user_id)}
         GROUP BY t.date
         ORDER BY total_length desc
-    LIMIT 1;
+    LIMIT 10;
     """
 
     result = conn.query(query)
     
     if result.empty:
         return None
-    
-    row = result.iloc[0]
-    
-    return (
-        row['date'],
-        row['routes'],
-        row['total_length'],
-        row['areas'],
-        row['route_urls'],
-        row['photo_urls']
-    )
+
+    return [
+        (
+            row['date'],
+            row['routes'],
+            row['commitment_grades'],
+            row['total_length'],
+            row['areas'],
+            row['route_urls'],
+            row['photo_urls']
+        )
+        for _, row in result.iterrows()
+    ]
 
 def top_grade(conn, level, user_id=None):
     query = f"""

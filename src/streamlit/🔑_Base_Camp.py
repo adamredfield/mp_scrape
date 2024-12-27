@@ -17,8 +17,11 @@ import sys
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(project_root)
 from src.streamlit.streamlit_helper_functions import get_user_id
+from src.streamlit.styles import get_navigation_style
 
 def main():
+
+    st.markdown(get_navigation_style(), unsafe_allow_html=True)
 
     if 'authenticated' not in st.session_state:
         st.session_state['authenticated'] = False
@@ -31,7 +34,7 @@ def main():
             st.session_state['user_id'] = user_id
             st.session_state['conn'] = conn
             st.session_state['authenticated'] = True
-            st.switch_page("pages/grade_distribution.py")
+            st.switch_page("pages/📊_Grade_Distribution.py")
 
 if __name__ == "__main__":
     main() 

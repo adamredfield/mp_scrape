@@ -123,6 +123,7 @@ try:
             
             .block-container {
                 padding-top: 3rem !important;
+                
         </style>
     """, unsafe_allow_html=True)
 
