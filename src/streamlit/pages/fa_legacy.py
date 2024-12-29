@@ -17,8 +17,8 @@ if 'fa_view_type' not in st.session_state:
 if 'selected_fa' not in st.session_state:
     st.session_state.selected_fa = None
 
-top_fas = fa_queries.get_top_first_ascensionists(conn, user_id=user_id)
-partnerships = fa_queries.get_collaborative_ascensionists(conn, "All FAs", user_id)
+top_fas = fa_queries.get_top_first_ascensionists(conn, user_id=user_id, year_start=1900, year_end=2100)
+partnerships = fa_queries.get_collaborative_ascensionists(conn, "All FAs", user_id, year_start=1900, year_end=2100)
 
 st.markdown("""
     <style>
@@ -207,9 +207,9 @@ with right:
 
     current_selection = st.session_state.selected_fa or "All FAs"
 
-decades = fa_queries.get_first_ascensionist_by_decade(conn, current_selection, user_id)
-areas = fa_queries.get_first_ascensionist_areas(conn, current_selection, user_id)
-grades = fa_queries.get_first_ascensionist_grades(conn, current_selection, user_id)
+decades = fa_queries.get_first_ascensionist_by_decade(conn, current_selection, user_id, year_start=1900, year_end=2100)
+areas = fa_queries.get_first_ascensionist_areas(conn, current_selection, user_id, year_start=1900, year_end=2100)
+grades = fa_queries.get_first_ascensionist_grades(conn, current_selection, user_id, year_start=1900, year_end=2100)
 
 if view_type == "Individual FA":
     partners = fa_queries.get_collaborative_ascensionists(conn, current_selection, user_id)
@@ -226,7 +226,7 @@ if view_type == "All FAs":
     st.markdown("<div class='list-container'>", unsafe_allow_html=True)
     for fa, count in top_fas:          
         with st.expander(f"{fa} - {count} routes"):
-            routes = fa_queries.get_fa_routes(conn, fa, user_id)
+            routes = fa_queries.get_fa_routes(conn, fa, user_id, year_start=1900, year_end=2100)
             for route in routes:
                 st.markdown(
                     f"<div class='route-item'>{route[0]}</div>", 
@@ -259,10 +259,10 @@ else:
     if view_type == "Individual FA":
         st.markdown("<h3 style='text-align: center;'>Frequent Partners</h3>", unsafe_allow_html=True)
         st.markdown("<div class='list-container'>", unsafe_allow_html=True)
-        partners = fa_queries.get_collaborative_ascensionists(conn, current_selection, user_id)
+        partners = fa_queries.get_collaborative_ascensionists(conn, current_selection, user_id, year_start=1900, year_end=2100)
         for partner, count in partners:
             with st.expander(f"{partner} - {count} routes"):
-                routes = fa_queries.get_partnership_routes(conn, current_selection, partner, user_id)
+                routes = fa_queries.get_partnership_routes(conn, current_selection, partner, user_id, year_start=1900, year_end=2100)
                 for route in routes:
                     st.markdown(
                         f"<div class='route-item'>{route[0]}</div>", 
@@ -275,7 +275,7 @@ else:
         
         # Split the partnership into individual names
         climber1, climber2 = current_selection.split(" & ")
-        partnership_routes = fa_queries.get_partnership_routes(conn, climber1.strip(), climber2.strip(), user_id)
+        partnership_routes = fa_queries.get_partnership_routes(conn, climber1.strip(), climber2.strip(), user_id, year_start=1900, year_end=2100)
         if partnership_routes:
             df = pd.DataFrame(partnership_routes, columns=['Route'])
             

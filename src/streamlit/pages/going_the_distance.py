@@ -24,59 +24,66 @@ def get_day_type(length):
         if length >= threshold:
             return f"{name} {emoji}"
 
+
 st.markdown(get_spotify_style(), unsafe_allow_html=True)
 
-st.markdown("""
-    <style>
-        /* Target verification radio buttons */
-        [data-testid="stVerticalBlock"] [role="radiogroup"] {
-            margin-top: -46px !important;
-            padding-top: 0 !important;
-            padding-bottom: 0 !important;
-        }
-        
-        /* Ensure this doesn't affect the filter radio buttons */
-        [data-testid="stExpander"] [role="radiogroup"] {
-            margin-top: 0 !important;
-            padding-top: initial !important;
-            padding-bottom: initial !important;
-        }
-    </style>
-""", unsafe_allow_html=True)
 
 st.markdown("""
     <style>
-            
-        [data-testid="stExpander"] {
-            margin-top: -20px !important;
-            margin-bottom: 20px !important;
+             
+        div[data-testid="stExpander"] {
+            margin-top: -80px !important;
+        }
+        
+        /* Reset margins for expanders inside tab panels */
+        div[role="tabpanel"] div[data-testid="stExpander"] {
+            margin-top: 0 !important;
+            margin-bottom: 10px !important;
         }
             
         .stat-card {
-            background: rgba(30, 215, 96, 0.1);
-            border: 1px solid rgba(30, 215, 96, 0.2);
-            border-radius: 10px;
-            padding: 1.5rem;
-            text-align: center;
-            height: 100%;
+            background: rgba(18, 18, 18, 0.95) !important;  /* Darker, more Spotify-like background */
+            border: 1px solid #1ed760 !important;
+            border-radius: 10px !important;
+            padding: 1rem 0.3rem !important;
+            text-align: center !important;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3)
+            margin-bottom: 0.5rem !important;
+            color: white !important;
+            display: flex !important;
+            flex-direction: column;
+            justify-content: center !important;
+            gap: 0.2rem
+        }
+            
+        /* Target the container of the stat-card */
+        div:has(> .stat-card) {
+            margin-top: 1rem !important;
         }
         
+        /* Card title styling */
         .stat-card h3 {
-            color: #888;
-            font-size: 1rem;
-            margin-bottom: 0rem;
+            color: white !important;
+            font-size: 1.1rem !important;
+            margin-bottom: -1rem !important;
+            font-weight: normal !important;
+            line-height: 1;
+            
         }
         
         .big-number {
-            color: #1ed760;
-            font-size: 2.5rem;
-            font-weight: bold;
-            margin: 0.5rem 0;
+            color: white !important;
+            font-size: 1.5rem !important;
+            font-weight: bold !important;
+            margin: .3rem 0 !important;
+            line-height: 1;
         }
         
         .subtitle {
-            color: #888;
-            font-size: 0.9rem;
+            color: white !important;
+            font-size: 1rem !important;
+            margin: 0.2rem !important;
+            line-height: 1 !important;
         }
         /* Biggest Day specific styles */
         .total-section {
@@ -142,7 +149,7 @@ st.markdown("""
 
         /* Also adjust the container margin */
         [data-testid="stTabs"] {
-            margin-top: 1rem !important;  /* Reduce from 2rem to 1rem */
+            margin-top: -1rem !important;  /* Reduce from 2rem to 1rem */
         }
         
         /* Mobile responsiveness */
@@ -210,6 +217,7 @@ try:
             gap: 100px;
             justify-content: center !important;
         }
+                
         
         /* If needed, also adjust the container padding */
         .stTabs {
@@ -219,8 +227,8 @@ try:
     """, unsafe_allow_html=True)
 
     tab1, tab2 = st.tabs(
-        ["📍 Areas", "📅 Biggest Day"])
-    
+    ["📍 Areas", "📅 Biggest Day"])
+            
     with tab1:
         st.markdown("""
             <div style='
@@ -235,32 +243,23 @@ try:
         # Add spacing between "Group Areas By" and radio buttons
         st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
 
-        st.markdown("""
+        container = st.container()
+        with container:
+            st.markdown("""
             <style>
-                /* Target the specific radio group container */
-                [data-testid="element-container"] div[data-testid="stHorizontalRadioGroup"] {
+                /* Target only this specific radio group */
+                .element-container:has(#area-filter-radio-after) + div div[role="radiogroup"] {
                     display: flex;
                     justify-content: center;
-                    width: 100%;
+                    gap: 10px;
                 }
-                
-                /* Also target the parent elements */
-                [data-testid="element-container"] {
-                    display: flex;
-                    justify-content: center;
-                }
-                
-                /* And the radio options container */
-                div[role="radiogroup"] {
-                    display: flex;
-                    justify-content: center;
-                    width: 100%;
+                .element-container:has(#area-filter-radio-after) + div {
+                    margin-bottom: -50px;  /* Adjust this value as needed */
+                    margin-top: -35px;
                 }
             </style>
         """, unsafe_allow_html=True)
-
-        container = st.container()
-        with container:
+            st.markdown('<span id="area-filter-radio-after"></span>', unsafe_allow_html=True)
             area_type = st.radio(
                 "",
                 options=[
@@ -269,7 +268,8 @@ try:
                 ],
                 format_func=lambda x: x[1],
                 key='area_filter_type',
-                horizontal=True 
+                horizontal=True,
+                label_visibility='collapsed'      
             )
 
         st.markdown("</div>", unsafe_allow_html=True)
@@ -339,10 +339,6 @@ try:
                     margin-top: 1rem;
                     padding-top: 0.5rem;
                     border-top: 1px solid rgba(255, 255, 255, 0.1);
-                }
-
-                [data-testid="stRadio"] {
-                    margin-bottom: -25px !important;
                 }
         """, unsafe_allow_html=True)
 
@@ -429,6 +425,7 @@ try:
         st.plotly_chart(fig, use_container_width=True)
     
     with tab2:
+        
         try:
             if 'previous_filter_state' not in st.session_state:
                 st.session_state.previous_filter_state = (None, None)
@@ -498,62 +495,85 @@ try:
 
                 major_routes_exist = any(grade.strip() in ["V", "VI", "VII"] for grade in commitment_grades)
           
+
                 if st.session_state.needs_verification and major_routes_exist:
                     major_route = next((route for route, grade in zip(route_list, commitment_grades) 
                                         if grade.strip() in ["V", "VI", "VII"]), None)
                     
                     if major_route:
                         route_name = major_route.split(" ~ ")[0]
-                    
-                        col1, col2 = st.columns([2,1])
-                        with col1:
-                            st.markdown("### Verify Single-Day Ascent")
 
-                            st.markdown("#### 🚨 Big Fucking Wall detected 🚨")
+                        # this controls just the buttons in tab 2 leaving filter and sidebar buttons unaffected
+                        st.markdown("""
+                            <style>
+                            .element-container:has(#verify-radio-after) + div div[role="radiogroup"] {
+                                display: flex;
+                                flex-direction: column;
+                                margin-left: 20px;
+                                margin-top: -120px;
+                            }
+                            .element-container:has(#verify-button-after) + div button {
+                                display: flex;
+                                justify-content: center;
+                                margin-top: -115px;
+                                margin-left: 80px;
+                                border: 1px solid #1ed760 !important;
+                                border-radius: 20px;
+                                background: rgba(30, 215, 96, 0.1)
+                                color: white !important;
+                                transition: all 0.3s ease !important;
+                            }
+                            </style>
+                            
+                        """, unsafe_allow_html=True)
 
-                            st.markdown("""
-                            Please confirm if you climbed it IAD (In a Day).
+                        st.markdown(f"""
+                            <div style="
+                                background: rgba(18, 18, 18, 0.95);
+                                border: 1px solid #1ed760;
+                                border-radius: 10px;
+                                padding: 1rem;
+                                margin-bottom: 1rem;
+                                ">
+                                <div style="
+                                    color: #1ed760;
+                                    font-size: 1.2rem;
+                                    margin-bottom: 1rem;
+                                    font-weight: bold;
+                                    text-align: center;
+                                ">🚨 Big Fucking Wall Detected 🚨</div>
+                                <div style="
+                                    color: #b3b3b3;
+                                    font-size: 1rem;
+                                    line-height: 1.5;
+                                    margin-bottom: 4rem;
+                                ">
+                                    Please confirm if you climbed it IAD.<br><br>
+                                    If yes...Pound a piton. Drink a Cobra.<br><br>
+                                    If not, who doesn't love sleeping on El Cap.<br><br>
+                                    Did you climb <strong>{route_name}</strong> IAD on <strong>{date.strftime('%m-%d-%y')}</strong>?
+                                </div>
+                            </div>
+                        """, unsafe_allow_html=True)
 
-                            If yes...Pound a piton. Drink a Cobra.
+                        st.markdown('<span id="verify-radio-after"></span>', unsafe_allow_html=True)
+                        response = st.radio(
+                            "",
+                            options=["Yes", "No"],
+                            key=f"verify_{date.strftime('%Y%m%d')}"
+                        )
 
-                            If not...who doesn't love sleeping on El Cap.
-                            """)
-
-                            st.markdown(f"Did you climb **{route_name}** IAD on **{date.strftime('%m-%d-%y')}**?")
-                            st.markdown("""
-                                <style>
-                                    [data-testid="stRadio"] {
-                                        margin-top:0px !important;
-                                    }
-                                </style>
-                            """, unsafe_allow_html=True)
-
-                            response = st.radio(
-                                "",  # Empty label since we're showing it above
-                                options=["Yes", "No"],
-                                key=f"verify_{date.strftime('%Y%m%d')}"
-                            )
-
-                            st.markdown("""
-                                <style>
-                                    /* Add space above the confirm button */
-                                    [data-testid="stButton"] {
-                                        margin-top: 20px !important;
-                                        padding-top: 10px !important;
-                                    }
-                                </style>
-                            """, unsafe_allow_html=True)
-
-                            if st.button("Confirm"):
-                                if response == "Select an option":
-                                    st.warning("Please select Yes or No.")
-                                elif response == "No":
-                                    st.session_state.current_day_index += 1
-                                    st.rerun()
-                                else: 
-                                    st.session_state.needs_verification = False
-                                    st.session_state.shown_big_day_prompts = True
-                                    st.rerun()
+                        st.markdown('<span id="verify-button-after"></span>', unsafe_allow_html=True)
+                        if st.button("Confirm"):
+                            if response == "Select an option":
+                                st.warning("Please select Yes or No.")
+                            elif response == "No":
+                                st.session_state.current_day_index += 1
+                                st.rerun()
+                            else: 
+                                st.session_state.needs_verification = False
+                                st.session_state.shown_big_day_prompts = True
+                                st.rerun()
 
                     else: # response == "Yes"
                         st.session_state.shown_big_day_prompts = True   
@@ -562,40 +582,47 @@ try:
                     if start_year == end_year:
                         day = date.day
                         suffix = 'th' if 11 <= day <= 13 else {1: 'st', 2: 'nd', 3: 'rd'}.get(day % 10, 'th')
-                        formatted_date = date.strftime(f'%B %d{suffix}')
+                        formatted_date = date.strftime(f'%b %d{suffix}')
                     else:
-                        formatted_date = date.strftime('%B %d, %Y')
+                        formatted_date = date.strftime('%b %d, %Y')
                         
-                    st.markdown(
-                        f"""
-                        <div style="display: flex; justify-content: center; gap: 1rem; margin: 0.5rem;">
-                            <div style="flex: 1; text-align: center;">
-                                <div style="color: #1ed760; margin-bottom: 0.5rem;">Total Length</div>
-                                <div style="color: white; font-size: 1.5rem; font-weight: bold;">{total_length:,} ft</div>
-                                <div style="color: #1ed760; margin-top: 0.5rem;">Routes</div>
-                                <div style="color: white; font-size: 1.5rem; font-weight: bold;">{num_routes}</div>
-                            </div>
-                            <div style="flex: 1; text-align: center;">
-                                <div style="color: #1ed760; margin-bottom: 0.5rem;">Date</div>
-                                <div style="color: white; font-size: 1.5rem; font-weight: bold;">{formatted_date}</div>
-                                <div style="color: #1ed760; margin-top: 0.5rem;">Area</div>
-                                <div style="color: white; font-size: 1.25rem;">{areas}</div>
-                            </div>
-                        </div>
-                        <div style="text-align: center; margin: 1.5rem 0;">
+                    
+                    with st.container():
+                        st.markdown(f"""
                             <div style="
-                                color: white;
-                                font-size: 1.2rem;
-                                font-weight: 500;
-                                letter-spacing: 0.5px;
-                                opacity: 0.9;
-                            ">{get_day_type(total_length)}</div>
-                        </div>
-                        """,
-                        unsafe_allow_html=True
-                    )
-                    # Add spacing
-                    st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
+                                background: rgba(18, 18, 18, 0.95);
+                                border: 1px solid #1ed760;
+                                border-radius: 10px;
+                                padding: 1.5rem;
+                                margin: 1rem 0;
+                                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+                            ">
+                                <div style="display: flex; justify-content: space-around; align-items: flex-start; gap: 1.1rem;">
+                                    <div style="flex: 1.1; text-align: center;">
+                                        <div style="color: #FEFEFE;">Total Length</div>
+                                        <div style="color: #FEFEFE; font-size: 1.1rem; font-weight: bold; margin: 0.5rem 0;">{total_length:,} ft</div>
+                                        <div style="color: #FEFEFE;">Routes</div>
+                                        <div style="color: #FEFEFE; font-size: 1.1rem; font-weight: bold;">{num_routes}</div>
+                                    </div>
+                                    <div style="flex: 1.1; text-align: center;">
+                                        <div style="color: #FEFEFE;">Date</div>
+                                        <div style="color: #FEFEFE; font-size: 1.1rem; font-weight: bold; margin: 0.5rem 0;">{formatted_date}</div>
+                                        <div style="color: #FEFEFE;">Area</div>
+                                        <div style="color: #FEFEFE; font-size: 1.1rem;white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{areas}</div>
+                                    </div>
+                                </div>
+                            </div>
+                                    <div style="
+                                    text-align: center;
+                                    color: #FEFEFE;
+                                    font-size: 1.2rem;
+                                    font-weight: 500;
+                                    margin: 0.5rem 0 1.5rem 0;
+                                    letter-spacing: 0.5px;
+                                ">
+                                    {get_day_type(total_length)}
+                                </div>
+                        """, unsafe_allow_html=True)
                     
                     for i, (route_name, route_details, url, photo) in enumerate(route_details_list, 1):    
                         with st.expander(f"{i}. {route_name}"):

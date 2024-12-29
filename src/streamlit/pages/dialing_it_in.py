@@ -21,7 +21,6 @@ if filters['year_start'] is not None and filters['year_end'] is not None:
     total_routes_df = metrics.total_routes(conn, user_id=user_id, year_start=filters['year_start'], year_end=filters['year_end'])
     route_data = metrics.most_climbed_route(conn, user_id=user_id, year_start=filters['year_start'], year_end=filters['year_end'])
 
-
 st.markdown(get_spotify_style(), unsafe_allow_html=True)
 
 st.markdown("""
@@ -94,12 +93,6 @@ st.markdown("""
         .stat-label {
             color: #b3b3b3;
             font-size: 1.3rem;
-        }
-
-        .streamlit-expanderHeader {
-            font-size: 1.3rem !important;
-            padding: 1rem !important;
-            margin-top: 2rem !important; 
         }
         
         .journey-title {
