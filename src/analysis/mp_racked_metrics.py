@@ -352,8 +352,7 @@ def get_highest_rated_climbs(conn, selected_styles=None, route_types=None, year_
     SELECT 
         DISTINCT r.route_name,
         r.main_area,
-        concat(r.route_name, ' ~ ', r.main_area, ' > ', r.specific_location,' - ', 
-        TRIM(NULLIF(CONCAT_WS(' ', r.yds_rating, r.hueco_rating, r.aid_rating,r.danger_rating, r.commitment_grade), ''))) routes,
+        r.specific_location,
         TRIM(NULLIF(CONCAT_WS(' ', 
             r.yds_rating,
             r.hueco_rating,
@@ -362,7 +361,7 @@ def get_highest_rated_climbs(conn, selected_styles=None, route_types=None, year_
             r.commitment_grade), '')) as grade,
         r.avg_stars,
         r.num_votes,
-        STRING_AGG(tav.mapped_tag, ', ') as tags,
+        STRING_AGG(tav.mapped_tag, ', ') as styles,
         r.primary_photo_url,
         r.route_url
     FROM routes.Routes r

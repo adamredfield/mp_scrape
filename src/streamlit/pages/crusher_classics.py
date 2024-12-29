@@ -192,53 +192,103 @@ with tab1:
         </style>
     """, unsafe_allow_html=True)
 
-    for route_name, main_area, route, grade, stars, route_id, tags, photo_url, route_url in top_rated_routes:
+    for route_name, main_area, specific_location, grade, stars, route_id, styles, photo_url, route_url in top_rated_routes:
+        if specific_location:
+            location_parts = specific_location.split(' > ')
+            if len(location_parts) >= 2:
+                shortened_location = ' > '.join(location_parts[-2:])
+            else:
+                shortened_location = location_parts[0]
+        else:
+            shortened_location = ''
         if photo_url:
-            img = get_squared_image(photo_url)
+            img = image_to_base64(get_squared_image(photo_url))
             
         # Create the expander title using pure markdown
         expander_title = rf"""
-    **{route_name}** :green[{grade}] {"⭐" * int(stars)}
+    **{route_name}** - {main_area} :green[{grade}]
         """.strip()
         
         with st.expander(expander_title, expanded=False):
             col1, col2 = st.columns([1, 2])
             
             with col1:
-                st.image(img)
+                st.markdown(
+                        f"""
+                        <div style="width: 100%;">
+                            <img src="{img}" 
+                                style="width: 100%; 
+                                        object-fit: cover; 
+                                        margin: 0; 
+                                        padding: 0;
+                                        border-radius: 4px;"
+                                alt="{route_name}">
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+            
             
             with col2:
                 st.markdown("### Route Details")
                 st.markdown(f"""
-                    - **Location:** {main_area}
-                    - **Type:** {tags}
-                    - **Length:** 60 ft
-                    - **Season:** Spring, Fall
-                    - **Protection:** Bolts
+                    - **Location:** {shortened_location}
+                    - **Type:** {styles}
                     
                     [:green[View on Mountain Project ↗]]({route_url})
                 """)
 
 
-
 with tab2:
-    st.markdown(f"<h2 class='spotify-header'>Top {tag_type.replace('_', ' ').title()}s</h2>", unsafe_allow_html=True)
+    st.markdown("""
+    <style>
+        .tag-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0;
+            margin-bottom: 0.3rem;
+        }
+        
+        .tag-name {
+            color: #EEEEEE;
+            font-size: 1rem;
+            min-width: 120px;
+        }
+        
+        .bar-container {
+                flex-grow: 1;
+                margin: 0;  /* Added margin on both sides */
+                padding: 0;
+        }
+        
+        .frequency-bar {
+            background: #1ed760;
+            height: 4px;
+            border-radius: 2px;
+        }
+        
+        .count {
+            color: #B3B3B3;
+            font-size: 0.9rem;
+            min-width: 80px;
+            text-align: right;
+        }
+    </style>
+""", unsafe_allow_html=True)
     
     counts = tag_df['Count'].fillna(0)
     max_count = counts.max() if len(counts) > 0 else 1
 
     for i, (_, tag, count) in enumerate(zip(tag_df['Type'], tag_df['Tag'], counts), 1):
-        num_bars = min(10, round((count / max_count) * 10)) if max_count > 0 else 0
-        frequency_bars = '|' * num_bars
+        percentage = (count / max_count) * 100 if max_count > 0 else 0
         
         st.markdown(f"""
             <div class="tag-item">
-                <div>
-                    <span class="item-number">{i}. </span>
-                    <span class="item-name">{tag}</span>
+                <div class="tag-name">{i}. {tag}</div>
+                <div class="bar-container">
+                    <div class="frequency-bar" style="width: {percentage}%;"></div>
                 </div>
-                <div class="item-details">
-                    <span style="color: #1ed760;">{frequency_bars}</span> {int(count)} routes
-                </div>
+                <div class="count">{int(count)} routes</div>
             </div>
         """, unsafe_allow_html=True)

@@ -38,7 +38,7 @@ st.markdown("""
         /* Reset margins for expanders inside tab panels */
         div[role="tabpanel"] div[data-testid="stExpander"] {
             margin-top: 0 !important;
-            margin-bottom: 20px !important;
+            margin-bottom: 10px !important;
         }
             
         .stat-card {
@@ -54,6 +54,11 @@ st.markdown("""
             flex-direction: column;
             justify-content: center !important;
             gap: 0.2rem
+        }
+            
+        /* Target the container of the stat-card */
+        div:has(> .stat-card) {
+            margin-top: 1rem !important;
         }
         
         /* Card title styling */
@@ -212,6 +217,7 @@ try:
             gap: 100px;
             justify-content: center !important;
         }
+                
         
         /* If needed, also adjust the container padding */
         .stTabs {
@@ -237,9 +243,23 @@ try:
         # Add spacing between "Group Areas By" and radio buttons
         st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
 
-
         container = st.container()
         with container:
+            st.markdown("""
+            <style>
+                /* Target only this specific radio group */
+                .element-container:has(#area-filter-radio-after) + div div[role="radiogroup"] {
+                    display: flex;
+                    justify-content: center;
+                    gap: 10px;
+                }
+                .element-container:has(#area-filter-radio-after) + div {
+                    margin-bottom: -50px;  /* Adjust this value as needed */
+                    margin-top: -35px;
+                }
+            </style>
+        """, unsafe_allow_html=True)
+            st.markdown('<span id="area-filter-radio-after"></span>', unsafe_allow_html=True)
             area_type = st.radio(
                 "",
                 options=[
@@ -248,7 +268,8 @@ try:
                 ],
                 format_func=lambda x: x[1],
                 key='area_filter_type',
-                horizontal=True 
+                horizontal=True,
+                label_visibility='collapsed'      
             )
 
         st.markdown("</div>", unsafe_allow_html=True)
@@ -561,40 +582,47 @@ try:
                     if start_year == end_year:
                         day = date.day
                         suffix = 'th' if 11 <= day <= 13 else {1: 'st', 2: 'nd', 3: 'rd'}.get(day % 10, 'th')
-                        formatted_date = date.strftime(f'%B %d{suffix}')
+                        formatted_date = date.strftime(f'%b %d{suffix}')
                     else:
-                        formatted_date = date.strftime('%B %d, %Y')
+                        formatted_date = date.strftime('%b %d, %Y')
                         
-                    st.markdown(
-                        f"""
-                        <div style="display: flex; justify-content: center; gap: 1rem; margin: 0.5rem;">
-                            <div style="flex: 1; text-align: center;">
-                                <div style="color: #1ed760; margin-bottom: 0.5rem;">Total Length</div>
-                                <div style="color: white; font-size: 1.5rem; font-weight: bold;">{total_length:,} ft</div>
-                                <div style="color: #1ed760; margin-top: 0.5rem;">Routes</div>
-                                <div style="color: white; font-size: 1.5rem; font-weight: bold;">{num_routes}</div>
-                            </div>
-                            <div style="flex: 1; text-align: center;">
-                                <div style="color: #1ed760; margin-bottom: 0.5rem;">Date</div>
-                                <div style="color: white; font-size: 1.5rem; font-weight: bold;">{formatted_date}</div>
-                                <div style="color: #1ed760; margin-top: 0.5rem;">Area</div>
-                                <div style="color: white; font-size: 1.25rem;">{areas}</div>
-                            </div>
-                        </div>
-                        <div style="text-align: center; margin: 1.5rem 0;">
+                    
+                    with st.container():
+                        st.markdown(f"""
                             <div style="
-                                color: white;
-                                font-size: 1.2rem;
-                                font-weight: 500;
-                                letter-spacing: 0.5px;
-                                opacity: 0.9;
-                            ">{get_day_type(total_length)}</div>
-                        </div>
-                        """,
-                        unsafe_allow_html=True
-                    )
-                    # Add spacing
-                    st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
+                                background: rgba(18, 18, 18, 0.95);
+                                border: 1px solid #1ed760;
+                                border-radius: 10px;
+                                padding: 1.5rem;
+                                margin: 1rem 0;
+                                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+                            ">
+                                <div style="display: flex; justify-content: space-around; align-items: flex-start; gap: 1.1rem;">
+                                    <div style="flex: 1.1; text-align: center;">
+                                        <div style="color: #FEFEFE;">Total Length</div>
+                                        <div style="color: #FEFEFE; font-size: 1.1rem; font-weight: bold; margin: 0.5rem 0;">{total_length:,} ft</div>
+                                        <div style="color: #FEFEFE;">Routes</div>
+                                        <div style="color: #FEFEFE; font-size: 1.1rem; font-weight: bold;">{num_routes}</div>
+                                    </div>
+                                    <div style="flex: 1.1; text-align: center;">
+                                        <div style="color: #FEFEFE;">Date</div>
+                                        <div style="color: #FEFEFE; font-size: 1.1rem; font-weight: bold; margin: 0.5rem 0;">{formatted_date}</div>
+                                        <div style="color: #FEFEFE;">Area</div>
+                                        <div style="color: #FEFEFE; font-size: 1.1rem;white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{areas}</div>
+                                    </div>
+                                </div>
+                            </div>
+                                    <div style="
+                                    text-align: center;
+                                    color: #FEFEFE;
+                                    font-size: 1.2rem;
+                                    font-weight: 500;
+                                    margin: 0.5rem 0 1.5rem 0;
+                                    letter-spacing: 0.5px;
+                                ">
+                                    {get_day_type(total_length)}
+                                </div>
+                        """, unsafe_allow_html=True)
                     
                     for i, (route_name, route_details, url, photo) in enumerate(route_details_list, 1):    
                         with st.expander(f"{i}. {route_name}"):
