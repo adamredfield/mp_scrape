@@ -94,12 +94,6 @@ st.markdown("""
             color: #b3b3b3;
             font-size: 1.3rem;
         }
-
-        .streamlit-expanderHeader {
-            font-size: 1.3rem !important;
-            padding: 1rem !important;
-            margin-top: 2rem !important; 
-        }
         
         .journey-title {
             color: white;

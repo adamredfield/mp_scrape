@@ -15,56 +15,36 @@ from src.analysis.filters_ctes import available_years
 user_id = st.session_state.user_id
 conn = st.connection('postgresql', type='sql')
 
-st.markdown(get_spotify_style(), unsafe_allow_html=True)
 
-st.markdown("""
-    <style>
-        /* Move filters up */
-        [data-testid="stExpander"] {
-            margin-top: -3rem !important;
-            margin-bottom: 1rem !important;
+st.markdown("""   
+     <style>
+        /* Filter spacing from top of page */
+        div[data-testid="stExpander"] {
+            margin-top: 0rem;
         }
-        
-        /* Adjust tab position */
+
+        /* Card spacing from filter */
+        div:has(> .style-card) {
+            margin-top: 0rem !important;  /* Adjust this value as needed */
+        }
+
+        /* Tab spacing from card */
         [data-testid="stTabs"] {
-            margin-top: 0 !important;
+            margin-top: -1rem !important;
         }
-        
-        /* Remove default margins */
-        .block-container {
-            padding-top: 1rem !important;
-        }
-        
-        /* Tab styling - clean and minimal */
-        button[data-baseweb="tab"] {
-            height: 50px;
-            white-space: pre-wrap;
-            background-color: transparent !important;
-            border-radius: 8px;
-            color: #888888;
-            font-weight: 500;
-        }
-        
-        /* Selected tab styling - just color change */
-        button[data-baseweb="tab"][aria-selected="true"] {
-            background-color: transparent !important;
-            color: #1ed760 !important;
-            border: none !important;
-        }
-        
-        /* Hover state - subtle */
-        button[data-baseweb="tab"]:hover {
-            background-color: transparent !important;
-            color: #1ed760;
-        }
-        
-        /* Add space between tabs */
+
+        /* Center tabs */
         .stTabs [data-baseweb="tab-list"] {
-            gap: 100px;
+            gap: 90px;
             justify-content: center !important;
         }
+        
+    .stExpander {
+        border: none !important;
+        padding: 0 !important;
+        
     </style>
-""", unsafe_allow_html=True)
+""", unsafe_allow_html=True)      
 
 years_df = available_years(conn, user_id)
 filters = render_filters(
@@ -83,15 +63,6 @@ selected_styles = filters.get('selected_tags')
 st.markdown("<div style='height: 2rem;'></div>", unsafe_allow_html=True)
 filter_col1, filter_col2, _ = st.columns([1, 1, 2])
 
-top_rated_routes = metrics.get_highest_rated_climbs(
-    conn,
-    selected_styles=selected_styles,
-    route_types=None,
-    year_start=start_year,
-    year_end=end_year,
-    tag_type=tag_type,
-    user_id=user_id
-).values.tolist()
 
 st.markdown(f"""
     <div class="style-card">
@@ -105,111 +76,150 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
+top_rated_routes = metrics.get_highest_rated_climbs(
+    conn,
+    selected_styles=selected_styles,
+    route_types=None,
+    year_start=start_year,
+    year_end=end_year,
+    tag_type=tag_type,
+    user_id=user_id
+).values.tolist()
+
 st.markdown("""
     <style>
-            
-        [data-testid="stExpander"] {
-            margin-top: -3rem !important;
-            margin-bottom: 0 !important;  /* Reduced from 1rem */
-        }          
+        /* Remove default Streamlit expander styling */
+        .stExpander {
+            border: none !important;
+            background-color: rgba(255, 255, 255, 0.05) !important;
+            border-radius: 8px !important;
+            margin-bottom: 8px !important;
+        }
+        
+        /* Remove the default border and background */
+        .streamlit-expanderHeader {
+            background-color: transparent !important;
+            border: none !important;
+            color: white !important;
+        }
+        
+        /* Style the expander content container */
+        .streamlit-expanderContent {
+            border: none !important;
+            background-color: transparent !important;
+        }
+        
+        /* Dark background for each expander */
+        div[data-testid="stExpander"] {
+            background: rgba(0, 0, 0, 0.2) !important;å
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            border-radius: 8px !important;
+        }
 
+        /* Hover effect */
+        div[data-testid="stExpander"]:hover {
+            background: rgba(255, 255, 255, 0.05) !important;
+        }
 
+        /* Move filters up */
+        section[data-testid="stSidebar"] > div {
+            padding-top: 1rem !important;
+        }
+        
+        /* Adjust main container padding */
+        .block-container {
+            padding-top: 1rem !important;
+        }
+        /* Adjust main container padding */
+        .block-container {
+            padding-top: 2rem !important;
+        }
+        
+        /* Style card positioning */
         .style-card {
-            background: rgba(30, 215, 96, 0.1);
-            border: 1px solid rgba(30, 215, 96, 0.2);
+            background: transparent;
+            border: 1px solid #1ed760;
             border-radius: 10px;
             padding: 1.5rem;
-            margin-top: -5rem !important;  /* Reduced from 1rem */
-            margin-bottom: 1rem;
+            margin: -4rem 0 2rem 0;  /* Increased negative top margin */
             text-align: center;
+            position: relative;  /* Add position relative */
+            z-index: 1;  /* Ensure card stays above other elements
+        }
+                    /* Tab content spacing */
+        .stTabs [data-baseweb="tab-list"] {
+            margin-bottom: 1rem !important;  /* Uniform spacing after tab list */
         }
         
-        .style-title {
-            color: #888;
-            font-size: 1rem;
-            margin-bottom: 0.5rem;
+        /* Tabs positioning */
+        [data-testid="stTabs"] {
+            margin-top: 0 !important;
+            margin-bottom: 0.5rem !important;
         }
         
-        .style-description {
-            color: #1ed760;
-            font-size: 2rem;
-            font-weight: bold;
-            margin: 0.5rem 0;
-        }
-        
-        .style-subtitle {
-            color: #888;
-            font-size: 0.9rem;
+        /* Remove default margins from expanders */
+        [data-testid="stExpander"] {
+            margin-top: 0 !important;
         }
     </style>
 """, unsafe_allow_html=True)
 
+tag_data = metrics.top_tags(
+    conn, 
+    tag_type, 
+    user_id=user_id,
+    year_start=start_year,
+    year_end=end_year
+)
+tag_df = pd.DataFrame(tag_data, columns=['Type', 'Tag', 'Count'])
 
 tab1, tab2 = st.tabs(["🏔️ Top Routes", "🏷️ Style Analysis"])
 
 with tab1:
-
-    tag_data = metrics.top_tags(
-        conn, 
-        tag_type, 
-        user_id=user_id,
-        year_start=start_year,
-        year_end=end_year
-    )
-    tag_df = pd.DataFrame(tag_data, columns=['Type', 'Tag', 'Count'])
-
-# Display routes in the grid
-    for route_name, main_area, route, grade, stars, route_id, tags, photo_url, route_url in top_rated_routes:
-        with st.expander(f"{route_name} • {main_area} • ⭐ {stars:.1f}"):
-            if photo_url:
-                img = image_to_base64(get_squared_image(photo_url))
-                
-            st.markdown(f"""
-                <div class="route-card">
-                    <div class="route-image-container">
-                        <img src="{img}" 
-                                class="route-image" 
-                                onerror="this.src='https://cdn.shopify.com/s/files/1/0049/9271/1909/products/Mountain-Climbing_1024x1024.jpg'">
-                    </div>
-                    <div class="route-info">
-                        <div class="route-stats">
-                            <span style="color: #b3b3b3;">{tags}</span>
-                        </div>
-                        <div class="route-link">
-                            <a href="{route_url}" target="_blank" style="color: #1ed760; text-decoration: none;">
-                                View on Mountain Project →
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            """, unsafe_allow_html=True)
-
-        st.markdown("""
+    st.markdown("""
         <style>
-            /* Expander styling */
-            .streamlit-expanderHeader {
+            .stExpander {
+                border: none !important;
                 background-color: rgba(255, 255, 255, 0.05) !important;
                 border-radius: 8px !important;
-                margin-bottom: 0.5rem !important;
-                border: none !important;
+                margin-bottom: 8px !important;
+                padding: 16px;
             }
             
-            .streamlit-expanderHeader:hover {
-                background-color: rgba(255, 255, 255, 0.1) !important;
-            }
-            
-            /* Remove default expander styling */
-            .streamlit-expanderContent {
-                border: none !important;
-                background-color: transparent !important;
-            }
-            
-            .route-link {
-                margin-top: 1rem;
-                text-align: center;
+            .stExpander:hover {
+                background-color: rgba(255, 255, 255, 0.08) !important;
             }
         </style>
     """, unsafe_allow_html=True)
+
+    for route_name, main_area, route, grade, stars, route_id, tags, photo_url, route_url in top_rated_routes:
+        if photo_url:
+            img = get_squared_image(photo_url)
+            
+        # Create the expander title using pure markdown
+        expander_title = rf"""
+    **{route_name}** :green[{grade}] {"⭐" * int(stars)}
+        """.strip()
+        
+        with st.expander(expander_title, expanded=False):
+            col1, col2 = st.columns([1, 2])
+            
+            with col1:
+                st.image(img)
+            
+            with col2:
+                st.markdown("### Route Details")
+                st.markdown(f"""
+                    - **Location:** {main_area}
+                    - **Type:** {tags}
+                    - **Length:** 60 ft
+                    - **Season:** Spring, Fall
+                    - **Protection:** Bolts
+                    
+                    [:green[View on Mountain Project ↗]]({route_url})
+                """)
+
+
 
 with tab2:
     st.markdown(f"<h2 class='spotify-header'>Top {tag_type.replace('_', ' ').title()}s</h2>", unsafe_allow_html=True)

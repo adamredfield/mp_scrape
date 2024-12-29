@@ -6,13 +6,13 @@ sys.path.append(project_root)
 
 from src.analysis.filters_ctes import add_user_filter, add_fa_name_filter, get_deduped_ticks_cte
 
-def get_top_first_ascensionists(conn, user_id=None):
+def get_top_first_ascensionists(conn, user_id=None, year_start=None, year_end=None):
     f"""
     Get the most prolific first ascensionists
     Returns: List of (name, count) tuples
     """
     query = f"""
-    {get_deduped_ticks_cte(user_id, year=None)}
+    {get_deduped_ticks_cte(user_id, year_start=year_start, year_end=year_end)}
     SELECT fa_name, COUNT(*) as fa_count
     FROM analysis.fa
     JOIN deduped_ticks t on t.route_id = fa.route_id
@@ -25,13 +25,13 @@ def get_top_first_ascensionists(conn, user_id=None):
     result = conn.query(query)
     return result.values.tolist()
 
-def get_first_ascensionist_by_decade(conn, name, user_id=None):
+def get_first_ascensionist_by_decade(conn, name, user_id=None, year_start=None, year_end=None):
     """
     Get a first ascensionist's activity by decade
     Returns: List of (decade, count) tuples
     """
     query = f"""
-    {get_deduped_ticks_cte(user_id, year=None)}
+    {get_deduped_ticks_cte(user_id, year_start=year_start, year_end=year_end)}
     SELECT 
         CONCAT(FLOOR(fa.year::int/10)*10, 's') as decade,
         COUNT(*) as fa_count
@@ -47,13 +47,13 @@ def get_first_ascensionist_by_decade(conn, name, user_id=None):
     result = conn.query(query)
     return result.values.tolist()
 
-def get_first_ascensionist_areas(conn, name, user_id=None):
+def get_first_ascensionist_areas(conn, name, user_id=None, year_start=None, year_end=None):
     """
     Get the areas where a first ascensionist was most active
     Returns: List of (area_name, count) tuples
     """
     query = f"""
-    {get_deduped_ticks_cte(user_id, year=None)}
+    {get_deduped_ticks_cte(user_id, year_start=year_start, year_end=year_end)}
     SELECT 
         r.main_area as area_name,
         COUNT(*) as fa_count
@@ -70,13 +70,13 @@ def get_first_ascensionist_areas(conn, name, user_id=None):
     result = conn.query(query)
     return result.values.tolist()
 
-def get_first_ascensionist_grades(conn, name, user_id=None):
+def get_first_ascensionist_grades(conn, name, user_id=None, year_start=None, year_end=None):
     """
     Get distribution of grades for a first ascensionist
     Returns: List of (grade, count) tuples
     """
     query = f"""
-    {get_deduped_ticks_cte(user_id, year=None)}
+    {get_deduped_ticks_cte(user_id, year_start=year_start, year_end=year_end)}
     SELECT 
         r.yds_rating,
         COUNT(*) as route_count
@@ -93,7 +93,7 @@ def get_first_ascensionist_grades(conn, name, user_id=None):
     result = conn.query(query)
     return result.values.tolist()
 
-def get_collaborative_ascensionists(conn, name, user_id=None):
+def get_collaborative_ascensionists(conn, name, user_id=None, year_start=None, year_end=None):
     """
     Find climbers who frequently did first ascents with given climber
     Returns: List of (partner_name, count) tuples
@@ -101,7 +101,7 @@ def get_collaborative_ascensionists(conn, name, user_id=None):
     if name == "All FAs":
         # Query for most frequent partnerships overall
         query = f"""
-        {get_deduped_ticks_cte(user_id, year=None)},
+        {get_deduped_ticks_cte(user_id, year_start=year_start, year_end=year_end)},
         partnerships AS (
             SELECT 
                 LEAST(a1.fa_name, a2.fa_name) as climber1,
@@ -150,10 +150,10 @@ def get_collaborative_ascensionists(conn, name, user_id=None):
     return result.values.tolist()
 
 
-def get_fa_routes(conn, fa_name, user_id):
+def get_fa_routes(conn, fa_name, user_id, year_start=None, year_end=None):
     """Get all routes where person was FA."""
     query = f"""
-    {get_deduped_ticks_cte(user_id,year=None)}
+    {get_deduped_ticks_cte(user_id, year_start=year_start, year_end=year_end)}
     SELECT CONCAT_WS(' ~ ',
         r.route_name,
         CONCAT_WS(' > ',
@@ -178,7 +178,7 @@ def get_fa_routes(conn, fa_name, user_id):
     return result.values.tolist()
 
 
-def get_partnership_routes(conn, fa_name, partner_name, user_id):
+def get_partnership_routes(conn, fa_name, partner_name, user_id, year_start=None, year_end=None):
     """
     Get routes where both climbers were FAs together.
     
@@ -192,7 +192,7 @@ def get_partnership_routes(conn, fa_name, partner_name, user_id):
         List of routes done together
     """
     query = f"""
-    {get_deduped_ticks_cte(user_id, year=None)}
+    {get_deduped_ticks_cte(user_id, year_start=year_start, year_end=year_end)}
     SELECT
         CONCAT_WS(' ~ ',
             r.route_name,

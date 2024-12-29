@@ -8,37 +8,6 @@ sys.path.append(project_root)
 
 import src.analysis.mp_racked_metrics as metrics
 
-def get_filter_style():
-    return """
-        <style>
-            .streamlit-expanderHeader {
-                font-size: 0.9em !important;
-                color: white !important;
-                background-color: transparent !important;
-                border: none !important;
-                padding: 4px 12px !important;
-                position: fixed !important;
-                top: 0.5rem !important;
-                left: 4rem !important;
-                z-index: 999 !important;
-            }
-            
-            .streamlit-expanderHeader svg {
-                font-size: 3em !important;
-                vertical-align: middle !important;
-            }
-            
-            .streamlit-expander {
-                border: none !important;
-                background-color: transparent !important;
-            }
-            
-            .block-container {
-                padding-top: 3rem !important;
-            }
-        </style>
-    """
-
 def commitment_grade_filter(df):
     """Commitment grade filter"""
     available_grades = sorted([g for g in df['commitment_grade'].unique() if pd.notna(g)])
@@ -94,17 +63,16 @@ def length_filter(df):
 
 def date_filter(df):
     """Date range filter"""
+
     available_years = sorted(df['date'].dt.year.unique())
 
-
     date_filter_type = st.radio(
-        "Date Range",
+        "",
         options=["Single Year", "Custom Range"],
         horizontal=True,
         key="single_year_date_range_radio",
+        label_visibility="collapsed" 
     )
-    
-    st.session_state.date_filter_type = date_filter_type
 
     if date_filter_type == "Single Year":
         year = st.selectbox(
@@ -190,10 +158,9 @@ def render_filters(df=None, filters_to_include=None, filter_title="Filters", con
     Args:
         df: DataFrame containing the data
         filters_to_include: List of filter names to include
-                          Options: ['grade', 'type', 'length', 'date']
+        Options: ['grade', 'type', 'length', 'date']
     """
-    st.markdown(get_filter_style(), unsafe_allow_html=True)
-    
+
     if filters_to_include is None:
         filters_to_include = ['grade', 'type', 'length', 'date']
     
@@ -205,10 +172,22 @@ def render_filters(df=None, filters_to_include=None, filter_title="Filters", con
         'date': date_filter,
         'route_type': route_type_filter
     }
-    
+
+    st.markdown("""
+        <style>
+            /* Top filter styling */
+            .top-filter {
+                margin-top: -40px !important;
+            }
+            
+            /* Route expanders styling */
+            .route-expander {
+                margin-top: -20px !important;
+            }
+        </style>
+    """, unsafe_allow_html=True)
     results = {}
     with st.expander(filter_title):
-
         if 'date' in filters_to_include:
             year_start, year_end = filter_functions['date'](df)
             results['year_start'] = year_start
