@@ -46,14 +46,14 @@ if not st.session_state['authenticated']:
 pg = st.navigation({
     "Overview": [
         st.Page("pages/grade_pyramid.py", 
-                title="Grade Pyramid", 
+                title="Grade Pyramid of Giza", 
                 icon="📊", 
                 default=True),
         st.Page("pages/going_the_distance.py", 
                 title="Going the Distance", 
                 icon="🏃"),
-        st.Page("pages/crusher_classics.py", 
-                title="Crusher Classics", 
+        st.Page("pages/classics_chaser.py", 
+                title="Classics Chaser", 
                 icon="⭐"),
     ],
     "Analysis": [

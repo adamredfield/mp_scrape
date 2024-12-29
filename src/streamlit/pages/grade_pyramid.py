@@ -15,6 +15,27 @@ from src.analysis.filters_ctes import available_years
 user_id = st.session_state.user_id
 conn = st.connection('postgresql', type='sql')
 
+years_df = available_years(conn, user_id)
+
+filters = render_filters(
+    df=years_df,
+    filters_to_include=['grade_grain', 'route_type', 'date'],
+    filter_title="Filter your data") 
+
+# Add instructions here
+st.markdown("""
+    <div style="
+        background: rgba(30, 215, 96, 0.1);
+        border: 1px solid #1ed760;
+        border-radius: 8px;
+        padding: 0.8rem;
+        margin: 1rem 0;
+        text-align: center;
+    ">
+        <span style="color: #1ed760; font-size: 0.9rem;">👆 Click any bar to see detailed route information</span>
+    </div>
+""", unsafe_allow_html=True)
+
 @st.cache_data
 def get_chart_data(_conn, user_id, grade_grain, route_type, year_start, year_end):
     """Cache the data fetching"""
@@ -214,7 +235,7 @@ st.markdown("""
         margin-top: 1rem !important;
     }
     .stExpander {
-        margin-top: -2rem !important;
+        margin-top: 0rem !important;
         margin-bottom: 2rem !important;
     }
             
@@ -240,13 +261,6 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.markdown(get_spotify_style(), unsafe_allow_html=True)
-
-years_df = available_years(conn, user_id)
-
-filters = render_filters(
-    df=years_df,
-    filters_to_include=['grade_grain', 'route_type', 'date'],
-    filter_title="Filter your data") 
 
 grade_grain = filters.get('grade_grain', 'base')
 route_type = None if filters.get('route_type', 'All') == 'All' else [filters.get('route_type', 'All')]
