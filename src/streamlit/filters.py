@@ -208,6 +208,9 @@ def render_filters(df=None, filters_to_include=None, filter_title="Filters", con
         Options: ['grade', 'type', 'length', 'date']
     """
 
+    if 'filter_expander_state' not in st.session_state:
+        st.session_state.filter_expander_state = False
+
     if filters_to_include is None:
         filters_to_include = ['grade', 'type', 'length', 'date']
     
@@ -235,7 +238,7 @@ def render_filters(df=None, filters_to_include=None, filter_title="Filters", con
         </style>
     """, unsafe_allow_html=True)
     results = {}
-    with st.expander(filter_title):
+    with st.expander(filter_title, expanded=st.session_state.filter_expander_state):
         if 'date' in filters_to_include:
             year_start, year_end = filter_functions['date'](df)
             results['year_start'] = year_start
@@ -253,5 +256,5 @@ def render_filters(df=None, filters_to_include=None, filter_title="Filters", con
         for filter_name in filters_to_include:
             if filter_name not in ['date', 'route_tag'] and filter_name in filter_functions:
                 results[filter_name] = filter_functions[filter_name](df)
-    
+    st.session_state.filter_expander_state = True           
     return results

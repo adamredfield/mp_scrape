@@ -22,6 +22,7 @@ filters = render_filters(
     filters_to_include=['grade_grain', 'route_type', 'date', 'tick_type'],
     filter_title="Filter your data") 
 
+
 @st.cache_data
 def get_chart_data(_conn, user_id, grade_grain, route_type, year_start, year_end, tick_types=None):
     """Cache the data fetching"""
