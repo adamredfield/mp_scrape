@@ -100,9 +100,10 @@ def date_filter(df):
 
 def route_type_filter(df=None):
     """Filter for different climbing types"""
-    return st.selectbox(
+    return st.multiselect(
         "Climbing Type",
-        options=['All', 'Boulder', 'Aid', 'Sport', 'Trad'],
+        options=['All', 'Boulder', 'Aid', 'Sport', 'Trad', 'Alpine'],
+        default=['Sport', 'Trad', 'Alpine'],
         format_func=lambda x: {
             'All': 'All Types',
             'Boulder': 'Boulder',
@@ -151,6 +152,52 @@ def route_tag_filter(df=None, conn=None, user_id=None, year_start=None, year_end
     
     return tag_type, selected_tags
 
+def tick_type_filter(df=None):
+    """Filter for different tick types"""
+    
+    # Default send types
+    default_sends = [
+        'Lead / Pinkpoint',
+        'Lead / Onsight',
+        'Lead / Redpoint',
+        'Lead / Flash',
+        'Solo'
+    ]
+    
+    # All available tick types
+    all_tick_types = [
+        'Lead / Pinkpoint',
+        'Lead / Onsight',
+        'Lead',
+        'Follow',
+        'Lead / Redpoint',
+        'Lead / Flash',
+        'Solo',
+        'TR'
+    ]
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.caption("Default Send Types")
+        selected_defaults = st.multiselect(
+            "Default Sends",
+            options=default_sends,
+            default=default_sends,
+            key='default_sends'
+        )
+    
+    with col2:
+        st.caption("Additional Send Types")
+        additional_types = st.multiselect(
+            "Additional Types",
+            options=[t for t in all_tick_types if t not in default_sends],
+            key='additional_sends'
+        )
+    
+    selected_types = selected_defaults + additional_types
+    return selected_types if selected_types else default_sends
+
 def render_filters(df=None, filters_to_include=None, filter_title="Filters", conn=None, user_id=None):
     """
     Render filter expander with specified filters
@@ -170,7 +217,8 @@ def render_filters(df=None, filters_to_include=None, filter_title="Filters", con
         'type': type_filter,
         'length': length_filter,
         'date': date_filter,
-        'route_type': route_type_filter
+        'route_type': route_type_filter,
+        'tick_type': tick_type_filter
     }
 
     st.markdown("""

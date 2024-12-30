@@ -19,25 +19,11 @@ years_df = available_years(conn, user_id)
 
 filters = render_filters(
     df=years_df,
-    filters_to_include=['grade_grain', 'route_type', 'date'],
+    filters_to_include=['grade_grain', 'route_type', 'date', 'tick_type'],
     filter_title="Filter your data") 
 
-# Add instructions here
-st.markdown("""
-    <div style="
-        background: rgba(30, 215, 96, 0.1);
-        border: 1px solid #1ed760;
-        border-radius: 8px;
-        padding: 0.8rem;
-        margin: 1rem 0;
-        text-align: center;
-    ">
-        <span style="color: #1ed760; font-size: 0.9rem;">👆 Click any bar to see detailed route information</span>
-    </div>
-""", unsafe_allow_html=True)
-
 @st.cache_data
-def get_chart_data(_conn, user_id, grade_grain, route_type, year_start, year_end):
+def get_chart_data(_conn, user_id, grade_grain, route_type, year_start, year_end, tick_types=None):
     """Cache the data fetching"""
     sends = metrics.get_grade_distribution(
         _conn,
@@ -46,6 +32,7 @@ def get_chart_data(_conn, user_id, grade_grain, route_type, year_start, year_end
         year_start=year_start,
         year_end=year_end,
         user_id=user_id,
+        tick_types=tick_types,
         tick_type='send'
     )
     
@@ -81,6 +68,18 @@ def create_figure(sends_df, falls_df, ordered_grades):
         'Alpine': '#B71C1C'    # Material Design red (darkest)
     }
     
+    send_hover_template = """
+    %{y}<br>
+    <b style='color: #1ed760'>%{customdata} sends</b><br>
+    <i>Click for details</i>
+    <extra></extra>"""
+    
+    fall_hover_template = """
+    %{y}<br>
+    <b style='color: #E57373'>%{x} falls</b><br>
+    <i>Click for details</i>
+    <extra></extra>"""
+    
     # sends
     for route_type in sends_df['route_type'].unique():
         mask = sends_df['route_type'] == route_type
@@ -89,9 +88,12 @@ def create_figure(sends_df, falls_df, ordered_grades):
             y=sends_df[mask]['grade'],
             x=-sends_df[mask]['count'],
             orientation='h',
-            width=0.5,
-            marker_color=sends_colors.get(route_type, '#1ed760'),
-            hovertemplate=f"{route_type} Sends: %{{customdata}}<br>Grade: %{{y}}<extra></extra>",
+            width=0.7,
+            marker=dict(
+                color=sends_colors.get(route_type, '#1ed760'),
+                opacity=0.8,  # Slight transparency
+            ),
+            hovertemplate=send_hover_template,
             customdata=abs(sends_df[mask]['count'])
         ))
     
@@ -236,7 +238,7 @@ st.markdown("""
     }
     .stExpander {
         margin-top: 0rem !important;
-        margin-bottom: 2rem !important;
+        margin-bottom: -3rem !important;
     }
             
     .filter-container {
@@ -263,7 +265,7 @@ st.markdown("""
 st.markdown(get_spotify_style(), unsafe_allow_html=True)
 
 grade_grain = filters.get('grade_grain', 'base')
-route_type = None if filters.get('route_type', 'All') == 'All' else [filters.get('route_type', 'All')]
+route_type = filters.get('route_type') if filters.get('route_type') else None
 
 start_date = filters.get('year_start')
 end_date = filters.get('year_end')
@@ -274,7 +276,8 @@ sends_df, falls_df = get_chart_data(
     grade_grain=grade_grain,
     route_type=route_type,
     year_start=start_date,
-    year_end=end_date    
+    year_end=end_date,
+    tick_types=filters.get('tick_type')
 )
 
 ordered_grades = sends_df['grade'].tolist()
@@ -293,7 +296,7 @@ with chart_container:
             'scrollZoom': False,
             'displayModeBar': False, 
             'doubleClick': False,    
-            'dragmode': True,        
+            'dragmode': False,        
             'responsive': True,
             'showAxisDragHandles': False,
             'showAxisRangeEntryBoxes': False,
@@ -341,7 +344,7 @@ if selected and selected.selection and len(selected.selection.points) > 0:
                 display_df = pd.DataFrame(details)
                 
                 if not display_df.empty:
-                    display_df['date'] = pd.to_datetime(display_df['date']).dt.strftime('%Y-%m-%d')
+                    display_df['date'] = pd.to_datetime(display_df['date']).dt.strftime('%m-%d-%y')
                     display_df = display_df.drop(columns=['route_type', 'pitches'])
                     display_df['link'] = display_df.apply(
                         lambda x: f"{x['route_url']}#{x['route_name']}", 
@@ -350,14 +353,13 @@ if selected and selected.selection and len(selected.selection.points) > 0:
                     st.dataframe(
                         display_df,
                         column_config={
-                            "link": st.column_config.LinkColumn("Route Name",display_text=".*#(.*)"),
+                            "link": st.column_config.LinkColumn("Route Name",display_text=".*#(.*)",width=110),
                             "original_grade": "Grade",
-                            "date": "Date",
+                            "date": st.column_config.Column("Date",width=70),
                             "tick_type": "Style",
-                            "main_area": "Location"
                         },
                         hide_index=True,
-                        column_order=["link", "main_area", "date", "tick_type", "original_grade"]
+                        column_order=["link", "date", "tick_type", "original_grade"]
                     )
                 else:
                     st.write("No routes found.")

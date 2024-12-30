@@ -1,6 +1,6 @@
 import os
 import sys
-
+import streamlit as st
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(project_root)
 
@@ -46,32 +46,36 @@ def get_grade_group(grade:str, level:str = 'base') -> str:
     else:
         return grade 
 
-def get_grade_distribution(conn, route_types=None, level='base', year_start=None, year_end=None, user_id=None, tick_type='send'):
+
+def get_grade_distribution(conn, route_types=None, level='base', year_start=None, year_end=None, user_id=None, tick_type='send', tick_types=None):
     """Get distribution of sends by grade with configurable grouping and route"""
 
-    send_filter = """
-    (
-        r.route_type ILIKE '%Aid%' -- All aid climbs count as sends
-        OR t.type = 'Solo'
-        OR t.type != 'Lead / Fell/Hung'
-    )
-    """
-
-    falls_filter = """
-    (
-        r.route_type NOT ILIKE '%Aid%'  -- Exclude aid climbs from falls
-        AND t.type = 'Lead / Fell/Hung'  
-        AND t.type != 'Solo'
-    )
-    """
-
-    tick_filter = send_filter if tick_type == 'send' else falls_filter
+    if tick_type == 'send':
+        if not tick_types:
+            tick_types = [
+                'Lead / Pinkpoint',
+                'Lead / Onsight',
+                'Lead / Redpoint',
+                'Lead / Flash',
+                'Solo'
+        ]
+        send_conditions = [f"t.type = '{t}'" for t in tick_types]
+        tick_filter = f"({' OR '.join(send_conditions)})"
+    else:
+        tick_filter = """
+        (
+            r.route_type NOT ILIKE '%Aid%'  -- Exclude aid climbs from falls
+            AND t.type = 'Lead / Fell/Hung'  
+            AND t.type != 'Solo'
+        )
+        """
 
     grade_column = """
     CASE 
         WHEN r.route_type ILIKE '%Boulder%' THEN r.hueco_rating 
         WHEN r.route_type ILIKE '%Aid%' THEN r.aid_rating 
     ELSE r.yds_rating END"""
+    
 
     query = f"""
     WITH base_data AS (
@@ -103,8 +107,14 @@ def get_grade_distribution(conn, route_types=None, level='base', year_start=None
     GROUP BY grade, route_type
     ORDER BY grade DESC;
     """
+    print(query)
 
     results =  conn.query(query)
+
+    if results.empty:
+        if tick_type == 'send':
+            st.write(f"No sends found for {tick_types}")
+        return[]
 
     grouped_grades = {}
 
