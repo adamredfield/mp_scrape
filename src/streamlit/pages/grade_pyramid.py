@@ -88,10 +88,14 @@ def create_figure(sends_df, falls_df, ordered_grades):
             y=sends_df[mask]['grade'],
             x=-sends_df[mask]['count'],
             orientation='h',
-            width=0.7,
+            width=0.8,
             marker=dict(
                 color=sends_colors.get(route_type, '#1ed760'),
                 opacity=0.8,  # Slight transparency
+                                line=dict(  # Add border to make small sections more visible
+                    width=1,
+                    color='rgba(255,255,255,0.3)'
+                )
             ),
             hovertemplate=send_hover_template,
             customdata=abs(sends_df[mask]['count'])
@@ -137,6 +141,7 @@ def create_figure(sends_df, falls_df, ordered_grades):
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
         showlegend=True,
+        margin=dict(l=10, r=10, t=60, b=10), 
         legend={
             'orientation': 'h',
             'yanchor': 'bottom',
@@ -280,9 +285,13 @@ sends_df, falls_df = get_chart_data(
     tick_types=filters.get('tick_type')
 )
 
+if sends_df.empty:
+    st.stop()
+
 ordered_grades = sends_df['grade'].tolist()
 
 fig = create_figure(sends_df, falls_df, ordered_grades)
+
 
 chart_container = st.container()
 details_container = st.container()
@@ -292,28 +301,36 @@ with chart_container:
     selected = st.plotly_chart(
         fig,
         use_container_width=True,
-        config={
-            'scrollZoom': False,
-            'displayModeBar': False, 
-            'doubleClick': False,    
-            'dragmode': False,        
-            'responsive': True,
-            'showAxisDragHandles': False,
-            'showAxisRangeEntryBoxes': False,
-            'showTips': False,  
-            'modeBarButtonsToRemove': [
-                'zoom',
-                'pan',
-                'select',
-                'lasso2d',
-                'zoomIn2d',
-                'zoomOut2d',
-                'autoScale2d',
-                'resetScale2d'
-            ]
-        },
+    config={
+        'scrollZoom': False,
+        'displayModeBar': False, 
+        'doubleClick': False,    
+        'dragmode': False,        
+        'responsive': True,
+        'showAxisDragHandles': False,
+        'showAxisRangeEntryBoxes': False,
+        'showTips': False,
+        'modeBarButtonsToRemove': [
+            'zoom',
+            'pan',
+            'select',
+            'lasso2d',
+            'zoomIn2d',
+            'zoomOut2d',
+            'autoScale2d',
+            'resetScale2d'
+        ],
+        'editable': False,
+        'edits': {
+            'legendPosition': False,
+            'legendText': False,
+            'annotationPosition': False,
+            'annotationTail': False,
+            'annotationText': False
+        }
+    },
         on_select="rerun",
-                    key="grade_dist_chart"
+        key="grade_dist_chart"
                 )
 
 # Handle selection events
@@ -330,8 +347,9 @@ if selected and selected.selection and len(selected.selection.points) > 0:
             details = metrics.get_route_details(
                 conn=conn,
                 grade=grade,
-                route_type=selected_route_type,
+                route_types=route_type,
                 tick_type='send' if is_send else 'fall',
+                tick_types=filters.get('tick_type'),
                 user_id=user_id,
                 grade_grain=grade_grain,
                 year_start=start_date,
@@ -353,10 +371,10 @@ if selected and selected.selection and len(selected.selection.points) > 0:
                     st.dataframe(
                         display_df,
                         column_config={
-                            "link": st.column_config.LinkColumn("Route Name",display_text=".*#(.*)",width=110),
+                            "link": st.column_config.LinkColumn("Route Name",display_text=".*#(.*)",width=125),
                             "original_grade": "Grade",
                             "date": st.column_config.Column("Date",width=70),
-                            "tick_type": "Style",
+                            "tick_type": st.column_config.Column("Style",width=90),
                         },
                         hide_index=True,
                         column_order=["link", "date", "tick_type", "original_grade"]

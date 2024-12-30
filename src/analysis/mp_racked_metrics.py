@@ -75,7 +75,6 @@ def get_grade_distribution(conn, route_types=None, level='base', year_start=None
         WHEN r.route_type ILIKE '%Boulder%' THEN r.hueco_rating 
         WHEN r.route_type ILIKE '%Aid%' THEN r.aid_rating 
     ELSE r.yds_rating END"""
-    
 
     query = f"""
     WITH base_data AS (
@@ -107,12 +106,13 @@ def get_grade_distribution(conn, route_types=None, level='base', year_start=None
     GROUP BY grade, route_type
     ORDER BY grade DESC;
     """
-    print(query)
 
     results =  conn.query(query)
 
     if results.empty:
         if tick_type == 'send':
+            st.write("")
+            st.write("")
             st.write(f"No sends found for {tick_types}")
         return[]
 
@@ -268,37 +268,28 @@ def grade_sort_key(grade):
     
     return (0, 0, 0)
 
-def get_route_details(conn, grade, route_type, tick_type='send', user_id=None, grade_grain='base', year_start=None, year_end=None):
+def get_route_details(conn, grade, route_types=None, tick_type='send', tick_types=None, user_id=None, grade_grain='base', year_start=None, year_end=None):
     """Get detailed route information for a specific grade and type"""
 
-    route_type_case = """
-    CASE 
-        WHEN r.route_type ILIKE '%Alpine%' THEN 'Alpine'
-        WHEN r.route_type ILIKE '%Aid%' THEN 'Aid'
-        WHEN r.route_type ILIKE '%Trad%' THEN 'Trad'
-        WHEN r.route_type ILIKE '%Sport%' THEN 'Sport'
-        WHEN r.route_type ILIKE '%TR%' THEN 'TR'
-        ELSE r.route_type 
-    END
-    """
-
-    send_filter = """
-    (
-        r.route_type ILIKE '%Aid%'
-        OR t.type = 'Solo'
-        OR t.type != 'Lead / Fell/Hung'
-    )
-    """
-
-    falls_filter = """
-    (
-        r.route_type NOT ILIKE '%Aid%'
-        AND t.type = 'Lead / Fell/Hung'
-        AND t.type != 'Solo'
-    )
-    """
-
-    tick_filter = send_filter if tick_type == 'send' else falls_filter
+    if tick_type == 'send':
+        if not tick_types:
+            tick_types = [
+                'Lead / Pinkpoint',
+                'Lead / Onsight',
+                'Lead / Redpoint',
+                'Lead / Flash',
+                'Solo'
+            ]
+        send_conditions = [f"t.type = '{t}'" for t in tick_types]
+        tick_filter = f"({' OR '.join(send_conditions)})"
+    else:
+        tick_filter = """
+        (
+            r.route_type NOT ILIKE '%Aid%'
+            AND t.type = 'Lead / Fell/Hung'
+            AND t.type != 'Solo'
+        )
+        """
 
     grade_column = """
     CASE 
@@ -312,7 +303,14 @@ def get_route_details(conn, grade, route_type, tick_type='send', user_id=None, g
             r.route_name,
             r.main_area,
             r.route_type,
-            {route_type_case} as calculated_type,
+            CASE 
+                WHEN r.route_type ILIKE '%Alpine%' THEN 'Alpine'
+                WHEN r.route_type ILIKE '%Aid%' THEN 'Aid'
+                WHEN r.route_type ILIKE '%Trad%' THEN 'Trad'
+                WHEN r.route_type ILIKE '%Sport%' THEN 'Sport'
+                WHEN r.route_type ILIKE '%TR%' THEN 'TR'
+                ELSE r.route_type 
+            END AS route_type_calc,
             t.date,
             t.type as tick_type,
             r.pitches,
@@ -321,19 +319,15 @@ def get_route_details(conn, grade, route_type, tick_type='send', user_id=None, g
         FROM routes.Routes r
         JOIN routes.Ticks t ON r.id = t.route_id
         WHERE {tick_filter}
-        AND {route_type_case} = :route_type
         AND {grade_column} IS NOT NULL
+        {route_type_filter(route_types)}
         {add_user_filter(user_id)}
         {year_filter(year_range=(year_start, year_end), use_where=False)}
     )
     SELECT * from route_data
     """
     
-    params = {
-        'route_type': route_type
-    }
-    
-    results = conn.query(query, params=params)
+    results = conn.query(query)
     df = pd.DataFrame(results)
 
     if not df.empty:
@@ -341,7 +335,7 @@ def get_route_details(conn, grade, route_type, tick_type='send', user_id=None, g
             lambda x: get_grade_group(str(x), grade_grain) if x else None
         )
         df = df[df['grouped_grade'] == grade]
-        df = df.drop(['grouped_grade', 'calculated_type'], axis=1)
+        df = df.drop(['grouped_grade', 'route_type_calc'], axis=1)
     return df
 
 def get_highest_rated_climbs(conn, selected_styles=None, route_types=None, year_start=None, year_end=None, tag_type=None, user_id=None):
