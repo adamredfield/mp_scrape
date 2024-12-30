@@ -268,7 +268,7 @@ def grade_sort_key(grade):
     
     return (0, 0, 0)
 
-def get_route_details(conn, grade, route_types=None, tick_type='send', tick_types=None, user_id=None, grade_grain='base', year_start=None, year_end=None):
+def get_route_details(conn, grade, clicked_type=None,filtered_types=None, tick_type='send', tick_types=None, user_id=None, grade_grain='base', year_start=None, year_end=None):
     """Get detailed route information for a specific grade and type"""
 
     if tick_type == 'send':
@@ -321,6 +321,7 @@ def get_route_details(conn, grade, route_types=None, tick_type='send', tick_type
         JOIN routes.Ticks t ON r.id = t.route_id
         WHERE {tick_filter}
         AND {grade_column} IS NOT NULL
+        {route_type_filter(filtered_types)}
         {add_user_filter(user_id)}
         {year_filter(year_range=(year_start, year_end), use_where=False)}
     )
@@ -329,7 +330,7 @@ def get_route_details(conn, grade, route_types=None, tick_type='send', tick_type
     """
 
     params = {
-        'clicked_type': route_types[0] if route_types else None  # Assuming route_types is a list with the clicked type
+        'clicked_type': clicked_type
     }
     
     results = conn.query(query, params=params)

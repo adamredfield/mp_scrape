@@ -347,7 +347,8 @@ if selected and selected.selection and len(selected.selection.points) > 0:
             details = metrics.get_route_details(
                 conn=conn,
                 grade=grade,
-                route_types=[selected_route_type],
+                clicked_type=selected_route_type,
+                filtered_types=route_type,
                 tick_type='send' if is_send else 'fall',
                 tick_types=filters.get('tick_type'),
                 user_id=user_id,
