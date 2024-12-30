@@ -298,6 +298,7 @@ def get_route_details(conn, grade, route_types=None, tick_type='send', tick_type
     ELSE r.yds_rating END"""
 
     query = f"""
+    
     WITH route_data AS (
         SELECT 
             r.route_name,
@@ -320,14 +321,18 @@ def get_route_details(conn, grade, route_types=None, tick_type='send', tick_type
         JOIN routes.Ticks t ON r.id = t.route_id
         WHERE {tick_filter}
         AND {grade_column} IS NOT NULL
-        {route_type_filter(route_types)}
         {add_user_filter(user_id)}
         {year_filter(year_range=(year_start, year_end), use_where=False)}
     )
     SELECT * from route_data
+    WHERE route_type_calc = :clicked_type
     """
+
+    params = {
+        'clicked_type': route_types[0] if route_types else None  # Assuming route_types is a list with the clicked type
+    }
     
-    results = conn.query(query)
+    results = conn.query(query, params=params)
     df = pd.DataFrame(results)
 
     if not df.empty:
@@ -335,7 +340,7 @@ def get_route_details(conn, grade, route_types=None, tick_type='send', tick_type
             lambda x: get_grade_group(str(x), grade_grain) if x else None
         )
         df = df[df['grouped_grade'] == grade]
-        df = df.drop(['grouped_grade', 'route_type_calc'], axis=1)
+        df = df.drop(['grouped_grade'], axis=1)
     return df
 
 def get_highest_rated_climbs(conn, selected_styles=None, route_types=None, year_start=None, year_end=None, tag_type=None, user_id=None):
