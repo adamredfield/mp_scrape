@@ -31,14 +31,14 @@ st.markdown("""
         }
 
         .intro-text {
-            color: white;
+            color: #b3b3b3;
             font-size: 1.75rem;
             text-align: center;
             line-height: 1.4;
             margin-top: -5.5rem;
             margin-bottom: .5rem;
         }
-
+            
         .route-card {
             background: #282828;
             border-radius: 8px;
@@ -48,7 +48,7 @@ st.markdown("""
         }
         
         .route-title {
-            color: white;
+            color: #b3b3b3;
             font-size: 1.5rem;
             margin-bottom: 1rem;
         }
@@ -64,17 +64,17 @@ st.markdown("""
         .route-link:link,
         .route-link:visited,
         .route-link:active {
-            color: white !important;
+            color: #b3b3b3 !important;
             text-decoration: underline !important;
         }
         
         .route-link:hover {
-            color: white !important;
+            color: #b3b3b3 !important;
             text-decoration: underline !important;
         }
         
         .grade-text {
-            color: white;
+            color: #b3b3b3;
         }
             
         .stat-container {
@@ -96,22 +96,25 @@ st.markdown("""
         }
         
         .journey-title {
-            color: white;
+            color: #b3b3b3;
             font-size: 1.5rem;
             margin: 0rem 1rem 1rem;
             text-align: center;
         }
         
         .ascent-container {
-            background: #181818;
-            border-radius: 6px;
+            background: rgba(18, 18, 18, 0.95);
+            border: 1px solid #282828;
+            border-radius: 10px;
             padding: 1rem;
             margin-bottom: 1rem;
-        }        
+            transition: border-color 0.3s ease;
+        }    
+            
         .ascent-number {
             color: #1ed760;
             font-weight: 500;
-            margin-bottom: 0.3rem;
+            font-size: 1.1rem;
         }
         .ascent-header {
             display: flex;
@@ -128,8 +131,10 @@ st.markdown("""
         .ascent-note {
             color: #b3b3b3;
             font-size: 1rem;
-            margin-left: 0rem;
-        }
+            margin-top: 0.5rem;
+            line-height: 1.4;
+        }   
+        
         </style>
     """, unsafe_allow_html=True)
 
@@ -155,27 +160,62 @@ if not route_data.empty:
 
     needs_break = "between" in date_text.lower()
 
-    # Intro text
     st.markdown(f"""
-        <div class="intro-text">
-            Out of {total_routes_count} routes{' <br>' if needs_break else ' '}{date_text}<br>
-            You couldn't get enough of """, unsafe_allow_html=True)
+        <div style="
+            text-align: center;
+            margin: -5.5rem 0 1.5rem;
+        ">
+            <div style="
+                color: #b3b3b3;
+                font-size: 1.3rem;
+                margin-bottom: 0.3rem;
+            ">
+                Out of {total_routes_count} routes {date_text}
+            </div>
+            <div style="
+                color: #b3b3b3;
+                font-size: 1.4rem;
+                font-weight: 500;
+            ">
+                You couldn't get enough of
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
     
-    # Route card
     st.markdown(f"""
-        <div class="route-card">
-            <div class="route-title">
-                <a href="{route_data['route_url']}" target="_blank" class="route-link">{route_data['route_name']}</a> 
+        <div style="
+            background: rgba(18, 18, 18, 0.95);
+            border: 1px solid #1ed760;
+            border-radius: 10px;
+            padding: 1rem 1rem;
+            text-align: center;
+            margin-bottom: 1rem;
+        ">
+            <div style="
+                color: #b3b3b3;
+                font-size: 1.1rem;
+                margin-bottom: 0.5rem;
+            ">
+                <a href="{route_data['route_url']}" target="_blank" style="color: #b3b3b3; text-decoration: none;">
+                    {route_data['route_name']}
+                </a> 
                 ~ {route_data['grade']}
             </div>
-            <div class="location-text">{route_data['specific_location']}</div>
-            <div class="stat-container">
-                <span class="stat-number">{times_climbed}</span>
-                <span class="stat-label">Laps Starting on {formatted_date}{suffix}</span>
+            <div style="
+                color: #b3b3b3;
+                font-size: 1.5rem;
+                font-weight: bold;
+                margin: 0.5rem 0;
+            ">
+                {formatted_total_length} ft
             </div>
-            <div class="stat-container">
-                <span class="stat-number">{formatted_total_length}</span>
-                <span class="stat-label">Total Feet Climbed!</span>
+            <div style="
+                color: #b3b3b3;
+                font-size: 1rem;
+            ">
+                ≈ {times_climbed} Laps on {formatted_date}{suffix}
+            </div>
+        </div>
     """, unsafe_allow_html=True)
 
     with st.expander("🏷️ Route Tags"):

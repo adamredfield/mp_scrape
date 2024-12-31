@@ -30,7 +30,7 @@ def get_spotify_style():
         }
         
         .item-name {
-            color: white;
+            color: #b3b3b3;
             font-size: 1.2rem;
         }
         
@@ -54,7 +54,7 @@ def get_spotify_style():
         .total-value {
             font-size: 2.5rem;
             font-weight: bold;
-            color: white;
+            color: #b3b3b3;
         }
         </style>
     """

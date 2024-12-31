@@ -7,7 +7,6 @@ project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(project_root)
 
 from src.streamlit.streamlit_helper_functions import get_squared_image, image_to_base64
-from src.streamlit.styles import get_spotify_style
 import src.analysis.mp_racked_metrics as metrics
 from src.streamlit.filters import render_filters
 from src.analysis.filters_ctes import available_years
@@ -47,9 +46,13 @@ st.markdown("""
 """, unsafe_allow_html=True)      
 
 years_df = available_years(conn, user_id)
+
+if 'filter_expander_state' not in st.session_state:
+    st.session_state.filter_expander_state = False 
+
 filters = render_filters(
     df=years_df,
-    filters_to_include=['date', 'route_tag'],
+    filters_to_include=['date', 'route_tag', 'route_type'],
     filter_title="Choose your filters",
     conn=conn,
     user_id=user_id
@@ -59,18 +62,25 @@ start_year = filters.get('year_start')
 end_year = filters.get('year_end')
 tag_type = filters.get('tag_type')
 selected_styles = filters.get('selected_tags')
-
+route_types = filters.get('route_type')
 st.markdown("<div style='height: 2rem;'></div>", unsafe_allow_html=True)
 filter_col1, filter_col2, _ = st.columns([1, 1, 2])
+
+classics_count = metrics.get_classics_count(conn, user_id, start_year, end_year, route_types=route_types, selected_styles=selected_styles, tag_type=tag_type)
+date_text = (f"in {start_year}" 
+            if start_year == end_year 
+            else f"from {start_year} to {end_year}")
 
 
 st.markdown(f"""
     <div class="style-card">
         <div style="display: flex; justify-content: center; gap: 2rem;">
             <div style="text-align: center;">
-                <div class="style-title">Your Climbing Style Is...</div>
-                <div class="style-description">Trad Dad Core</div>
-                <div class="style-subtitle">Based on your {start_year} climbing data</div>
+                <div class="style-title">{classics_count} Classic Routes Climbed 🏆</div>
+                <div class="style-subtitle">{date_text}</div>
+                <div style="color: #B3B3B3; font-size: 0.8rem; margin-top: 0.5rem;">
+                    Routes with 3.5 stars and 15 votes
+                </div>
             </div>
         </div>
     </div>
@@ -79,7 +89,7 @@ st.markdown(f"""
 top_rated_routes = metrics.get_highest_rated_climbs(
     conn,
     selected_styles=selected_styles,
-    route_types=None,
+    route_types=route_types,
     year_start=start_year,
     year_end=end_year,
     tag_type=tag_type,
@@ -100,7 +110,7 @@ st.markdown("""
         .streamlit-expanderHeader {
             background-color: transparent !important;
             border: none !important;
-            color: white !important;
+            color: #b3b3b3 !important;
         }
         
         /* Style the expander content container */

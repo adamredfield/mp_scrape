@@ -50,9 +50,9 @@ st.markdown("""
         
         div.stSelectbox {
             position: absolute !important;  
-            left: 130px !important;        
-            top: -93px !important;          
-            width: 225px !important;       
+            left: 150px !important;        
+            top: -110px !important;          
+            width: 200px !important;       
         }
         
         div.stSelectbox label {
@@ -119,11 +119,11 @@ st.markdown("""
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);  
         }
         .item-name {
-            color: white;
+            color: #b3b3b3;
         }
     
         .item-details {
-            color: white;
+            color: #b3b3b3;
                         margin-right: 2rem;  /* Add right margin to move text left */
         }
         .list-item:hover {
@@ -137,7 +137,7 @@ st.markdown("""
 
         .streamlit-expanderHeader {
             border-bottom: none !important;
-            color: white !important;
+            color: #b3b3b3 !important;
             font-size: 1em !important;
             padding: 0.5rem 0 !important;
         }
@@ -161,7 +161,7 @@ st.markdown("""
             max-width: 800px;
         }
         .dataframe td {
-            white-space: normal !important;
+            #b3b3b3-space: normal !important;
             padding: 0.5rem !important;
         }
     """, unsafe_allow_html=True)
