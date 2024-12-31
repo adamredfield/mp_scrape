@@ -136,7 +136,7 @@ def clean_year(year_str):
 
 def clean_name(name):
     """Clean and standardize climber names"""
-    # Remove leading/trailing punctuation and whitespace
+    # Remove leading/trailing punctuation and #b3b3b3space
     name = re.sub(r'^[\W_]+|[\W_]+$', '', name)
 
     # Remove common noise words and patterns

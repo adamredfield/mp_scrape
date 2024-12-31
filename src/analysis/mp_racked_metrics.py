@@ -346,8 +346,6 @@ def get_route_details(conn, grade, clicked_type=None,filtered_types=None, tick_t
 
 def get_highest_rated_climbs(conn, selected_styles=None, route_types=None, year_start=None, year_end=None, tag_type=None, user_id=None):
 
-    print('Debug years in get_highest_rated_climbs:', year_start, year_end)
-
     """Get highest rated climbs"""
     style_filter = ""
     if selected_styles:
@@ -378,7 +376,7 @@ def get_highest_rated_climbs(conn, selected_styles=None, route_types=None, year_
     LEFT JOIN analysis.TagAnalysisView tav on r.id = tav.route_id 
         AND tav.mapped_type = '{tag_type}'
     JOIN deduped_ticks t ON r.id = t.route_id
-    WHERE r.num_votes >= 10
+    WHERE r.num_votes >= 15
     {route_type_filter(route_types)}
     {year_filter(year_range=(year_start, year_end), use_where=False)}
     {add_user_filter(user_id)}
@@ -389,6 +387,7 @@ def get_highest_rated_climbs(conn, selected_styles=None, route_types=None, year_
     ORDER BY r.avg_stars DESC, num_votes DESC
     LIMIT 20
     """
+    print(query)
     return conn.query(query)
 
 def get_bigwall_routes(conn, user_id=None, route_types=None):
@@ -714,3 +713,27 @@ def get_user_year_range(conn, user_id):
     """
     result = conn.query(query)
     return result.iloc[0]['min_year'], result.iloc[0]['max_year']
+
+def get_classics_count(conn, user_id=None, year_start=None, year_end=None, route_types=None, tag_type=None, selected_styles=None):
+    style_filter = ""
+    if selected_styles:
+        style_conditions = [
+            f"(',' || STRING_AGG(tav.mapped_tag, ',') || ',') ILIKE '%,{style},%'"
+            for style in selected_styles
+        ]
+        style_filter = f"HAVING {' AND '.join(style_conditions)}"
+    query = f"""
+        SELECT DISTINCT r.id
+        FROM routes.Ticks t
+        JOIN routes.Routes r ON t.route_id = r.id
+        LEFT JOIN analysis.TagAnalysisView tav on r.id = tav.route_id 
+            AND tav.mapped_type = '{tag_type}'
+        {year_filter(year_range=(year_start, year_end), use_where=True)}
+        {add_user_filter(user_id)}
+        {route_type_filter(route_types)}
+        AND r.avg_stars >= 3.5
+        AND r.num_votes >= 15
+        GROUP BY r.id
+        {style_filter};
+    """
+    return len(conn.query(query))

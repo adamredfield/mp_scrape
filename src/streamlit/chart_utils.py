@@ -24,7 +24,7 @@ def create_bar_chart(
     ])
     
     axis_settings = dict(
-        color='white',
+        color='#b3b3b3',
         showgrid=True,
         gridcolor='#333333',
         tickfont=dict(size=10)
@@ -38,7 +38,7 @@ def create_bar_chart(
         ),
         paper_bgcolor='black',
         plot_bgcolor='black',
-        font=dict(color='white'),
+        font=dict(color='#b3b3b3'),
         height=CHART_HEIGHT,
         margin=MARGIN,
         bargap=BAR_GAP,
@@ -120,24 +120,24 @@ def create_gradient_bar_chart(df, x_col, y_col, title):
             'x': 0.5,
             'xanchor': 'center',
             'yanchor': 'top',
-            'font': {'color': 'white', 'size': 20}
+            'font': {'color': '#b3b3b3', 'size': 20}
         },
         xaxis_title="Total Length (Feet)",
         margin=dict(l=20, r=20, t=50, b=20),
         height=400,
         xaxis=dict(
-            color='white',
+            color='#b3b3b3',
             gridcolor='#333333',
             showgrid=True
         ),
         yaxis=dict(
-            color='white',
+            color='#b3b3b3',
             gridcolor='#333333',
             showgrid=False,
             categoryorder='total ascending'
         ),
         font=dict(
-            color='white'
+            color='#b3b3b3'
         ),
         barmode='stack',
         dragmode=False,

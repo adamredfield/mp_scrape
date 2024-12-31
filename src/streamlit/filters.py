@@ -103,7 +103,7 @@ def route_type_filter(df=None):
     return st.multiselect(
         "Climbing Type",
         options=['All', 'Boulder', 'Aid', 'Sport', 'Trad', 'Alpine'],
-        default=['Sport', 'Trad', 'Alpine'],
+        default=['Sport', 'Trad', 'Alpine', 'Aid'],
         format_func=lambda x: {
             'All': 'All Types',
             'Boulder': 'Boulder',
@@ -255,6 +255,5 @@ def render_filters(df=None, filters_to_include=None, filter_title="Filters", con
             results['selected_tags'] = selected_tags
         for filter_name in filters_to_include:
             if filter_name not in ['date', 'route_tag'] and filter_name in filter_functions:
-                results[filter_name] = filter_functions[filter_name](df)
-    st.session_state.filter_expander_state = True           
+                results[filter_name] = filter_functions[filter_name](df)       
     return results
