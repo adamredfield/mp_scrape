@@ -39,7 +39,7 @@ def login_and_save_session(playwright):
     print("Starting browser launch sequence...")
     try:
         browser = playwright.chromium.launch(
-            headless=False,
+            headless=True,
             args=[
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
