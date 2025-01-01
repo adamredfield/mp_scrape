@@ -105,7 +105,7 @@ def fetch_dynamic_page_content(page, route_link, max_retries=3):
             except Exception as e:
                 print(f"Error fetching {route_link} (Attempt {attempt + 1}): {str(e)}")
                 if "context or browser has been closed" in str(e):
-                    return "BROWSER_CLOSED"  # Special return value
+                    return "BROWSER_CLOSED"
                 
                 if attempt < max_retries - 1:
                     continue
