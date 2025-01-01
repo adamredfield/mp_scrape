@@ -53,6 +53,11 @@ def check_routes_exists(cursor, route_ids):
 @with_retry()
 def insert_comments_batch(cursor, comments):  
     try:
+        print(f"Received {len(comments)} comments to insert")
+        if not comments:
+            print("No comments to insert")
+            return
+        
         args_str = ','.join(
 cursor.mogrify(
                 "(%(route_id)s, %(comment)s, encode(digest(%(comment)s, 'sha256'), 'hex'), %(insert_date)s)",
@@ -73,6 +78,9 @@ cursor.mogrify(
         
     except Exception as e:
         print(f"Error inserting comments batch: {str(e)}")
+        print(f"Comments data: {comments}")  # Debug print
+        print(f"Args string: {args_str}")    # Debug print
+        print(f"SQL attempted: {comments_sql}") 
         raise
 
 @with_retry()

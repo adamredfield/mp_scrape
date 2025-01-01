@@ -39,7 +39,7 @@ def login_and_save_session(playwright):
     print("Starting browser launch sequence...")
     try:
         browser = playwright.chromium.launch(
-            headless=True,
+            headless=False,
             args=[
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
@@ -104,6 +104,8 @@ def fetch_dynamic_page_content(page, route_link, max_retries=3):
                 return html_content
             except Exception as e:
                 print(f"Error fetching {route_link} (Attempt {attempt + 1}): {str(e)}")
+                if "context or browser has been closed" in str(e):
+                    return "BROWSER_CLOSED"  # Special return value
                 
                 if attempt < max_retries - 1:
                     continue
@@ -503,9 +505,31 @@ def process_page(page_number, ticks_url, user_id, retry_count=0):
                         }
                         if int(route_id) in existing_routes:
                             print(f"Route {route_name} with id {route_id} already exists in the database.")
+                            continue
                             
                         if int(route_id) not in existing_routes:
                             route_html_content = fetch_dynamic_page_content(page, route_link)
+
+                            if route_html_content == "BROWSER_CLOSED":
+                                print("Browser closed, recreating session...")
+                                if context:
+                                    try:
+                                        context.close()
+                                    except:
+                                        pass
+                                if browser:
+                                    try:
+                                        browser.close()
+                                    except:
+                                        pass
+                                browser, context = login_and_save_session(playwright)
+                                page = context.new_page()
+                                print("Session recreated, continuing with next route")
+                                continue
+                            if route_html_content is None:
+                                print(f"Skipping route {route_name} due to fetch errors")
+                                continue
+
                             route_soup = BeautifulSoup(route_html_content, 'html.parser')
                             current_route_data = parse_route_data(route_soup, route_id, route_name, route_link)
                             current_route_comments_data = parse_route_comments_data(route_soup, route_id)
@@ -582,3 +606,5 @@ def process_page(page_number, ticks_url, user_id, retry_count=0):
     except Exception as e:
         print(f"Error processing page {page_number}: {str(e)}")
         raise
+
+
