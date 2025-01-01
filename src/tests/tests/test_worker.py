@@ -5,8 +5,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.append(project_root)
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+sys.path.insert(0, project_root)
 
 from src.lambdas.worker import lambda_handler
 
@@ -16,8 +16,8 @@ def test_worker():
         'Records': [{
             'body': json.dumps({
                 'page_number': 1,
-                'ticks_url': 'https://www.mountainproject.com/user/200780729/choss-pirate/ticks?page=',
-                'user_id': '200780729/choss-pirate'
+                'ticks_url': 'https://www.mountainproject.com/user/200362278/doctor-choss/ticks?page=',
+                'user_id': '200362278/doctor-choss'
             })
         }]
     }

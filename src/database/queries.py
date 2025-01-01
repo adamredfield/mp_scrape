@@ -53,6 +53,11 @@ def check_routes_exists(cursor, route_ids):
 @with_retry()
 def insert_comments_batch(cursor, comments):  
     try:
+        print(f"Received {len(comments)} comments to insert")
+        if not comments:
+            print("No comments to insert")
+            return
+        
         args_str = ','.join(
 cursor.mogrify(
                 "(%(route_id)s, %(comment)s, encode(digest(%(comment)s, 'sha256'), 'hex'), %(insert_date)s)",
@@ -73,6 +78,9 @@ cursor.mogrify(
         
     except Exception as e:
         print(f"Error inserting comments batch: {str(e)}")
+        print(f"Comments data: {comments}")  # Debug print
+        print(f"Args string: {args_str}")    # Debug print
+        print(f"SQL attempted: {comments_sql}") 
         raise
 
 @with_retry()
@@ -81,16 +89,19 @@ def insert_ticks_batch(cursor, tick_data):
     for tick in tick_data:
         if tick['type'] is None:
             tick['type'] = ''
+        if tick['pitches_climbed'] is None:
+            tick['pitches_climbed'] = None 
+
 
     args_str = ','.join(
         cursor.mogrify(
-            "(%(user_id)s, %(route_id)s, %(date)s, %(type)s, %(note)s, encode(digest(COALESCE(%(note)s, ''), 'sha256'), 'hex'), %(insert_date)s)",
+            "(%(user_id)s, %(route_id)s, %(date)s, %(type)s, %(note)s, encode(digest(COALESCE(%(note)s, ''), 'sha256'), 'hex'),%(pitches_climbed)s, %(insert_date)s)",
             tick
         ).decode('utf-8')
         for tick in tick_data
     )
     tick_sql = f"""
-        INSERT INTO routes.Ticks (user_id, route_id, date, type, note, note_hash, insert_date)
+        INSERT INTO routes.Ticks (user_id, route_id, date, type, note, note_hash, pitches_climbed, insert_date)
         VALUES {args_str}
         ON CONFLICT ON CONSTRAINT ticks_user_id_route_id_date_type_note_hash_key DO NOTHING
         RETURNING id

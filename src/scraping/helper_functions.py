@@ -104,6 +104,8 @@ def fetch_dynamic_page_content(page, route_link, max_retries=3):
                 return html_content
             except Exception as e:
                 print(f"Error fetching {route_link} (Attempt {attempt + 1}): {str(e)}")
+                if "context or browser has been closed" in str(e):
+                    return "BROWSER_CLOSED"
                 
                 if attempt < max_retries - 1:
                     continue
@@ -393,6 +395,7 @@ def parse_tick_details(tick_details, current_route_data, user_id):
 
     tick_type = None
     tick_note = None
+    pitch_count = None
 
     valid_tick_types = [
         'Solo', 'TR', 'Follow', 'Lead',
@@ -403,6 +406,12 @@ def parse_tick_details(tick_details, current_route_data, user_id):
 
     if ' · ' in tick_details_text:
         post_date_text = tick_details_text.split(' · ')[1]  # Get everything after the bullet, following date
+        pitch_pattern = r'(\d+)\s*pitches?'
+        pitch_match = re.search(pitch_pattern, post_date_text)
+        if pitch_match:
+            pitch_count = int(pitch_match.group(1))
+
+
         if '.' in post_date_text:
             parts = post_date_text.split('.', 1)
             if "pitches" in parts[0].lower():
@@ -429,6 +438,7 @@ def parse_tick_details(tick_details, current_route_data, user_id):
         'date': tick_date,
         'type': tick_type,
         'note': tick_note,
+        'pitches_climbed': pitch_count,
         'insert_date': datetime.now(timezone.utc).isoformat()
     }
     return tick_data
@@ -506,6 +516,27 @@ def process_page(page_number, ticks_url, user_id, retry_count=0):
                             
                         if int(route_id) not in existing_routes:
                             route_html_content = fetch_dynamic_page_content(page, route_link)
+
+                            if route_html_content == "BROWSER_CLOSED":
+                                print("Browser closed, recreating session...")
+                                if context:
+                                    try:
+                                        context.close()
+                                    except:
+                                        pass
+                                if browser:
+                                    try:
+                                        browser.close()
+                                    except:
+                                        pass
+                                browser, context = login_and_save_session(playwright)
+                                page = context.new_page()
+                                print("Session recreated, continuing with next route")
+                                continue
+                            if route_html_content is None:
+                                print(f"Skipping route {route_name} due to fetch errors")
+                                continue
+
                             route_soup = BeautifulSoup(route_html_content, 'html.parser')
                             current_route_data = parse_route_data(route_soup, route_id, route_name, route_link)
                             current_route_comments_data = parse_route_comments_data(route_soup, route_id)
@@ -551,7 +582,6 @@ def process_page(page_number, ticks_url, user_id, retry_count=0):
                             print(f"\nProcessing ticks for {route_name} ({route_id})")
                             print(f"Number of ticks: {len(tick_details_map[route_id])}")
                             for tick_detail in tick_details_map[route_id]:
-                                tick_info = parse_tick_details(tick_detail, current_route_data, user_id)
                                 tick_data.append(parse_tick_details(tick_detail, current_route_data, user_id))
 
                     if route_data:
@@ -582,3 +612,5 @@ def process_page(page_number, ticks_url, user_id, retry_count=0):
     except Exception as e:
         print(f"Error processing page {page_number}: {str(e)}")
         raise
+
+
