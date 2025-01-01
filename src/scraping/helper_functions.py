@@ -395,6 +395,7 @@ def parse_tick_details(tick_details, current_route_data, user_id):
 
     tick_type = None
     tick_note = None
+    pitch_count = None
 
     valid_tick_types = [
         'Solo', 'TR', 'Follow', 'Lead',
@@ -405,6 +406,12 @@ def parse_tick_details(tick_details, current_route_data, user_id):
 
     if ' · ' in tick_details_text:
         post_date_text = tick_details_text.split(' · ')[1]  # Get everything after the bullet, following date
+        pitch_pattern = r'(\d+)\s*pitches?'
+        pitch_match = re.search(pitch_pattern, post_date_text)
+        if pitch_match:
+            pitch_count = int(pitch_match.group(1))
+
+
         if '.' in post_date_text:
             parts = post_date_text.split('.', 1)
             if "pitches" in parts[0].lower():
@@ -431,6 +438,7 @@ def parse_tick_details(tick_details, current_route_data, user_id):
         'date': tick_date,
         'type': tick_type,
         'note': tick_note,
+        'pitches_climbed': pitch_count,
         'insert_date': datetime.now(timezone.utc).isoformat()
     }
     return tick_data
@@ -505,7 +513,6 @@ def process_page(page_number, ticks_url, user_id, retry_count=0):
                         }
                         if int(route_id) in existing_routes:
                             print(f"Route {route_name} with id {route_id} already exists in the database.")
-                            continue
                             
                         if int(route_id) not in existing_routes:
                             route_html_content = fetch_dynamic_page_content(page, route_link)
@@ -575,7 +582,6 @@ def process_page(page_number, ticks_url, user_id, retry_count=0):
                             print(f"\nProcessing ticks for {route_name} ({route_id})")
                             print(f"Number of ticks: {len(tick_details_map[route_id])}")
                             for tick_detail in tick_details_map[route_id]:
-                                tick_info = parse_tick_details(tick_detail, current_route_data, user_id)
                                 tick_data.append(parse_tick_details(tick_detail, current_route_data, user_id))
 
                     if route_data:

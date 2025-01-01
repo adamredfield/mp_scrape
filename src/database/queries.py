@@ -89,16 +89,19 @@ def insert_ticks_batch(cursor, tick_data):
     for tick in tick_data:
         if tick['type'] is None:
             tick['type'] = ''
+        if tick['pitches_climbed'] is None:
+            tick['pitches_climbed'] = None 
+
 
     args_str = ','.join(
         cursor.mogrify(
-            "(%(user_id)s, %(route_id)s, %(date)s, %(type)s, %(note)s, encode(digest(COALESCE(%(note)s, ''), 'sha256'), 'hex'), %(insert_date)s)",
+            "(%(user_id)s, %(route_id)s, %(date)s, %(type)s, %(note)s, encode(digest(COALESCE(%(note)s, ''), 'sha256'), 'hex'),%(pitches_climbed)s, %(insert_date)s)",
             tick
         ).decode('utf-8')
         for tick in tick_data
     )
     tick_sql = f"""
-        INSERT INTO routes.Ticks (user_id, route_id, date, type, note, note_hash, insert_date)
+        INSERT INTO routes.Ticks (user_id, route_id, date, type, note, note_hash, pitches_climbed, insert_date)
         VALUES {args_str}
         ON CONFLICT ON CONSTRAINT ticks_user_id_route_id_date_type_note_hash_key DO NOTHING
         RETURNING id

@@ -11,52 +11,52 @@ from playwright.sync_api import sync_playwright
 from src.scraping.helper_functions import login_and_save_session, fetch_dynamic_page_content, parse_route_data, parse_route_comments_data, get_total_pages
 
 STATE_IDS = {
-    "Alabama": "105905173",
-    "Alaska": "105909311",
-    "Arizona": "105708962",
-    "Arkansas": "105901027",
+    #"Alabama": "105905173",
+    #"Alaska": "105909311",
+    #"Arizona": "105708962",
+   #"Arkansas": "105901027",
     "California": "105708959",
     "Colorado": "105708956",
-    "Connecticut": "105806977",
-    "Delaware": "106861605",
-    "Florida": "111721391",
-    "Georgia": "105897947",
-    "Hawaii": "106316122",
+    #"Connecticut": "105806977",
+    #"Delaware": "106861605",
+    #"Florida": "111721391",
+    #"Georgia": "105897947",
+    #"Hawaii": "106316122",
     "Idaho": "105708958",
-    "Illinois": "105911816",
-    "Indiana": "112389571",
-    "Iowa": "106092653",
-    "Kansas": "107235316",
+    #"Illinois": "105911816",
+    #"Indiana": "112389571",
+    #"Iowa": "106092653",
+    #"Kansas": "107235316",
     "Kentucky": "105868674",
-    "Louisiana": "116720343",
+    #"Louisiana": "116720343",
     "Maine": "105948977",
-    "Maryland": "106029417",
+    #"Maryland": "106029417",
     "Massachusetts": "105908062",
-    "Michigan": "106113246",
-    "Minnesota": "105812481",
-    "Mississippi": "108307056",
-    "Missouri": "105899020",
+    #"Michigan": "106113246",
+    #"Minnesota": "105812481",
+    #"Mississippi": "108307056",
+    #"Missouri": "105899020",
     "Montana": "105907492",
-    "Nebraska": "116096758",
+    #"Nebraska": "116096758",
     "Nevada": "105708961",
     "New Hampshire": "105872225",
     "New Jersey": "106374428",
     "New Mexico": "105708964",
     "New York": "105800424",
     "North Carolina": "105873282",
-    "North Dakota": "106598130",
-    "Ohio": "105994953",
-    "Oklahoma": "105854466",
+    #"North Dakota": "106598130",
+    #"Ohio": "105994953",
+    #"Oklahoma": "105854466",
     "Oregon": "105708965",
-    "Pennsylvania": "105913279",
-    "Rhode Island": "106842810",
-    "South Carolina": "107638915",
-    "South Dakota": "105708963",
-    "Tennessee": "105887760",
+    #"Pennsylvania": "105913279",
+    #"Rhode Island": "106842810",
+    #"South Carolina": "107638915",
+    #"South Dakota": "105708963",
+    #"Tennessee": "105887760",
     "Texas": "105835804",
     "Utah": "105708957",
     "Vermont": "105891603",
-    "Virginia": "105852400",
+    #"Virginia": "105852400",
     "Washington": "105708966",
     "West Virginia": "105855459",
     "Wisconsin": "105708968",
@@ -80,7 +80,7 @@ def set_route_finder_filters(page, grade, state):
         page.uncheck('input[id="check_is_top_rope"][name="is_top_rope"]')
 
         # Set stars filter to 3+ stars
-        page.select_option('select[id="stars"][name="stars"]', "3.3")
+        page.select_option('select[id="stars"][name="stars"]', "3.8")
         
         # Set pitches to Any
         page.evaluate(f'''
@@ -108,117 +108,118 @@ def scrape_high_rated_routes():
     """Main function to scrape all 3+ star routes"""
 
     grades = [
-        "5.0", "5.1", "5.2", "5.3", "5.4", "5.5", 
+        #"5.0", "5.1", "5.2", "5.3", "5.4", "5.5", 
         "5.6", "5.7", "5.8", "5.9", "5.10a", "5.10b", "5.10c", "5.10d",
         "5.11a", "5.11b", "5.11c", "5.11d", "5.12a", "5.12b", "5.12c", "5.12d",
         "5.13a", "5.13b", "5.13c", "5.13d", "5.14a", "5.14b", "5.14c", "5.14d"
     ]
+
+    with create_connection() as conn:  # Single database connection for entire session
+        cursor = conn.cursor()
     
-    with sync_playwright() as playwright:
-        try:
-            
-            browser, context = login_and_save_session(playwright)
-            page = context.new_page()
-            
-            for state in states:
-                print(f"\n{'='*50}")
-                print(f"Processing state: {state}")
-                print(f"{'='*50}")
+        with sync_playwright() as playwright:
+            try:
                 
-                for grade in grades:
-                    print(f"\nProcessing grade {grade} in {state}")
-
-                    filtered_url = set_route_finder_filters(page, grade, state)
-                    if not filtered_url:
-                        print(f"Failed to set filters for {state}, grade {grade}")
-                        continue
-
-                    total_pages = get_total_pages(filtered_url)
-                    print(f"Found {total_pages} pages of routes")
+                browser, context = login_and_save_session(playwright)
+                page = context.new_page()
+                
+                for state in states:
+                    print(f"\n{'='*50}")
+                    print(f"Processing state: {state}")
+                    print(f"{'='*50}")
                     
-                    # Process each page of results
-                    for page_num in range(1, total_pages + 1):
-                        with create_connection() as conn:
-                            cursor = conn.cursor()
-                            try:
-                                print(f"Processing page {page_num}/{total_pages} for {state} grade {grade}")
-                                
-                                # Navigate to specific page if not on first page
-                                if page_num > 1:
-                                    page.goto(f"{filtered_url}&page={page_num}")
-                                    page.wait_for_selector(".table-responsive")
-                                
-                                route_ids_to_check = {}
+                    for grade in grades:
+                        print(f"\nProcessing grade {grade} in {state}")
 
-                                # Get route data from current page
-                                route_rows = page.query_selector_all(".table-responsive .route-table.hidden-xs-down .route-row")
-                                
-                                for row in route_rows:
-                                    route_link = row.query_selector("a").get_attribute("href")
-                                    route_name = row.query_selector("strong").text_content().strip()
-                                    route_id = route_link.split('/route/')[1].split('/')[0]
-                                    route_ids_to_check[route_id] = (route_name, route_link)
-                                        
-                                # Check if route already exists before processing
+                        filtered_url = set_route_finder_filters(page, grade, state)
+                        if not filtered_url:
+                            print(f"Failed to set filters for {state}, grade {grade}")
+                            continue
 
-                                existing_routes = queries.check_routes_exists(cursor, route_ids_to_check.keys())
-
-                                for route_id, (route_name, route_link) in route_ids_to_check.items():
-                                    print(f'Retrieving data for {route_name}')
-
-                                    if int(route_id) in existing_routes:
-                                        print(f"Route {route_name} with id {route_id} already exists in the database.")
-                                        continue
-
-
-                                    route_html_content = fetch_dynamic_page_content(page, route_link)
-                                    if route_html_content == "BROWSER_CLOSED":
-                                        print("Browser closed, recreating session...")
-                                        if context:
-                                            try:
-                                                context.close()
-                                            except:
-                                                pass
-                                        if browser:
-                                            try:
-                                                browser.close()
-                                            except:
-                                                pass
-                                        browser, context = login_and_save_session(playwright)
-                                        page = context.new_page()
-                                        print("Session recreated, continuing with next route")
-                                        continue
-                                    if route_html_content is None:
-                                        print(f"Skipping route {route_name} due to fetch errors")
-                                        continue
-                                    route_soup = BeautifulSoup(route_html_content, 'html.parser')
+                        total_pages = get_total_pages(filtered_url)
+                        print(f"Found {total_pages} pages of routes")
+                        
+                        # Process each page of results
+                        for page_num in range(1, total_pages + 1):
+                                try:
+                                    print(f"Processing page {page_num}/{total_pages} for {state} grade {grade}")
                                     
-                                    current_route_data = parse_route_data(route_soup, route_id, route_name, route_link)
-                                    current_route_comments_data = parse_route_comments_data(route_soup, route_id)
-                                
+                                    # Navigate to specific page if not on first page
+                                    if page_num > 1:
+                                        page.goto(f"{filtered_url}&page={page_num}")
+                                        page.wait_for_selector(".table-responsive")
+                                    
+                                    route_ids_to_check = {}
 
-                                    queries.insert_routes_batch(cursor, [current_route_data])
-                                    queries.insert_comments_batch(cursor, current_route_comments_data)
-                                    conn.commit()
-                            except Exception as e:
-                                print(f"Error processing page: {str(e)}")
-                                conn.rollback()
-                                if "context or browser has been closed" in str(e):
-                                    if context:
-                                        context.close()
-                                    if browser:
-                                        browser.close()
-                                    context = None
-                                    browser = None
-                                    break
-                                
-                                continue
-                                                    
-        finally:
-            if context:
-                context.close()
-            if browser:
-                browser.close()
+                                    # Get route data from current page
+                                    route_rows = page.query_selector_all(".table-responsive .route-table.hidden-xs-down .route-row")
+                                    
+                                    for row in route_rows:
+                                        route_link = row.query_selector("a").get_attribute("href")
+                                        route_name = row.query_selector("strong").text_content().strip()
+                                        route_id = route_link.split('/route/')[1].split('/')[0]
+                                        route_ids_to_check[route_id] = (route_name, route_link)
+                                            
+                                    # Check if route already exists before processing
+
+                                    existing_routes = queries.check_routes_exists(cursor, route_ids_to_check.keys())
+
+                                    for route_id, (route_name, route_link) in route_ids_to_check.items():
+                                        print(f'Retrieving data for {route_name}')
+
+                                        if int(route_id) in existing_routes:
+                                            print(f"Route {route_name} with id {route_id} already exists in the database.")
+                                            continue
+
+
+                                        route_html_content = fetch_dynamic_page_content(page, route_link)
+                                        if route_html_content == "BROWSER_CLOSED":
+                                            print("Browser closed, recreating session...")
+                                            if context:
+                                                try:
+                                                    context.close()
+                                                except:
+                                                    pass
+                                            if browser:
+                                                try:
+                                                    browser.close()
+                                                except:
+                                                    pass
+                                            browser, context = login_and_save_session(playwright)
+                                            page = context.new_page()
+                                            print("Session recreated, continuing with next route")
+                                            continue
+                                        if route_html_content is None:
+                                            print(f"Skipping route {route_name} due to fetch errors")
+                                            continue
+                                        route_soup = BeautifulSoup(route_html_content, 'html.parser')
+                                        
+                                        current_route_data = parse_route_data(route_soup, route_id, route_name, route_link)
+                                        current_route_comments_data = parse_route_comments_data(route_soup, route_id)
+                                    
+
+                                        queries.insert_routes_batch(cursor, [current_route_data])
+                                        queries.insert_comments_batch(cursor, current_route_comments_data)
+                                        conn.commit()
+                                except Exception as e:
+                                    print(f"Error processing page: {str(e)}")
+                                    conn.rollback()
+                                    if "context or browser has been closed" in str(e):
+                                        if context:
+                                            context.close()
+                                        if browser:
+                                            browser.close()
+                                        context = None
+                                        browser = None
+                                        break
+                                    
+                                    continue
+                                                        
+            finally:
+                if context:
+                    context.close()
+                if browser:
+                    browser.close()
 
 if __name__ == "__main__":
     scrape_high_rated_routes()

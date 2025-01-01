@@ -16,3 +16,6 @@ env/
 .devcontainer/
 .DS_Store
 .cursorrules
+batch_files/
+batch_results/
+assets/
