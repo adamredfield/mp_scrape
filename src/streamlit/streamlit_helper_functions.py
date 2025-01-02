@@ -83,7 +83,8 @@ def verify_user_exists(conn, user_id):
         with button_cols:
             col1, col2 = st.columns([1,2])
             with col1:
-                with st.empty():
+                refresh_container = st.empty()
+                with refresh_container:
                     if st.button("Refresh Data"):
                         info_msg.empty()
                         details_msg.empty()
@@ -94,12 +95,55 @@ def verify_user_exists(conn, user_id):
                             st.session_state.start_time = datetime.now()
                             st.rerun()
             with col2:
-                if st.button("Continue with existing data"):
-                    st.session_state.data_status = 'ready'
-                    return True
-            
-            if st.session_state.get('data_status') != 'ready':
-                st.stop()
+                if 'show_form' not in st.session_state:
+                    st.session_state.show_form = False
+
+                continue_container = st.empty()
+
+                if not st.session_state.show_form:
+                    # Only show continue button if form isn't showing
+                    with continue_container:
+                        if st.button("Continue with existing data"):
+                            continue_container.empty()
+                            st.session_state.show_form = True
+                            info_msg.empty()
+                            details_msg.empty()
+                            refresh_container.empty()
+                            
+
+                if st.session_state.show_form:
+                    st.info("Please indicate usage of pitch option for ticks:")
+                    
+                    with st.form("pitch_usage_form"):
+                        choice = st.radio(
+                            "For The Nose, would 11 pitches mean...", 
+                            options=["A", "B"],
+                            captions=[
+                                "Partial ascent (Dolt Run = 11/31 pitches)",
+                                "Pitch count of full ascent (simul in 11 pitches)"
+                            ],
+                            horizontal=True, 
+                            key="pitch_usage"
+                        )
+
+                        submitted = st.form_submit_button("Save Preference")
+                        if submitted:
+                            print("Form submitted!")
+                            if choice:
+                                continue_container.empty()
+                                st.session_state.show_form = True
+                                info_msg.empty()
+                                details_msg.empty()
+                                refresh_container.empty()
+                                preference = 'partial' if choice == "A" else 'simul'
+                                st.session_state.pitches_preference = preference
+                                st.session_state.data_status = 'ready'
+                                st.success(f"Preference saved: Racking up...")
+                                time.sleep(3)
+                                return True
+                            else:
+                                st.error("Please make a selection")
+                                return False
 
     else:
         info_msg.warning("Your data has not been collected yet.")
@@ -384,3 +428,6 @@ def get_squared_image(url):
     except Exception as e:
         print(f"Error loading image from {url}: {e}")
         return None
+    
+    
+
