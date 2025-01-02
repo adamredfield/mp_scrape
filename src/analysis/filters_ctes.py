@@ -21,6 +21,22 @@ estimated_lengths_cte = f"""
         )
         """
 
+def get_pitch_preference_lengths(pitch_preference):
+    """Returns the appropriate length calculation based on pitch preference"""
+    if pitch_preference != 'partial':
+        return "coalesce(r.length_ft, el.estimated_length)"
+    else:
+        return """
+            coalesce(r.length_ft, el.estimated_length) * 
+            CASE 
+                WHEN t.pitches_climbed IS NOT NULL 
+                    AND r.pitches IS NOT NULL 
+                    AND t.pitches_climbed <= r.pitches THEN
+                    (t.pitches_climbed::float / r.pitches)
+                ELSE
+                    1
+            END"""
+
 def get_deduped_ticks_cte(user_id=None, year_start=None, year_end=None):
     deduped_ticks_cte = f"""
         WITH deduped_ticks_base AS(

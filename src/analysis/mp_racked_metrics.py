@@ -4,7 +4,7 @@ import streamlit as st
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(project_root)
 
-from src.analysis.filters_ctes import add_user_filter, route_type_filter, year_filter, estimated_lengths_cte, get_deduped_ticks_cte
+from src.analysis.filters_ctes import add_user_filter, route_type_filter, year_filter, estimated_lengths_cte, get_deduped_ticks_cte, get_pitch_preference_lengths
 from operator import itemgetter
 import pandas as pd
 
@@ -390,7 +390,7 @@ def get_highest_rated_climbs(conn, selected_styles=None, route_types=None, year_
     print(query)
     return conn.query(query)
 
-def get_bigwall_routes(conn, user_id=None, route_types=None):
+def get_bigwall_routes(conn, user_id=None, route_types=None, pitch_preference=None):
     """Get all bigwall routes"""
     query = f'''
     {estimated_lengths_cte}
@@ -399,7 +399,7 @@ def get_bigwall_routes(conn, user_id=None, route_types=None):
         r.route_name,
         TRIM(NULLIF(CONCAT_WS(' ', r.yds_rating, r.hueco_rating, r.aid_rating, r.danger_rating), '')) as grade,
         r.commitment_grade,
-        CAST(COALESCE(r.length_ft, el.estimated_length) AS INTEGER) as length,
+        {get_pitch_preference_lengths(pitch_preference)} as length,
         CONCAT(r.main_area, ', ', r.region) as area,
         r.main_area,
         r.route_url,
@@ -449,18 +449,22 @@ def get_bigwall_routes(conn, user_id=None, route_types=None):
     r.region,
     r.route_url,
     r.primary_photo_url,
-    r.route_type
+    r.route_type,
+    t.pitches_climbed,
+    r.pitches
     ORDER BY commitment_grade DESC, length DESC;
     '''
+    print(query)
     return conn.query(query)
 
-def get_length_climbed(conn, area_type="main_area", user_id=None, year_start=None, year_end=None):
+def get_length_climbed(conn, area_type="main_area", user_id=None, year_start=None, year_end=None, pitch_preference=None):
+
     query = f"""
     {estimated_lengths_cte}
     SELECT 
         EXTRACT(YEAR FROM t.date) as year,
         r.{area_type} location,
-        sum(coalesce(r.length_ft, el.estimated_length)) length_climbed
+        sum({get_pitch_preference_lengths(pitch_preference)}) as length_climbed
     FROM routes.Routes r
     JOIN routes.Ticks t ON r.id = t.route_id
     LEFT JOIN estimated_lengths el on el.id = r.id
@@ -548,7 +552,7 @@ def days_climbed(conn, user_id=None):
     """
     return conn.query(query).iloc[0,0]
 
-def biggest_climbing_day(conn, user_id=None, year_start=None, year_end=None):
+def biggest_climbing_day(conn, user_id=None, year_start=None, year_end=None, pitch_preference=None):
 
     query = f"""
         {estimated_lengths_cte}
@@ -563,7 +567,7 @@ def biggest_climbing_day(conn, user_id=None, year_start=None, year_end=None):
                     ), ' | '
                 ) routes,
                 STRING_AGG(COALESCE(r.commitment_grade, 'None'), ' | ') commitment_grades,
-                CAST(ROUND(SUM(COALESCE(r.length_ft, el.estimated_length)),0) AS INTEGER) total_length,
+                sum({get_pitch_preference_lengths(pitch_preference)}) total_length,
                 STRING_AGG(DISTINCT CONCAT(r.main_area, ', ', r.region), ' & ') areas,
                 STRING_AGG(r.route_url, ' | ') route_urls,
                 STRING_AGG(r.primary_photo_url, ' | ') photo_urls

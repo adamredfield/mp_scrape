@@ -12,8 +12,6 @@ from src.streamlit.styles import get_spotify_style
 from src.streamlit.filters import render_filters
 from src.analysis.filters_ctes import available_years
 
-st.write(st.session_state.get('pitches_preference'))
-
 user_id = st.session_state.user_id
 conn = st.connection('postgresql', type='sql')
 

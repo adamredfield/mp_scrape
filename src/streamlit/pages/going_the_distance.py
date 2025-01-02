@@ -192,7 +192,7 @@ try:
     
     # Column 1: Total Length
     with col1:
-        length_data = metrics.get_length_climbed(conn, user_id=user_id, year_start=start_year, year_end=end_year)
+        length_data = metrics.get_length_climbed(conn, user_id=user_id, year_start=start_year, year_end=end_year, pitch_preference=st.session_state.pitches_preference)
         length_df = pd.DataFrame(length_data, columns=['Year', 'Location', 'Length'])
         total_length = length_df['Length'].sum()
         el_caps = total_length / 3000
@@ -470,7 +470,8 @@ try:
                 conn, 
                 user_id=user_id,
                 year_start=start_year,
-                year_end=end_year    
+                year_end=end_year,
+                pitch_preference=st.session_state.pitches_preference
             )
                 
             if st.session_state.current_day_index < len(biggest_days):

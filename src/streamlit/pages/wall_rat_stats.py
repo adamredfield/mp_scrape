@@ -15,8 +15,7 @@ user_id = st.session_state.user_id
 conn = st.connection('postgresql', type='sql')
 
 try:
-    df = metrics.get_bigwall_routes(conn,user_id=user_id)
-    print(df['route_type'].unique())
+    df = metrics.get_bigwall_routes(conn,user_id=user_id, pitch_preference=st.session_state.pitches_preference)
     
     if df.empty:
         st.error("No big wall routes found for 2024")
@@ -195,7 +194,7 @@ try:
             </div>
             <div class='total-section'>
                 <div class='total-label'>Total Length</div>
-                <div class='total-value'>{filtered_df['length'].sum():,} ft</div>
+                <div class='total-value'>{int(filtered_df['length'].sum()):,} ft</div>
             </div>
         </div>
         """,
