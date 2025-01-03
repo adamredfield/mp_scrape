@@ -11,20 +11,15 @@ import src.analysis.mp_racked_metrics as metrics
 from src.streamlit.filters import render_filters
 from src.analysis.filters_ctes import available_years
 import streamlit.components.v1 as components
+from src.streamlit.styles import get_spotify_style
+
+st.markdown(get_spotify_style(), unsafe_allow_html=True)
 
 user_id = st.session_state.user_id
 conn = st.connection('postgresql', type='sql')
 
-
-
-
 st.markdown("""   
      <style>
-        /* Filter spacing from top of page */
-        div[data-testid="stExpander"] {
-            margin-top: 0rem;
-        }
-
         /* Card spacing from filter */
         div:has(> .style-card) {
             margin-top: 0rem !important;  /* Adjust this value as needed */
@@ -41,10 +36,6 @@ st.markdown("""
             justify-content: center !important;
         }
         
-    .stExpander {
-        border: none !important;
-        padding: 0 !important;
-        
     </style>
 """, unsafe_allow_html=True)      
 
@@ -58,7 +49,7 @@ filters = render_filters(
     filters_to_include=['date', 'route_tag', 'route_type'],
     filter_title="Choose your filters",
     conn=conn,
-    user_id=user_id
+    user_id=user_id 
 )
 
 start_year = filters.get('year_start')
@@ -74,7 +65,6 @@ date_text = (f"in {start_year}"
             if start_year == end_year 
             else f"from {start_year} to {end_year}")
 
-
 st.markdown(f"""
     <div class="style-card">
         <div style="display: flex; justify-content: center; gap: 2rem;">
@@ -82,7 +72,8 @@ st.markdown(f"""
                 <div class="style-title">{classics_count} Classic Routes Climbed 🏆</div>
                 <div class="style-subtitle">{date_text}</div>
                 <div style="color: #B3B3B3; font-size: 0.8rem; margin-top: 0.5rem;">
-                    Routes with 3.5 stars and 15 votes
+                    Routes with 3.5 stars and 15 votes<br>
+                    *Highlighted in Gold below
                 </div>
             </div>
         </div>
@@ -102,20 +93,6 @@ top_rated_routes = metrics.get_highest_rated_climbs(
 st.markdown("""
     <style>
 
-        
-        /* Style the expander content container */
-        .streamlit-expanderContent {
-            border: none !important;
-            background-color: transparent !important;
-        }
-        
-        /* Dark background for each expander */
-        div[data-testid="stExpander"] {
-            background: rgba(0, 0, 0, 0.2) !important;å
-            border: 1px solid rgba(255, 255, 255, 0.1) !important;
-            border-radius: 8px !important;
-        }
-
         /* Keeps filters near top of page*/
         .block-container {
             padding-top: 2rem !important;
@@ -123,7 +100,6 @@ st.markdown("""
         
         /* Style card positioning */
         .style-card {
-            background: transparent;
             border: 1px solid #1ed760;
             border-radius: 10px;
             padding: 1.5rem;
@@ -157,23 +133,22 @@ tag_df = pd.DataFrame(tag_data, columns=['Type', 'Tag', 'Count'])
 
 tab1, tab2 = st.tabs(["🏔️ Top Routes", "🏷️ Style Analysis"])
 
-def local_css(file_name):
-    with open(file_name) as f:
-        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
-
 with tab1:
+    def local_css(file_name):
+        with open(file_name) as f:
+            st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
     local_css("src/streamlit/styles.css")
 
     if 'loaded_images' not in st.session_state:
         st.session_state.loaded_images = {}
-    
-    print("Session state at start:", st.session_state)
 
     @st.cache_data
     def process_image(photo_url, route_name):
         """Cache the image processing"""
         if photo_url:
-            img = image_to_base64(get_squared_image(photo_url))
+            squared_img = get_squared_image(photo_url)
+            img = image_to_base64(squared_img)
             return img
         return None
 
@@ -188,26 +163,28 @@ with tab1:
                 img = process_image(photo_url, route_name)
                 if img:
                     st.session_state.loaded_images[route_id] = img
-                    container.markdown(
-                        f"""
-                        <div style="width: 100%;">
-                            <img src="{img}" 
-                                style="width: 100%; 
-                                        object-fit: cover; 
-                                        margin: 0; 
-                                        padding: 0;
-                                        border-radius: 4px;"
-                                alt="{route_name}">
-                        </div>
-                        """,
-                        unsafe_allow_html=True
-                    )
+                container.markdown(
+                    f"""
+                    <div style="width: 300px; height: 300px; background: black;">
+                        <img src="{img}" 
+                            style="width: 100%;
+                                    height: 100%;
+                                    object-fit: contain; 
+                                    margin: 0; 
+                                    padding: 0;
+                                    border-radius: 4px;"
+                            alt="{route_name}">
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
         else:
             container.markdown(
                 f"""
-                <div style="width: 100%;">
+                <div style="width: 100%; aspect-ratio: 1;">
                     <img src="{st.session_state.loaded_images[route_id]}" 
                         style="width: 100%; 
+                                height: 100%;
                                 object-fit: cover; 
                                 margin: 0; 
                                 padding: 0;
@@ -222,22 +199,19 @@ with tab1:
     <script>
     setTimeout(() => {
         try {
-            // First, clean up any existing styles
-            const allExpanders = window.parent.document.querySelectorAll('div.stExpander');
+            const allExpanders = window.parent.document.querySelectorAll('div[data-testid="stExpander"]');
             allExpanders.forEach(exp => {
-                exp.classList.remove('classic-route', 'regular-route');
+                exp.style.backgroundColor = 'rgb(14, 17, 23)';
             });
-            
             // Then apply new styles
-            const expanders = Array.from(window.parent.document.querySelectorAll('div.stExpander'));
+            const expanders = Array.from(allExpanders);
             console.log('Found expanders:', expanders.length);
     """
 
     for i, (route_name, main_area, specific_location, grade, stars, route_id, styles, photo_url, route_url) in enumerate(top_rated_routes):
         i +=1
 
-
-        if stars >= 3.5:  # if it's a classic route
+        if stars >= 3.5:
             js_code += f"""
                 try {{
                     const element = expanders[{i}];
@@ -271,7 +245,6 @@ with tab1:
         else:
             shortened_location = ''
             
-        # Create the expander title using pure markdown
         expander_title = rf"""**{route_name}** - {main_area} :green[{grade}]""".strip()
 
         with st.expander(expander_title, expanded=False):
@@ -291,7 +264,6 @@ with tab1:
                     [:green[View on Mountain Project ↗]]({route_url})
                 """)
         
-        print("-------------------")
     js_code += """
             } catch (err) {
                 console.error('Main error:', err);
