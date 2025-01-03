@@ -387,7 +387,6 @@ def get_highest_rated_climbs(conn, selected_styles=None, route_types=None, year_
     ORDER BY r.avg_stars DESC, num_votes DESC
     LIMIT 20
     """
-    print(query)
     return conn.query(query)
 
 def get_bigwall_routes(conn, user_id=None, route_types=None, pitch_preference=None):
@@ -454,7 +453,6 @@ def get_bigwall_routes(conn, user_id=None, route_types=None, pitch_preference=No
     r.pitches
     ORDER BY commitment_grade DESC, length DESC;
     '''
-    print(query)
     return conn.query(query)
 
 def get_length_climbed(conn, area_type="main_area", user_id=None, year_start=None, year_end=None, pitch_preference=None):

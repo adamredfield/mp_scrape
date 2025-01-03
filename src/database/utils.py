@@ -39,7 +39,7 @@ def add_new_tags_to_mapping(cursor):
             rat.tag_type,
             True,
             rat.insert_date
-        FROM analysis.RouteAnalysisTags rat
+        FROM analysis.RouteAnalysisTags_v2 rat
         LEFT JOIN analysis.TagMapping m ON rat.tag_value = m.raw_tag
         WHERE m.raw_tag IS NULL
         ON CONFLICT (raw_tag, original_tag_type) DO NOTHING;

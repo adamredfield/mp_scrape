@@ -257,7 +257,8 @@ def main():
                             {"role": "system", "content": get_system_prompt()},
                             {"role": "user", "content": construct_prompt(route)}
                         ],
-                        "max_tokens": 1000
+                        "max_tokens": 1000,
+                        "temperature": 0.2
                     }
                 }
                 f.write(json.dumps(entry) + '\n')

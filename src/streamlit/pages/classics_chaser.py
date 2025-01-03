@@ -10,9 +10,12 @@ from src.streamlit.streamlit_helper_functions import get_squared_image, image_to
 import src.analysis.mp_racked_metrics as metrics
 from src.streamlit.filters import render_filters
 from src.analysis.filters_ctes import available_years
+import streamlit.components.v1 as components
 
 user_id = st.session_state.user_id
 conn = st.connection('postgresql', type='sql')
+
+
 
 
 st.markdown("""   
@@ -98,20 +101,7 @@ top_rated_routes = metrics.get_highest_rated_climbs(
 
 st.markdown("""
     <style>
-        /* Remove default Streamlit expander styling */
-        .stExpander {
-            border: none !important;
-            background-color: rgba(255, 255, 255, 0.05) !important;
-            border-radius: 8px !important;
-            margin-bottom: 8px !important;
-        }
-        
-        /* Remove the default border and background */
-        .streamlit-expanderHeader {
-            background-color: transparent !important;
-            border: none !important;
-            color: #b3b3b3 !important;
-        }
+
         
         /* Style the expander content container */
         .streamlit-expanderContent {
@@ -126,21 +116,7 @@ st.markdown("""
             border-radius: 8px !important;
         }
 
-        /* Hover effect */
-        div[data-testid="stExpander"]:hover {
-            background: rgba(255, 255, 255, 0.05) !important;
-        }
-
-        /* Move filters up */
-        section[data-testid="stSidebar"] > div {
-            padding-top: 1rem !important;
-        }
-        
-        /* Adjust main container padding */
-        .block-container {
-            padding-top: 1rem !important;
-        }
-        /* Adjust main container padding */
+        /* Keeps filters near top of page*/
         .block-container {
             padding-top: 2rem !important;
         }
@@ -156,7 +132,7 @@ st.markdown("""
             position: relative;  /* Add position relative */
             z-index: 1;  /* Ensure card stays above other elements
         }
-                    /* Tab content spacing */
+        /* Tab content spacing */
         .stTabs [data-baseweb="tab-list"] {
             margin-bottom: 1rem !important;  /* Uniform spacing after tab list */
         }
@@ -167,10 +143,6 @@ st.markdown("""
             margin-bottom: 0.5rem !important;
         }
         
-        /* Remove default margins from expanders */
-        [data-testid="stExpander"] {
-            margin-top: 0 !important;
-        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -185,45 +157,38 @@ tag_df = pd.DataFrame(tag_data, columns=['Type', 'Tag', 'Count'])
 
 tab1, tab2 = st.tabs(["🏔️ Top Routes", "🏷️ Style Analysis"])
 
-with tab1:
-    st.markdown("""
-        <style>
-            .stExpander {
-                border: none !important;
-                background-color: rgba(255, 255, 255, 0.05) !important;
-                border-radius: 8px !important;
-                margin-bottom: 8px !important;
-                padding: 16px;
-            }
-            
-            .stExpander:hover {
-                background-color: rgba(255, 255, 255, 0.08) !important;
-            }
-        </style>
-    """, unsafe_allow_html=True)
+def local_css(file_name):
+    with open(file_name) as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
-    for route_name, main_area, specific_location, grade, stars, route_id, styles, photo_url, route_url in top_rated_routes:
-        if specific_location:
-            location_parts = specific_location.split(' > ')
-            if len(location_parts) >= 2:
-                shortened_location = ' > '.join(location_parts[-2:])
-            else:
-                shortened_location = location_parts[0]
-        else:
-            shortened_location = ''
+with tab1:
+    local_css("src/streamlit/styles.css")
+
+    if 'loaded_images' not in st.session_state:
+        st.session_state.loaded_images = {}
+    
+    print("Session state at start:", st.session_state)
+
+    @st.cache_data
+    def process_image(photo_url, route_name):
+        """Cache the image processing"""
         if photo_url:
             img = image_to_base64(get_squared_image(photo_url))
-            
-        # Create the expander title using pure markdown
-        expander_title = rf"""
-    **{route_name}** - {main_area} :green[{grade}]
-        """.strip()
-        
-        with st.expander(expander_title, expanded=False):
-            col1, col2 = st.columns([1, 2])
-            
-            with col1:
-                st.markdown(
+            return img
+        return None
+
+    @st.fragment
+    def load_and_display_image(route_id, photo_url, route_name):
+        """Fragment for handling image loading and display"""
+
+        container = st.empty()
+
+        if route_id not in st.session_state.loaded_images:
+            if container.button("Load Image", key=f"load_{route_id}_{route_name.replace(' ', '_')}"):
+                img = process_image(photo_url, route_name)
+                if img:
+                    st.session_state.loaded_images[route_id] = img
+                    container.markdown(
                         f"""
                         <div style="width: 100%;">
                             <img src="{img}" 
@@ -237,7 +202,85 @@ with tab1:
                         """,
                         unsafe_allow_html=True
                     )
+        else:
+            container.markdown(
+                f"""
+                <div style="width: 100%;">
+                    <img src="{st.session_state.loaded_images[route_id]}" 
+                        style="width: 100%; 
+                                object-fit: cover; 
+                                margin: 0; 
+                                padding: 0;
+                                border-radius: 4px;"
+                        alt="{route_name}">
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+    js_code = """
+    <script>
+    setTimeout(() => {
+        try {
+            // First, clean up any existing styles
+            const allExpanders = window.parent.document.querySelectorAll('div.stExpander');
+            allExpanders.forEach(exp => {
+                exp.classList.remove('classic-route', 'regular-route');
+            });
             
+            // Then apply new styles
+            const expanders = Array.from(window.parent.document.querySelectorAll('div.stExpander'));
+            console.log('Found expanders:', expanders.length);
+    """
+
+    for i, (route_name, main_area, specific_location, grade, stars, route_id, styles, photo_url, route_url) in enumerate(top_rated_routes):
+        i +=1
+
+
+        if stars >= 3.5:  # if it's a classic route
+            js_code += f"""
+                try {{
+                    const element = expanders[{i}];
+                    if (element) {{
+                        element.classList.add("classic-route");
+                        console.log("Added classic-route to index {i}, ID: {route_id}");
+                    }}
+                }} catch (err) {{
+                    console.error("Error with classic route at index {i}, ID: {route_id}", err);
+                }}
+            """
+        else:
+            js_code += f"""
+                try {{
+                    const element = expanders[{i}];
+                    if (element) {{
+                        element.classList.add("regular-route");
+                        console.log("Added regular-route to index {i}, ID: {route_id}");
+                    }}
+                }} catch (err) {{
+                    console.error("Error with regular route at index {i}, ID: {route_id}", err);
+                }}
+            """
+
+        if specific_location:
+            location_parts = specific_location.split(' > ')
+            if len(location_parts) >= 2:
+                shortened_location = ' > '.join(location_parts[-2:])
+            else:
+                shortened_location = location_parts[0]
+        else:
+            shortened_location = ''
+            
+        # Create the expander title using pure markdown
+        expander_title = rf"""**{route_name}** - {main_area} :green[{grade}]""".strip()
+
+        with st.expander(expander_title, expanded=False):
+            col1, col2 = st.columns([1, 2])
+            
+            with col1:
+                if photo_url:
+                    load_and_display_image(route_id, photo_url, route_name)
+        
             
             with col2:
                 st.markdown("### Route Details")
@@ -247,8 +290,17 @@ with tab1:
                     
                     [:green[View on Mountain Project ↗]]({route_url})
                 """)
-
-
+        
+        print("-------------------")
+    js_code += """
+            } catch (err) {
+                console.error('Main error:', err);
+            }
+    }, 1000);  // Single timeout of 1 second
+    </script>
+    """
+    components.html(js_code, height=0, width=0)
+    
 with tab2:
     st.markdown("""
     <style>
