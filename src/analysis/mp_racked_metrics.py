@@ -4,7 +4,7 @@ import streamlit as st
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(project_root)
 
-from src.analysis.filters_ctes import add_user_filter, route_type_filter, year_filter, estimated_lengths_cte, get_deduped_ticks_cte, get_pitch_preference_lengths
+from src.analysis.filters_ctes import add_user_filter, route_type_filter, year_filter, estimated_lengths_cte, get_deduped_ticks_cte, get_pitch_preference_lengths, add_grade_filter
 from src.streamlit.filters import generate_route_type_where_clause
 from operator import itemgetter
 import pandas as pd
@@ -746,8 +746,35 @@ def get_classics_count(conn, user_id=None, year_start=None, year_end=None, route
     """
     return len(conn.query(query))
 
+def get_available_grades(conn, route_types=None):
+    
+    grade_column = """
+    CASE 
+        WHEN route_type ILIKE '%Boulder%' THEN hueco_rating 
+        WHEN route_type ILIKE '%Aid%' THEN aid_rating 
+    ELSE yds_rating END"""
 
-def get_routes_for_route_finder(conn, offset=0, routes_per_page=None, route_types=None, tag_selections=None, user_id=None, climbed_filter='All Routes'):
+    route_type_filter = ""
+    if route_types:
+        conditions = [f"route_type ILIKE '%{rt}%'" for rt in route_types]
+        route_type_filter = f"AND ({' OR '.join(conditions)})"
+
+    query = f"""
+    SELECT DISTINCT
+        {grade_column} AS grade
+    FROM routes.Routes
+    WHERE {grade_column} IS NOT NULL
+    {route_type_filter}
+    ORDER BY grade;
+    """
+
+    results = conn.query(query)
+    return results.to_dict('records')
+
+def get_routes_for_route_finder(conn, offset=0, routes_per_page=None, route_types=None, tag_selections=None, user_id=None, climbed_filter='All Routes', fa_selection='All FAs', grade_system=None, grade_range=None):
+    print(f"Debug - Route Finder Parameters:")
+    print(f"Grade System: {grade_system}")
+    print(f"Grade Range: {grade_range}")
     tag_conditions = []
     if tag_selections:
         for tag_type, selected_tags in tag_selections.items():
@@ -777,6 +804,16 @@ def get_routes_for_route_finder(conn, offset=0, routes_per_page=None, route_type
             SELECT 1 FROM routes.Ticks t 
             WHERE t.route_id = r.id 
             AND t.user_id = '{user_id}'
+        )
+        """
+
+    fa_condition = ""
+    if fa_selection != 'All FAs':
+        fa_condition = f"""
+        AND EXISTS (
+            SELECT 1 FROM analysis.fa 
+            WHERE fa.route_id = r.id 
+            AND fa.fa_name = '{fa_selection}'
         )
         """
 
@@ -984,6 +1021,8 @@ def get_routes_for_route_finder(conn, offset=0, routes_per_page=None, route_type
     LEFT JOIN analysis.taganalysisview tav on tav.route_id = r.id 
     {route_type_where_clause}
     {climbed_condition}
+    {fa_condition}
+    {add_grade_filter(grade_system, grade_range)}
     group by r.id,
     r.route_name, 
     grade,

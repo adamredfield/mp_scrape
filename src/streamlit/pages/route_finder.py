@@ -61,7 +61,7 @@ with filter_container:
     default_years = (2000, 2100)
     filters = render_filters(
         df=years_df,
-        filters_to_include=['route_tag', 'route_type', 'climbed_routes'],
+        filters_to_include=['route_tag', 'route_type', 'climbed_routes', 'fa', 'grade'],
         filter_title="Choose your filters",
         conn=conn,
         user_id=user_id,
@@ -71,13 +71,17 @@ with filter_container:
     tag_selections = filters.get('tag_selections', {})
     route_types = filters.get('route_type')
     climbed_filter = filters.get('climbed_filter', 'All Routes')
+    fa_selection = filters.get('fa_filter', 'All FAs')
+    grade_system, grade_range = filters.get('grade_filter', (None, None)) 
 
 st.markdown(get_spotify_style(), unsafe_allow_html=True)
 
 current_filters = {
     'tag_selections': tag_selections,
     'route_types': route_types,
-    'climbed_filter': climbed_filter
+    'climbed_filter': climbed_filter,
+    'fa_selection': fa_selection,
+    'grade_filter': (grade_system, grade_range)
 }
 
 if st.session_state.previous_filters != current_filters:
@@ -89,7 +93,7 @@ if st.session_state.previous_filters != current_filters:
 routes_container = st.container(height=1000, border=False)
 with routes_container:
 
-    new_routes = metrics.get_routes_for_route_finder(conn, offset=st.session_state.offset, routes_per_page=ROUTES_PER_PAGE, tag_selections=tag_selections, route_types=route_types, climbed_filter=climbed_filter, user_id=user_id)
+    new_routes = metrics.get_routes_for_route_finder(conn, offset=st.session_state.offset, routes_per_page=ROUTES_PER_PAGE, tag_selections=tag_selections, route_types=route_types, climbed_filter=climbed_filter, user_id=user_id, fa_selection=fa_selection, grade_system=grade_system, grade_range=grade_range)
 
     if not new_routes.empty and len(st.session_state.all_loaded_routes) == st.session_state.offset:
         st.session_state.all_loaded_routes.extend(new_routes.to_dict('records'))

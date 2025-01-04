@@ -140,3 +140,20 @@ def available_years(conn,user_id):
     available_years_df = conn.query(years_query)
     years_df = pd.DataFrame({'date': pd.to_datetime(available_years_df['year'], format='%Y')})
     return years_df
+
+def add_grade_filter(grade_system, grade_range):
+    """Add grade filter to SQL query"""
+    if not grade_system or not grade_range:
+        return ""
+    
+    min_grade, max_grade = grade_range
+    grade_column = {
+        'YDS': 'r.yds_rating',
+        'Boulder': 'r.hueco_rating',
+        'Aid': 'r.aid_rating'
+    }.get(grade_system)
+
+    return f"""
+    AND {grade_column} IS NOT NULL
+    AND {grade_column} BETWEEN '{min_grade}' AND '{max_grade}'
+    """

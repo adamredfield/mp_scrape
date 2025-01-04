@@ -7,6 +7,7 @@ project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(project_root)
 
 import src.analysis.mp_racked_metrics as metrics
+from src.analysis.fa_queries import get_all_top_first_ascensionists
 
 def commitment_grade_filter(df):
     """Commitment grade filter"""
@@ -125,38 +126,91 @@ def generate_route_type_where_clause(route_types):
     return f"WHERE ({' OR '.join(type_conditions)})"
 
 def route_tag_filter(df=None, conn=None, user_id=None, year_start=None, year_end=None):  
-    st.write("Route Characteristics") 
-
     tag_selections = {}
-
     tag_types = ['style', 'feature', 'descriptor', 'rock_type']
 
-    for tag_type in tag_types:
-        tag_data = metrics.top_tags(
-            conn, 
-            tag_type, 
-            user_id=user_id,
-            year_start=year_start,
-            year_end=year_end
-        )
-        tag_df = pd.DataFrame(tag_data, columns=['Type', 'Tag', 'Count']).head(10)
-        
-        display_name = {
-            'style': 'Styles',
-            'feature': 'Features',
-            'descriptor': 'Descriptors',
-            'rock_type': 'Rock Types'
-        }.get(tag_type, tag_type.title())
-    
-        # Select tags using multiselect
-        selected_tags = st.multiselect(
-            f"Filter by {display_name}",
-            options=tag_df['Tag'].tolist(),
-            key=f'filter_{tag_type}'
-        )
+    total_selected = sum(len(st.session_state.get(f'filter_{tag_type}', [])) for tag_type in tag_types)
+    label = f"Route Characteristics ({total_selected})" if total_selected > 0 else "Route Characteristics"
 
-        if selected_tags:
-            tag_selections[tag_type] = selected_tags
+    st.markdown("""
+        <style>
+        .filter-pill {
+            background-color: #2e2e2e;
+            padding: 2px 8px;
+            border-radius: 12px;
+            margin: 2px;
+            display: inline-block;
+            font-size: 0.8em;
+            border: 1px solid #3e3e3e;
+        }
+        .filter-type {
+            color: #1DB954;
+            font-weight: bold;
+        }
+        .filter-values {
+            color: #ffffff;
+        }
+        .filter-container {
+            line-height: 2;
+            margin-top: 4px;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    col1, col2 = st.columns([1, 3])
+    with col1:
+        with st.popover(label, use_container_width=True):
+            if total_selected > 0:
+                if st.button("Clear All Filters", type="secondary", use_container_width=True):
+                    for tag_type in tag_types:
+                        st.session_state[f'filter_{tag_type}'] = []
+                    st.rerun()
+                st.divider()
+
+            tabs = st.tabs([
+                'Styles',
+                'Features',
+                'Descriptors',
+                'Rock Types'
+            ])
+            for tab, tag_type in zip(tabs, tag_types):
+                with tab:
+                    tag_data = metrics.top_tags(
+                        conn, 
+                        tag_type, 
+                        user_id=user_id,
+                        year_start=year_start,
+                        year_end=year_end
+                    )
+                    tag_df = pd.DataFrame(tag_data, columns=['Type', 'Tag', 'Count']).head(10)
+                    options = [f"{tag} ({count})" for tag, count in zip(tag_df['Tag'], tag_df['Count'])]
+
+                    selected_tags = st.multiselect(
+                        f"Select {tag_type.title()}",
+                        options=options,
+                        format_func=lambda x: x.split(' (')[0],
+                        key=f'filter_{tag_type}'
+                    )
+
+                    if selected_tags:
+                        # Store only the tag names without counts
+                        tag_selections[tag_type] = [tag.split(' (')[0] for tag in selected_tags]
+                        st.caption(f"Selected: {', '.join(tag.split(' (')[0] for tag in selected_tags)}")
+    with col2:
+        if total_selected > 0:
+            pills = []
+            for tag_type in tag_types:
+                selected = st.session_state.get(f'filter_{tag_type}', [])
+                if selected:
+                    tag_names = [tag.split(' (')[0] for tag in selected]
+                    pills.append(
+                        f'<span class="filter-pill">'
+                        f'<span class="filter-type">{tag_type.title()}</span>: '
+                        f'<span class="filter-values">{", ".join(tag_names)}</span>'
+                        f'</span>'
+                    )
+            
+            st.markdown(" ".join(pills), unsafe_allow_html=True)
     
     return tag_selections
 
@@ -215,6 +269,95 @@ def climbed_routes_filter():
         key='climbed_routes_filter'
     )
 
+def fa_filter(conn):
+    """Filter for routes by first ascensionist"""
+    fas = get_all_top_first_ascensionists(conn)
+    return st.selectbox(
+        "First Ascensionist",
+        options=fas,
+        key='fa_filter_key'
+    )
+
+def grade_filter(conn, route_types=None, user_id=None, year_start=None, year_end=None):
+    """Filter for climbing grades with type-specific handling"""
+    
+    print("Starting grade_filter function")
+
+    try:
+        grade_data = metrics.get_available_grades(
+            conn=conn,
+            route_types=route_types
+        )
+
+        print(f"Grade data received: {grade_data[:5] if grade_data else 'No data'}")  # Debug
+        
+    except Exception as e:
+        print(f"Error getting grade distribution: {str(e)}")  # Debug
+        print(f"Arguments passed to get_grade_distribution:")  # Debug
+        print(f"conn: {type(conn)}")
+        print(f"route_types: {route_types}")
+        print(f"year_start: {year_start}")
+        print(f"year_end: {year_end}")
+        print(f"user_id: {user_id}")
+        return None, None
+    
+    if not grade_data:
+        return None, None
+
+    grade_types = {
+        'YDS': [],
+        'Boulder': [],
+        'Aid': []
+    }
+
+    for item in grade_data:
+        grade = item['grade']
+        if grade.startswith('V'):
+            grade_types['Boulder'].append(grade)
+        elif grade.startswith(('A', 'C')):
+            grade_types['Aid'].append(grade)
+        elif grade.startswith('5.'):
+            grade_types['YDS'].append(grade)
+
+    print(f"Grade types populated: {grade_types}") 
+
+    # Sort grades within each type
+    for grade_type in grade_types:
+        grade_types[grade_type] = sorted(list(set(grade_types[grade_type])), 
+                                       key=metrics.grade_sort_key)
+    print("Starting to create UI elements")  
+    col1, col2 = st.columns([1, 3])
+    with col1:
+        with st.popover("Grade Filter", use_container_width=True):
+            grade_system = st.radio(
+                "Grade System",
+                options=['YDS', 'Boulder', 'Aid'],
+                horizontal=True
+            )
+
+            if grade_types[grade_system]:
+                col1, col2 = st.columns(2)
+                with col1:
+                    min_grade = st.selectbox(
+                        "Minimum",
+                        options=grade_types[grade_system],
+                        index=0,
+                        key='min_grade'
+                    )
+                with col2:
+                    max_grade_options = [g for g in grade_types[grade_system] 
+                                       if metrics.grade_sort_key(g) >= metrics.grade_sort_key(min_grade)]
+                    max_grade = st.selectbox(
+                        "Maximum",
+                        options=max_grade_options,
+                        index=len(max_grade_options)-1,
+                        key='max_grade'
+                    )
+            
+                return grade_system, (min_grade, max_grade)
+    
+    return None, None
+
 def render_filters(df=None, filters_to_include=None, filter_title="Filters", conn=None, user_id=None, default_years=None):
     """
     Render filter expander with specified filters
@@ -239,7 +382,9 @@ def render_filters(df=None, filters_to_include=None, filter_title="Filters", con
         'date': date_filter,
         'route_type': route_type_filter,
         'tick_type': tick_type_filter,
-        'climbed_routes': climbed_routes_filter
+        'climbed_routes': climbed_routes_filter,
+        'fa': fa_filter,
+        'grade': grade_filter
     }
 
     st.markdown("""
@@ -274,7 +419,11 @@ def render_filters(df=None, filters_to_include=None, filter_title="Filters", con
             results['tag_selections'] = tag_selections
         if 'climbed_routes' in filters_to_include:
             results['climbed_filter'] = climbed_routes_filter()
+        if 'fa' in filters_to_include:
+            results['fa_filter'] = fa_filter(conn)
+        if 'grade' in filters_to_include:
+            results['grade_filter'] = grade_filter(conn, route_types=results.get('route_type'))
         for filter_name in filters_to_include:
-            if filter_name not in ['date', 'route_tag', 'climbed_routes'] and filter_name in filter_functions:
+            if filter_name not in ['date', 'route_tag', 'climbed_routes', 'fa', 'grade'] and filter_name in filter_functions:
                 results[filter_name] = filter_functions[filter_name](df)       
     return results
