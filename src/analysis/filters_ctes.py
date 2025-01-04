@@ -37,7 +37,7 @@ def get_pitch_preference_lengths(pitch_preference):
                     1
             END"""
 
-def get_deduped_ticks_cte(user_id=None, year_start=None, year_end=None):
+def get_deduped_ticks_cte(user_id=None, year_start=2000, year_end=2100):
     deduped_ticks_cte = f"""
         WITH deduped_ticks_base AS(
                 SELECT *,

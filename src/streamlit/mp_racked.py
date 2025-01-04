@@ -56,6 +56,9 @@ pg = st.navigation({
         st.Page("pages/classics_chaser.py", 
                 title="Classics Chaser", 
                 icon="⭐"),
+        st.Page("pages/route_finder.py", 
+                title="Advanced Route Finder", 
+                icon="🔍"),        
     ],
     "Analysis": [
         st.Page("pages/wall_rat_stats.py", 
