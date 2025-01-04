@@ -122,7 +122,7 @@ def generate_route_type_where_clause(route_types):
     for route_type in route_types:
         type_conditions.append(f"r.route_type ILIKE '%{route_type}%'")
     
-    return f"WHERE {' OR '.join(type_conditions)}"
+    return f"WHERE ({' OR '.join(type_conditions)})"
 
 def route_tag_filter(df=None, conn=None, user_id=None, year_start=None, year_end=None):  
     st.write("Route Characteristics") 
@@ -206,6 +206,15 @@ def tick_type_filter(df=None):
     selected_types = selected_defaults + additional_types
     return selected_types if selected_types else default_sends
 
+def climbed_routes_filter():
+    """Filter for climbed/unclimbed routes"""
+    return st.radio(
+        "Show Routes",
+        options=['All Routes', 'Unclimbed', 'Climbed'],
+        horizontal=True,
+        key='climbed_routes_filter'
+    )
+
 def render_filters(df=None, filters_to_include=None, filter_title="Filters", conn=None, user_id=None, default_years=None):
     """
     Render filter expander with specified filters
@@ -229,7 +238,8 @@ def render_filters(df=None, filters_to_include=None, filter_title="Filters", con
         'length': length_filter,
         'date': date_filter,
         'route_type': route_type_filter,
-        'tick_type': tick_type_filter
+        'tick_type': tick_type_filter,
+        'climbed_routes': climbed_routes_filter
     }
 
     st.markdown("""
@@ -262,7 +272,9 @@ def render_filters(df=None, filters_to_include=None, filter_title="Filters", con
                 year_end=results.get('year_end')
             )
             results['tag_selections'] = tag_selections
+        if 'climbed_routes' in filters_to_include:
+            results['climbed_filter'] = climbed_routes_filter()
         for filter_name in filters_to_include:
-            if filter_name not in ['date', 'route_tag'] and filter_name in filter_functions:
+            if filter_name not in ['date', 'route_tag', 'climbed_routes'] and filter_name in filter_functions:
                 results[filter_name] = filter_functions[filter_name](df)       
     return results

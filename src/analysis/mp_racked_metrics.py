@@ -747,7 +747,7 @@ def get_classics_count(conn, user_id=None, year_start=None, year_end=None, route
     return len(conn.query(query))
 
 
-def get_routes_for_route_finder(conn, offset=0, routes_per_page=None, route_types=None, tag_selections=None, user_id=None):
+def get_routes_for_route_finder(conn, offset=0, routes_per_page=None, route_types=None, tag_selections=None, user_id=None, climbed_filter='All Routes'):
     tag_conditions = []
     if tag_selections:
         for tag_type, selected_tags in tag_selections.items():
@@ -760,7 +760,25 @@ def get_routes_for_route_finder(conn, offset=0, routes_per_page=None, route_type
     
     tag_filter = f"HAVING {' AND '.join(tag_conditions)}" if tag_conditions else ""
 
-    route_where_clause = generate_route_type_where_clause(route_types)
+    route_type_where_clause = generate_route_type_where_clause(route_types)
+
+    climbed_condition = ""
+    if climbed_filter == 'Unclimbed':
+        climbed_condition = f"""
+        AND NOT EXISTS (
+            SELECT 1 FROM routes.Ticks t 
+            WHERE t.route_id = r.id 
+            AND t.user_id = '{user_id}'
+        )
+        """
+    elif climbed_filter == 'Climbed':
+        climbed_condition = f"""
+        AND EXISTS (
+            SELECT 1 FROM routes.Ticks t 
+            WHERE t.route_id = r.id 
+            AND t.user_id = '{user_id}'
+        )
+        """
 
     query = f"""
     WITH estimated_lengths AS (
@@ -964,7 +982,8 @@ def get_routes_for_route_finder(conn, offset=0, routes_per_page=None, route_type
     LEFT JOIN estimated_lengths el on el.id = r.id
     left join estimated_pitches ep on ep.id = r.id
     LEFT JOIN analysis.taganalysisview tav on tav.route_id = r.id 
-    {route_where_clause}
+    {route_type_where_clause}
+    {climbed_condition}
     group by r.id,
     r.route_name, 
     grade,
