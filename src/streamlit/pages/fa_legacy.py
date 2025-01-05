@@ -8,6 +8,7 @@ sys.path.append(project_root)
 
 import src.analysis.fa_queries as fa_queries
 from src.streamlit.chart_utils import create_bar_chart
+from src.streamlit.styles import get_spotify_style
 
 user_id = st.session_state.user_id
 conn = st.connection('postgresql', type='sql')
@@ -20,12 +21,13 @@ if 'selected_fa' not in st.session_state:
 top_fas = fa_queries.get_top_first_ascensionists(conn, user_id=user_id, year_start=1900, year_end=2100)
 partnerships = fa_queries.get_collaborative_ascensionists(conn, "All FAs", user_id, year_start=1900, year_end=2100)
 
+st.markdown(get_spotify_style(), unsafe_allow_html=True)
 st.markdown("""
     <style>
         .block-container {
-            padding-top: 1rem;
             padding-bottom: 0rem;
             max-width: 100%;
+            padding: 2rem 1rem 10rem 1rem !important;
         }
         
         .stDataFrame {
@@ -133,6 +135,7 @@ st.markdown("""
             border: none !important;
             box-shadow: none !important;
             background-color: transparent !important;
+            margin-bottom: 1-rem !important;
         }
 
         .streamlit-expanderHeader {

@@ -14,53 +14,53 @@ STATE_IDS = {
     #"Alabama": "105905173",
     #"Alaska": "105909311",
     #"Arizona": "105708962",
-   #"Arkansas": "105901027",
-    "California": "105708959",
-    "Colorado": "105708956",
-    #"Connecticut": "105806977",
-    #"Delaware": "106861605",
-    #"Florida": "111721391",
-    #"Georgia": "105897947",
-    #"Hawaii": "106316122",
-    "Idaho": "105708958",
-    #"Illinois": "105911816",
-    #"Indiana": "112389571",
-    #"Iowa": "106092653",
-    #"Kansas": "107235316",
-    "Kentucky": "105868674",
-    #"Louisiana": "116720343",
+    #"Arkansas": "105901027",
+    #"California": "105708959",
+    #"Colorado": "105708956",
+    "Connecticut": "105806977",
+    "Delaware": "106861605",
+    "Florida": "111721391",
+    "Georgia": "105897947",
+    "Hawaii": "106316122",
+    #"Idaho": "105708958",
+    "Illinois": "105911816",
+    "Indiana": "112389571",
+    "Iowa": "106092653",
+    "Kansas": "107235316",
+    #"Kentucky": "105868674",
+    "Louisiana": "116720343",
     "Maine": "105948977",
-    #"Maryland": "106029417",
+    "Maryland": "106029417",
     "Massachusetts": "105908062",
-    #"Michigan": "106113246",
-    #"Minnesota": "105812481",
-    #"Mississippi": "108307056",
-    #"Missouri": "105899020",
+    "Michigan": "106113246",
+    "Minnesota": "105812481",
+    "Mississippi": "108307056",
+    "Missouri": "105899020",
     "Montana": "105907492",
-    #"Nebraska": "116096758",
-    "Nevada": "105708961",
+    "Nebraska": "116096758",
+    #"Nevada": "105708961",
     "New Hampshire": "105872225",
     "New Jersey": "106374428",
-    "New Mexico": "105708964",
-    "New York": "105800424",
+    #"New Mexico": "105708964",
+    #"New York": "105800424",
     "North Carolina": "105873282",
-    #"North Dakota": "106598130",
-    #"Ohio": "105994953",
-    #"Oklahoma": "105854466",
-    "Oregon": "105708965",
-    #"Pennsylvania": "105913279",
-    #"Rhode Island": "106842810",
-    #"South Carolina": "107638915",
-    #"South Dakota": "105708963",
-    #"Tennessee": "105887760",
+    "North Dakota": "106598130",
+    "Ohio": "105994953",
+    "Oklahoma": "105854466",
+    #"Oregon": "105708965",
+    "Pennsylvania": "105913279",
+    "Rhode Island": "106842810",
+    "South Carolina": "107638915",
+    "South Dakota": "105708963",
+    "Tennessee": "105887760",
     "Texas": "105835804",
-    "Utah": "105708957",
+    #"Utah": "105708957",
     "Vermont": "105891603",
-    #"Virginia": "105852400",
-    "Washington": "105708966",
-    "West Virginia": "105855459",
+    "Virginia": "105852400",
+    #"Washington": "105708966",
+    #"West Virginia": "105855459",
     "Wisconsin": "105708968",
-    "Wyoming": "105708960"
+    #"Wyoming": "105708960"
 }
 
 states = list(STATE_IDS.keys())
@@ -108,7 +108,7 @@ def scrape_high_rated_routes():
     """Main function to scrape all 3+ star routes"""
 
     grades = [
-        #"5.0", "5.1", "5.2", "5.3", "5.4", "5.5", 
+        "5.0", "5.1", "5.2", "5.3", "5.4", "5.5", 
         "5.6", "5.7", "5.8", "5.9", "5.10a", "5.10b", "5.10c", "5.10d",
         "5.11a", "5.11b", "5.11c", "5.11d", "5.12a", "5.12b", "5.12c", "5.12d",
         "5.13a", "5.13b", "5.13c", "5.13d", "5.14a", "5.14b", "5.14c", "5.14d"
@@ -221,5 +221,72 @@ def scrape_high_rated_routes():
                 if browser:
                     browser.close()
 
+def scrape_fifty_classics():
+    """Scrape data for the Fifty Classic Climbs"""
+
+
+    with create_connection() as conn:
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT route_id FROM routes.fifty_classics")
+        route_ids = [str(row[0]) for row in cursor.fetchall()]
+    
+        with sync_playwright() as playwright:
+            try:
+                browser, context = login_and_save_session(playwright)
+                page = context.new_page()
+                
+                for route_id in route_ids:
+                    # Construct and fetch route URL
+                    route_link = f"https://www.mountainproject.com/route/{route_id}"
+                    print(f"\nProcessing route: {route_link}")
+                    
+                    # Check if route already exists in routes table
+                    existing_routes = queries.check_routes_exists(cursor, [route_id])
+                    if int(route_id) in existing_routes:
+                        print(f"Route with ID {route_id} already exists in database.")
+                        continue
+                    
+                    route_html_content = fetch_dynamic_page_content(page, route_link)
+                    
+                    if route_html_content == "BROWSER_CLOSED":
+                        print("Browser closed, recreating session...")
+                        if context:
+                            context.close()
+                        if browser:
+                            browser.close()
+                        browser, context = login_and_save_session(playwright)
+                        page = context.new_page()
+                        continue
+                        
+                    if route_html_content is None:
+                        print(f"Skipping route {route_id} due to fetch errors")
+                        continue
+                        
+                    route_soup = BeautifulSoup(route_html_content, 'html.parser')
+                    
+                    # Get route name from the page
+                    route_name = route_soup.select_one('h1').text.strip()
+                    
+                    # Parse and insert route data
+                    current_route_data = parse_route_data(route_soup, route_id, route_name, route_link)
+                    current_route_comments_data = parse_route_comments_data(route_soup, route_id)
+                    
+                    queries.insert_routes_batch(cursor, [current_route_data])
+                    queries.insert_comments_batch(cursor, current_route_comments_data)
+                    conn.commit()
+                    
+                    print(f"Successfully processed {route_name}")
+                    
+            except Exception as e:
+                print(f"Error: {str(e)}")
+                conn.rollback()
+            finally:
+                if context:
+                    context.close()
+                if browser:
+                    browser.close()
+
+
 if __name__ == "__main__":
-    scrape_high_rated_routes()
+    scrape_fifty_classics()

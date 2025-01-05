@@ -62,6 +62,11 @@ def get_spotify_style():
 def get_navigation_style():
     return """
         <style>
+        /* Reset default spacing */
+        .block-container {
+            padding-top: 1rem !important;
+            padding-bottom: 0rem !important;
+        }
         /* Navigation container */
         .st-emotion-cache-eczf16 {
             background-color: #121212 !important;  /* Spotify's dark background */

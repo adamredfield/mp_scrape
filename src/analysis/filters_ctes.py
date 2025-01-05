@@ -21,7 +21,23 @@ estimated_lengths_cte = f"""
         )
         """
 
-def get_deduped_ticks_cte(user_id=None, year_start=None, year_end=None):
+def get_pitch_preference_lengths(pitch_preference):
+    """Returns the appropriate length calculation based on pitch preference"""
+    if pitch_preference != 'partial':
+        return "coalesce(r.length_ft, el.estimated_length)"
+    else:
+        return """
+            coalesce(r.length_ft, el.estimated_length) * 
+            CASE 
+                WHEN t.pitches_climbed IS NOT NULL 
+                    AND r.pitches IS NOT NULL 
+                    AND t.pitches_climbed <= r.pitches THEN
+                    (t.pitches_climbed::float / r.pitches)
+                ELSE
+                    1
+            END"""
+
+def get_deduped_ticks_cte(user_id=None, year_start=2000, year_end=2100):
     deduped_ticks_cte = f"""
         WITH deduped_ticks_base AS(
                 SELECT *,
@@ -124,3 +140,31 @@ def available_years(conn,user_id):
     available_years_df = conn.query(years_query)
     years_df = pd.DataFrame({'date': pd.to_datetime(available_years_df['year'], format='%Y')})
     return years_df
+
+def add_grade_filter(grade_system, grade_range):
+    """Add grade filter to SQL query"""
+    if not grade_system or not grade_range:
+        return ""
+    
+    min_grade, max_grade = grade_range
+    grade_column = {
+        'YDS': 'r.yds_rating',
+        'Boulder': 'r.hueco_rating',
+        'Aid': 'r.aid_rating'
+    }.get(grade_system)
+
+    return f"""
+    AND {grade_column} IS NOT NULL
+    AND {grade_column} BETWEEN '{min_grade}' AND '{max_grade}'
+    """
+
+def fa_year_filter(fa_year_start, fa_year_end):
+    """Get routes based on filters including FA year"""
+    
+    fa_year_condition = ""
+    if fa_year_start and fa_year_end:
+        fa_year_condition = f"""
+            AND fa.year BETWEEN {fa_year_start} AND {fa_year_end}
+        """
+    
+    return fa_year_condition

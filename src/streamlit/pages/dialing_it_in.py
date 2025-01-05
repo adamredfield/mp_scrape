@@ -24,12 +24,12 @@ if filters['year_start'] is not None and filters['year_end'] is not None:
 st.markdown(get_spotify_style(), unsafe_allow_html=True)
 
 st.markdown("""
-        <style>
-        
+        <style> 
+        /* Main container */
         .block-container {
-            padding-top: 3rem !important; 
+            padding-bottom: 10rem !important;
+            max-width: 100%;
         }
-
         .intro-text {
             color: #b3b3b3;
             font-size: 1.75rem;

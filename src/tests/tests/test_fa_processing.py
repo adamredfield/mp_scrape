@@ -1,15 +1,20 @@
 import os
 import sys
-
-project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-sys.path.append(project_root)
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+sys.path.insert(0, project_root)
 
 from src.database.utils import create_connection
 from src.analysis.fa_parsing import parse_fa_data
 from src.database import queries
 from psycopg2.extras import DictCursor
+from datetime import datetime
 
 def test_fa_processing():
+
+    INSERT_FIRST_ASCENT = """
+                        INSERT INTO analysis.fa (route_id, fa_name, fa_type, year, insert_date)
+                        VALUES (%s, %s, %s, %s, %s);
+                        """
 
     with create_connection() as conn:
         cursor = conn.cursor(cursor_factory=DictCursor)
@@ -41,14 +46,15 @@ def test_fa_processing():
                 
                 try:
                     cursor.execute(
-                        queries.INSERT_FIRST_ASCENT,
-                        (route_id, fa['name'], fa['type'], fa['year'])
+                        INSERT_FIRST_ASCENT,
+                        (route_id, fa['name'], fa['type'], fa['year'], datetime.now())
                     )
+                    conn.commit()
                     print("  Successfully inserted into database")
                 except Exception as e:
                     print(f"  Error inserting into database: {e}")
         
-        conn.commit()
+        
         
         print("\nSample of processed data:")
         print("-" * 50)

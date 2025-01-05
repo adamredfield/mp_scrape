@@ -47,7 +47,7 @@ def get_system_prompt():
         "- Do not use line breaks within reasoning strings"
     )
 
-def get_routes_batch(cursor, limit=1000):
+def get_routes_batch(cursor, limit=3000):
     """Get a batch of routes that haven't been analyzed yet"""
     query = '''
     SELECT 
@@ -237,7 +237,7 @@ def main():
     with create_connection() as conn:
         cursor = conn.cursor()
         print("Connected to database...")
-        routes = get_routes_batch(cursor, limit=1050)
+        routes = get_routes_batch(cursor, limit=3000)
         print(f"Retrieved {len(routes)} routes from database")
         
         timestamp = time.strftime("%Y%m%d_%H%M%S")
@@ -257,7 +257,8 @@ def main():
                             {"role": "system", "content": get_system_prompt()},
                             {"role": "user", "content": construct_prompt(route)}
                         ],
-                        "max_tokens": 1000
+                        "max_tokens": 1000,
+                        "temperature": 0.2
                     }
                 }
                 f.write(json.dumps(entry) + '\n')

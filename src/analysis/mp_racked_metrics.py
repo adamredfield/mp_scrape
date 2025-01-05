@@ -4,7 +4,8 @@ import streamlit as st
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(project_root)
 
-from src.analysis.filters_ctes import add_user_filter, route_type_filter, year_filter, estimated_lengths_cte, get_deduped_ticks_cte
+from src.analysis.filters_ctes import add_user_filter, route_type_filter, year_filter, estimated_lengths_cte, get_deduped_ticks_cte, get_pitch_preference_lengths, add_grade_filter, fa_year_filter
+from src.streamlit.filters import generate_route_type_where_clause
 from operator import itemgetter
 import pandas as pd
 
@@ -47,7 +48,7 @@ def get_grade_group(grade:str, level:str = 'base') -> str:
         return grade 
 
 
-def get_grade_distribution(conn, route_types=None, level='base', year_start=None, year_end=None, user_id=None, tick_type='send', tick_types=None):
+def get_grade_distribution(conn, route_types=None, level='base', year_start=None, year_end=None, user_id=None, tick_type='send', tick_types=None, tag_type=None):
     """Get distribution of sends by grade with configurable grouping and route"""
 
     if tick_type == 'send':
@@ -69,6 +70,11 @@ def get_grade_distribution(conn, route_types=None, level='base', year_start=None
             AND t.type != 'Solo'
         )
         """
+    
+    tag_type_filter = ""
+    if tag_type:
+        placeholders = ', '.join(['%s'] * len(tag_type))
+        tag_type_filter = f"WHERE ur.tag_type IN ({placeholders})"
 
     grade_column = """
     CASE 
@@ -344,16 +350,18 @@ def get_route_details(conn, grade, clicked_type=None,filtered_types=None, tick_t
         df = df.drop(['grouped_grade'], axis=1)
     return df
 
-def get_highest_rated_climbs(conn, selected_styles=None, route_types=None, year_start=None, year_end=None, tag_type=None, user_id=None):
-
-    """Get highest rated climbs"""
-    style_filter = ""
-    if selected_styles:
-        style_conditions = [
-            f"(',' || STRING_AGG(tav.mapped_tag, ',') || ',') ILIKE '%,{style},%'"
-            for style in selected_styles
-        ]
-        style_filter = f"HAVING {' AND '.join(style_conditions)}"
+def get_classic_climbs(conn, tag_selections=None, route_types=None, year_start=None, year_end=None, tag_type=None, user_id=None):
+    tag_conditions = []
+    if tag_selections:
+        for tag_type, selected_tags in tag_selections.items():
+            if selected_tags:
+                conditions = [
+                    f"(',' || STRING_AGG(CASE WHEN tav.mapped_type = '{tag_type}' THEN tav.mapped_tag END, ',') || ',') ILIKE '%,{tag},%'"
+                    for tag in selected_tags
+                ]
+                tag_conditions.append(f"({' AND '.join(conditions)})")
+    
+    tag_filter = f"HAVING {' AND '.join(tag_conditions)}" if tag_conditions else ""
 
     query = f"""
     {get_deduped_ticks_cte(user_id=user_id, year_start=year_start, year_end=year_end)}
@@ -374,23 +382,22 @@ def get_highest_rated_climbs(conn, selected_styles=None, route_types=None, year_
         r.route_url
     FROM routes.Routes r
     LEFT JOIN analysis.TagAnalysisView tav on r.id = tav.route_id 
-        AND tav.mapped_type = '{tag_type}'
     JOIN deduped_ticks t ON r.id = t.route_id
     WHERE r.num_votes >= 15
+    AND r.avg_stars >= 3.5
     {route_type_filter(route_types)}
     {year_filter(year_range=(year_start, year_end), use_where=False)}
     {add_user_filter(user_id)}
     GROUP BY r.route_name, r.main_area, r.specific_location, r.yds_rating, r.hueco_rating, 
              r.aid_rating, r.danger_rating, r.commitment_grade, r.avg_stars, r.num_votes,
              r.primary_photo_url, r.route_url
-    {style_filter}
+    {tag_filter}
     ORDER BY r.avg_stars DESC, num_votes DESC
     LIMIT 20
     """
-    print(query)
     return conn.query(query)
 
-def get_bigwall_routes(conn, user_id=None, route_types=None):
+def get_bigwall_routes(conn, user_id=None, route_types=None, pitch_preference=None):
     """Get all bigwall routes"""
     query = f'''
     {estimated_lengths_cte}
@@ -399,7 +406,7 @@ def get_bigwall_routes(conn, user_id=None, route_types=None):
         r.route_name,
         TRIM(NULLIF(CONCAT_WS(' ', r.yds_rating, r.hueco_rating, r.aid_rating, r.danger_rating), '')) as grade,
         r.commitment_grade,
-        CAST(COALESCE(r.length_ft, el.estimated_length) AS INTEGER) as length,
+        {get_pitch_preference_lengths(pitch_preference)} as length,
         CONCAT(r.main_area, ', ', r.region) as area,
         r.main_area,
         r.route_url,
@@ -449,18 +456,21 @@ def get_bigwall_routes(conn, user_id=None, route_types=None):
     r.region,
     r.route_url,
     r.primary_photo_url,
-    r.route_type
+    r.route_type,
+    t.pitches_climbed,
+    r.pitches
     ORDER BY commitment_grade DESC, length DESC;
     '''
     return conn.query(query)
 
-def get_length_climbed(conn, area_type="main_area", user_id=None, year_start=None, year_end=None):
+def get_length_climbed(conn, area_type="main_area", user_id=None, year_start=None, year_end=None, pitch_preference=None):
+
     query = f"""
     {estimated_lengths_cte}
     SELECT 
         EXTRACT(YEAR FROM t.date) as year,
         r.{area_type} location,
-        sum(coalesce(r.length_ft, el.estimated_length)) length_climbed
+        sum({get_pitch_preference_lengths(pitch_preference)}) as length_climbed
     FROM routes.Routes r
     JOIN routes.Ticks t ON r.id = t.route_id
     LEFT JOIN estimated_lengths el on el.id = r.id
@@ -548,7 +558,7 @@ def days_climbed(conn, user_id=None):
     """
     return conn.query(query).iloc[0,0]
 
-def biggest_climbing_day(conn, user_id=None, year_start=None, year_end=None):
+def biggest_climbing_day(conn, user_id=None, year_start=None, year_end=None, pitch_preference=None):
 
     query = f"""
         {estimated_lengths_cte}
@@ -563,7 +573,7 @@ def biggest_climbing_day(conn, user_id=None, year_start=None, year_end=None):
                     ), ' | '
                 ) routes,
                 STRING_AGG(COALESCE(r.commitment_grade, 'None'), ' | ') commitment_grades,
-                CAST(ROUND(SUM(COALESCE(r.length_ft, el.estimated_length)),0) AS INTEGER) total_length,
+                sum({get_pitch_preference_lengths(pitch_preference)}) total_length,
                 STRING_AGG(DISTINCT CONCAT(r.main_area, ', ', r.region), ' & ') areas,
                 STRING_AGG(r.route_url, ' | ') route_urls,
                 STRING_AGG(r.primary_photo_url, ' | ') photo_urls
@@ -714,26 +724,436 @@ def get_user_year_range(conn, user_id):
     result = conn.query(query)
     return result.iloc[0]['min_year'], result.iloc[0]['max_year']
 
-def get_classics_count(conn, user_id=None, year_start=None, year_end=None, route_types=None, tag_type=None, selected_styles=None):
-    style_filter = ""
-    if selected_styles:
-        style_conditions = [
-            f"(',' || STRING_AGG(tav.mapped_tag, ',') || ',') ILIKE '%,{style},%'"
-            for style in selected_styles
-        ]
-        style_filter = f"HAVING {' AND '.join(style_conditions)}"
+def get_classics_count(conn, user_id=None, year_start=None, year_end=None, route_types=None, tag_type=None, tag_selections=None):
+    tag_conditions = []
+    if tag_selections:
+        for tag_type, selected_tags in tag_selections.items():
+            if selected_tags:
+                conditions = [
+                    f"(',' || STRING_AGG(CASE WHEN tav.mapped_type = '{tag_type}' THEN tav.mapped_tag END, ',') || ',') ILIKE '%,{tag},%'"
+                    for tag in selected_tags
+                ]
+                tag_conditions.append(f"({' AND '.join(conditions)})")
+    
+    tag_filter = f"HAVING {' AND '.join(tag_conditions)}" if tag_conditions else ""
     query = f"""
         SELECT DISTINCT r.id
         FROM routes.Ticks t
         JOIN routes.Routes r ON t.route_id = r.id
         LEFT JOIN analysis.TagAnalysisView tav on r.id = tav.route_id 
-            AND tav.mapped_type = '{tag_type}'
         {year_filter(year_range=(year_start, year_end), use_where=True)}
         {add_user_filter(user_id)}
         {route_type_filter(route_types)}
         AND r.avg_stars >= 3.5
         AND r.num_votes >= 15
         GROUP BY r.id
-        {style_filter};
+        {tag_filter};
     """
     return len(conn.query(query))
+
+def get_available_grades(conn, route_types=None):
+    
+    grade_column = """
+    CASE 
+        WHEN route_type ILIKE '%Boulder%' THEN hueco_rating 
+        WHEN route_type ILIKE '%Aid%' THEN aid_rating 
+    ELSE yds_rating END"""
+
+    route_type_filter = ""
+    if route_types:
+        conditions = [f"route_type ILIKE '%{rt}%'" for rt in route_types]
+        route_type_filter = f"AND ({' OR '.join(conditions)})"
+
+    query = f"""
+    SELECT DISTINCT
+        {grade_column} AS grade
+    FROM routes.Routes
+    WHERE {grade_column} IS NOT NULL
+    {route_type_filter}
+    ORDER BY grade;
+    """
+
+    results = conn.query(query)
+    return results.to_dict('records')
+
+def get_routes_for_route_finder(conn, offset=0, routes_per_page=None, route_types=None, tag_selections=None, user_id=None, climbed_filter='All Routes', fa_selection='All FAs', grade_system=None, grade_range=None, fa_year_start=None, fa_year_end=None):
+    tag_conditions = []
+    if tag_selections:
+        for tag_type, selected_tags in tag_selections.items():
+            if selected_tags:
+                conditions = [
+                    f"(',' || STRING_AGG(CASE WHEN tav.mapped_type = '{tag_type}' THEN tav.mapped_tag END, ',') || ',') ILIKE '%,{tag},%'"
+                    for tag in selected_tags
+                ]
+                tag_conditions.append(f"({' AND '.join(conditions)})")
+    
+    tag_filter = f"HAVING {' AND '.join(tag_conditions)}" if tag_conditions else ""
+
+    route_type_where_clause = generate_route_type_where_clause(route_types)
+
+    climbed_condition = ""
+    if climbed_filter == 'Unclimbed':
+        climbed_condition = f"""
+        AND NOT EXISTS (
+            SELECT 1 FROM routes.Ticks t 
+            WHERE t.route_id = r.id 
+            AND t.user_id = '{user_id}'
+        )
+        """
+    elif climbed_filter == 'Climbed':
+        climbed_condition = f"""
+        AND EXISTS (
+            SELECT 1 FROM routes.Ticks t 
+            WHERE t.route_id = r.id 
+            AND t.user_id = '{user_id}'
+        )
+        """
+
+    fa_condition = ""
+    if fa_selection != 'All FAs':
+        fa_condition = f"""
+        AND EXISTS (
+            SELECT 1 FROM analysis.fa 
+            WHERE fa.route_id = r.id 
+            AND fa.fa_name = '{fa_selection}'
+        )
+        """
+
+    query = f"""
+    WITH estimated_lengths AS (
+    SELECT  id,
+            CASE WHEN route_type ILIKE '%trad%' AND length_ft IS NULL AND pitches IS NULL -- trad single-pitch
+                THEN (SELECT avg(length_ft) FROM routes.Routes r WHERE route_type ILIKE '%trad%'AND length_ft IS NOT NULL and pitches IS NULL AND length_ft < 230) -- avg single-pitch trad pitch length
+                WHEN route_type ILIKE '%trad%' AND length_ft IS NULL AND pitches IS NOT NULL -- trad multipitch
+                THEN (SELECT avg(length_ft/ pitches) FROM routes.Routes r WHERE route_type ILIKE '%trad%' AND length_ft IS NOT NULL and pitches IS NOT NULL) * pitches
+                WHEN route_type ILIKE '%sport%' AND length_ft IS NULL AND pitches IS NOT NULL -- sport single-pitch
+                THEN (SELECT avg(length_ft) FROM routes.Routes r WHERE route_type ILIKE '%sport%'AND length_ft IS NOT NULL and pitches IS NULL AND length_ft < 230) -- avg single-pitch sport pitch length
+                WHEN route_type ILIKE '%sport%' AND length_ft IS NULL AND pitches IS NOT NULL -- sport multipitch
+                THEN (SELECT avg(length_ft/ pitches) FROM routes.Routes r WHERE route_type ILIKE '%sport%' AND length_ft IS NOT NULL and pitches IS NOT NULL) * pitches
+                WHEN route_type ILIKE '%boulder%' AND length_ft IS NULL
+                THEN (SELECT avg(length_ft) FROM routes.Routes r WHERE route_type ILIKE '%boulder%' AND length_ft IS NOT NULL) -- boulder
+                WHEN route_type ILIKE '%aid%' AND length_ft IS NULL AND pitches IS NOT NULL -- aid multipitch
+                THEN (SELECT avg(length_ft/ pitches) FROM routes.Routes r WHERE route_type ILIKE '%aid%' AND length_ft IS NOT NULL and pitches IS NOT NULL) * pitches
+                ELSE (SELECT avg(length_ft) FROM routes.Routes r WHERE route_type ILIKE '%trad%'AND length_ft IS NOT NULL and pitches IS NULL AND length_ft < 230)
+                END AS estimated_length
+        FROM routes.Routes
+        ),
+    estimated_pitches AS (
+        SELECT id,
+            CASE 
+                WHEN pitches IS NOT NULL THEN pitches
+                WHEN route_type NOT ILIKE '%trad%' 
+                    AND route_type NOT ILIKE '%sport%' 
+                    AND route_type NOT ILIKE '%aid%' 
+                    AND route_type NOT ILIKE '%alpine%' THEN NULL
+                WHEN length_ft <= 230 THEN 1
+                WHEN length_ft IS NOT NULL and length_ft < 1000 THEN
+                    CASE 
+                        WHEN route_type ILIKE '%trad%' THEN 
+                            CEIL(length_ft / (
+                                SELECT avg(length_ft / pitches) 
+                                FROM routes.Routes 
+                                WHERE route_type ILIKE '%trad%' 
+                                AND length_ft IS NOT NULL 
+                                AND pitches > 2
+                            ))
+                        WHEN route_type ILIKE '%sport%' THEN 
+                            CEIL(length_ft / (
+                                SELECT avg(length_ft / pitches) 
+                                FROM routes.Routes 
+                                WHERE route_type ILIKE '%sport%' 
+                                AND length_ft IS NOT NULL 
+                                AND pitches > 2
+                            ))
+                        WHEN route_type ILIKE '%aid%' THEN 
+                            CEIL(length_ft / (
+                                SELECT avg(length_ft / pitches) 
+                                FROM routes.Routes 
+                                WHERE route_type ILIKE '%aid%' 
+                                AND length_ft IS NOT NULL 
+                                AND pitches > 2
+                            ))
+                        WHEN route_type ILIKE '%alpine%' THEN 
+                            CEIL(length_ft / (
+                                SELECT avg(length_ft / pitches) 
+                                FROM routes.Routes 
+                                WHERE route_type ILIKE '%alpine%' 
+                                AND length_ft IS NOT NULL 
+                                AND pitches > 2
+                            ))
+                        ELSE NULL
+                    END
+                ELSE NULL
+            END AS estimated_pitches
+        FROM routes.Routes r
+    )
+    select
+    r.id,
+    r.route_name, 
+    TRIM(NULLIF(CONCAT_WS(' ', r.yds_rating, r.hueco_rating, r.aid_rating, r.danger_rating, r.commitment_grade), '')) grade,
+    r.avg_stars,
+    least(4.0,round((
+        (r.avg_stars * r.num_votes + 
+        CASE  -- Prior mean (m) - same within grade tiers
+            -- Grade VI tiers
+        WHEN r.commitment_grade = 'VI' AND r.num_votes >= 600 THEN 4.5
+        WHEN r.commitment_grade = 'VI' AND r.num_votes >= 500 THEN 4.49
+        WHEN r.commitment_grade = 'VI' AND r.num_votes >= 400 THEN 4.48
+        WHEN r.commitment_grade = 'VI' AND r.num_votes >= 300 THEN 4.47
+        WHEN r.commitment_grade = 'VI' AND r.num_votes >= 200 THEN 4.46
+        WHEN r.commitment_grade = 'VI' AND r.num_votes >= 100 THEN 4.45
+        WHEN r.commitment_grade = 'VI' AND r.num_votes >= 50 THEN 3.85
+        WHEN r.commitment_grade = 'VI' THEN 3.65
+        -- Grade V tiers
+        WHEN r.commitment_grade = 'V' AND r.num_votes >= 600 THEN 4
+        WHEN r.commitment_grade = 'V' AND r.num_votes >= 500 THEN 3.99
+        WHEN r.commitment_grade = 'V' AND r.num_votes >= 400 THEN 3.98
+        WHEN r.commitment_grade = 'V' AND r.num_votes >= 300 THEN 3.97
+        WHEN r.commitment_grade = 'V' AND r.num_votes >= 200 THEN 3.96
+        WHEN r.commitment_grade = 'V' AND r.num_votes >= 100 THEN 3.95
+        WHEN r.commitment_grade = 'VI' THEN 3.5
+        -- Grade IV tiers
+        WHEN r.commitment_grade = 'IV' AND r.num_votes >= 600 THEN 3.9
+        WHEN r.commitment_grade = 'IV' AND r.num_votes >= 500 THEN 3.89
+        WHEN r.commitment_grade = 'IV' AND r.num_votes >= 400 THEN 3.88
+        WHEN r.commitment_grade = 'IV' AND r.num_votes >= 300 THEN 3.86
+        WHEN r.commitment_grade = 'OV' AND r.num_votes >= 200 THEN 3.81
+        WHEN r.commitment_grade = 'IV' AND r.num_votes >= 100 THEN 3.75
+            -- Grade IV tiers
+        -- ALL routes vote count tiers
+        WHEN r.num_votes >= 1000 THEN 4
+        WHEN r.num_votes >= 750 THEN 3.9
+        WHEN r.num_votes >= 500 THEN 3.8
+        WHEN r.num_votes >= 250 THEN 3.8
+        WHEN r.num_votes >= 100 THEN 3.5
+        WHEN r.num_votes >= 50 THEN 3
+        ELSE 2
+    END * 
+        CASE  -- Confidence number (C)
+            -- Grade VI tiers
+            WHEN r.commitment_grade = 'VI' AND r.num_votes >= 600 THEN GREATEST(15, ROUND(r.num_votes * 0.2))
+            WHEN r.commitment_grade = 'VI' AND r.num_votes >= 500 THEN GREATEST(15, ROUND(r.num_votes * 0.19))
+            WHEN r.commitment_grade = 'VI' AND r.num_votes >= 400 THEN GREATEST(15, ROUND(r.num_votes * 0.18))
+            WHEN r.commitment_grade = 'VI' AND r.num_votes >= 300 THEN GREATEST(15, ROUND(r.num_votes * 0.15))
+            WHEN r.commitment_grade = 'VI' AND r.num_votes >= 200 THEN GREATEST(15, ROUND(r.num_votes * 0.13))
+            WHEN r.commitment_grade = 'VI' AND r.num_votes >= 100 THEN GREATEST(15, ROUND(r.num_votes * 0.1))
+            WHEN r.commitment_grade = 'VI' AND r.num_votes >= 50 THEN GREATEST(15, ROUND(r.num_votes * 0.05))
+            WHEN r.commitment_grade = 'V' AND r.num_votes >= 600 THEN GREATEST(20, ROUND(r.num_votes * 0.15))
+            WHEN r.commitment_grade = 'V' AND r.num_votes >= 500 THEN GREATEST(20, ROUND(r.num_votes * 0.14))
+            WHEN r.commitment_grade = 'V' AND r.num_votes >= 400 THEN GREATEST(20, ROUND(r.num_votes * 0.13))
+            WHEN r.commitment_grade = 'V' AND r.num_votes >= 300 THEN GREATEST(20, ROUND(r.num_votes * 0.12))
+            WHEN r.commitment_grade = 'V' AND r.num_votes >= 200 THEN GREATEST(20, ROUND(r.num_votes * 0.11))
+            WHEN r.commitment_grade = 'V' AND r.num_votes >= 100 THEN GREATEST(20, ROUND(r.num_votes * 0.1))
+            WHEN r.commitment_grade = 'V' AND r.num_votes >= 50 THEN GREATEST(20, ROUND(r.num_votes * 0.07))
+            WHEN r.commitment_grade = 'IV' AND r.num_votes >= 600 THEN GREATEST(25, ROUND(r.num_votes * 0.1))
+            WHEN r.commitment_grade = 'IV' AND r.num_votes >= 500 THEN GREATEST(25, ROUND(r.num_votes * 0.09))
+            WHEN r.commitment_grade = 'IV' AND r.num_votes >= 400 THEN GREATEST(25, ROUND(r.num_votes * 0.08))
+            WHEN r.commitment_grade = 'IV' AND r.num_votes >= 300 THEN GREATEST(25, ROUND(r.num_votes * 0.07))
+            WHEN r.commitment_grade = 'IV' AND r.num_votes >= 200 THEN GREATEST(25, ROUND(r.num_votes * 0.06))
+            WHEN r.commitment_grade = 'IV' AND r.num_votes >= 100 THEN GREATEST(25, ROUND(r.num_votes * 0.05))
+            WHEN r.commitment_grade = 'IV' AND r.num_votes >= 50 THEN GREATEST(25, ROUND(r.num_votes * 0.03))
+            WHEN r.num_votes >= 600 THEN GREATEST(30, ROUND(r.num_votes * 0.03))
+            WHEN r.num_votes >= 500 THEN GREATEST(30, ROUND(r.num_votes * 0.025))
+            WHEN r.num_votes >= 400 THEN GREATEST(30, ROUND(r.num_votes * 0.02))
+            WHEN r.num_votes >= 300 THEN GREATEST(30, ROUND(r.num_votes * 0.015))
+            WHEN r.num_votes >= 200 THEN GREATEST(30, ROUND(r.num_votes * 0.01))
+            WHEN r.num_votes >= 100 THEN GREATEST(30, ROUND(r.num_votes * 0.005))
+            ELSE GREATEST(30, ROUND(r.num_votes * 0.0001))
+        END)::NUMERIC / (
+        r.num_votes + 
+        CASE  -- Same confidence numbers as above
+            WHEN r.commitment_grade = 'VI' AND r.num_votes >= 600 THEN GREATEST(15, ROUND(r.num_votes * 0.2))
+            WHEN r.commitment_grade = 'VI' AND r.num_votes >= 500 THEN GREATEST(15, ROUND(r.num_votes * 0.19))
+            WHEN r.commitment_grade = 'VI' AND r.num_votes >= 400 THEN GREATEST(15, ROUND(r.num_votes * 0.18))
+            WHEN r.commitment_grade = 'VI' AND r.num_votes >= 300 THEN GREATEST(15, ROUND(r.num_votes * 0.15))
+            WHEN r.commitment_grade = 'VI' AND r.num_votes >= 200 THEN GREATEST(15, ROUND(r.num_votes * 0.13))
+            WHEN r.commitment_grade = 'VI' AND r.num_votes >= 100 THEN GREATEST(15, ROUND(r.num_votes * 0.1))
+            WHEN r.commitment_grade = 'VI' AND r.num_votes >= 50 THEN GREATEST(15, ROUND(r.num_votes * 0.05))
+            WHEN r.commitment_grade = 'V' AND r.num_votes >= 600 THEN GREATEST(20, ROUND(r.num_votes * 0.15))
+            WHEN r.commitment_grade = 'V' AND r.num_votes >= 500 THEN GREATEST(20, ROUND(r.num_votes * 0.14))
+            WHEN r.commitment_grade = 'V' AND r.num_votes >= 400 THEN GREATEST(20, ROUND(r.num_votes * 0.13))
+            WHEN r.commitment_grade = 'V' AND r.num_votes >= 300 THEN GREATEST(20, ROUND(r.num_votes * 0.12))
+            WHEN r.commitment_grade = 'V' AND r.num_votes >= 200 THEN GREATEST(20, ROUND(r.num_votes * 0.11))
+            WHEN r.commitment_grade = 'V' AND r.num_votes >= 100 THEN GREATEST(20, ROUND(r.num_votes * 0.1))
+            WHEN r.commitment_grade = 'V' AND r.num_votes >= 50 THEN GREATEST(20, ROUND(r.num_votes * 0.07))
+            WHEN r.commitment_grade = 'IV' AND r.num_votes >= 600 THEN GREATEST(25, ROUND(r.num_votes * 0.1))
+            WHEN r.commitment_grade = 'IV' AND r.num_votes >= 500 THEN GREATEST(25, ROUND(r.num_votes * 0.09))
+            WHEN r.commitment_grade = 'IV' AND r.num_votes >= 400 THEN GREATEST(25, ROUND(r.num_votes * 0.08))
+            WHEN r.commitment_grade = 'IV' AND r.num_votes >= 300 THEN GREATEST(25, ROUND(r.num_votes * 0.07))
+            WHEN r.commitment_grade = 'IV' AND r.num_votes >= 200 THEN GREATEST(25, ROUND(r.num_votes * 0.06))
+            WHEN r.commitment_grade = 'IV' AND r.num_votes >= 100 THEN GREATEST(25, ROUND(r.num_votes * 0.05))
+            WHEN r.commitment_grade = 'IV' AND r.num_votes >= 50 THEN GREATEST(25, ROUND(r.num_votes * 0.03))
+            WHEN r.num_votes >= 600 THEN GREATEST(30, ROUND(r.num_votes * 0.03))
+            WHEN r.num_votes >= 500 THEN GREATEST(30, ROUND(r.num_votes * 0.025))
+            WHEN r.num_votes >= 400 THEN GREATEST(30, ROUND(r.num_votes * 0.02))
+            WHEN r.num_votes >= 300 THEN GREATEST(30, ROUND(r.num_votes * 0.015))
+            WHEN r.num_votes >= 200 THEN GREATEST(30, ROUND(r.num_votes * 0.01))
+            WHEN r.num_votes >= 100 THEN GREATEST(30, ROUND(r.num_votes * 0.005))
+            ELSE GREATEST(30, ROUND(r.num_votes * 0.0001))
+        END)
+    ), 3)) as choss_adjusted_benchmark,
+    r.num_votes,
+    r.region,
+    r.main_area,
+    r.sub_area,
+    r.specific_location,
+    r.route_type,
+    coalesce(r.length_ft, el.estimated_length) length_ft,
+    coalesce(r.pitches,ep.estimated_pitches) pitches,
+    r.fa,
+    STRING_AGG(DISTINCT NULLIF(CASE 
+        WHEN tav.mapped_type = 'style' AND tav.mapped_tag IS NOT NULL 
+        THEN tav.mapped_tag 
+    END, ''), ', ') as styles,
+    STRING_AGG(DISTINCT NULLIF(CASE 
+        WHEN tav.mapped_type = 'feature' AND tav.mapped_tag IS NOT NULL 
+        THEN tav.mapped_tag 
+    END, ''), ', ') as features,
+    STRING_AGG(DISTINCT NULLIF(CASE 
+        WHEN tav.mapped_type = 'descriptor' AND tav.mapped_tag IS NOT NULL 
+        THEN tav.mapped_tag 
+    END, ''), ', ') as descriptors,
+    STRING_AGG(DISTINCT NULLIF(CASE 
+        WHEN tav.mapped_type = 'rock_type' AND tav.mapped_tag IS NOT NULL 
+        THEN tav.mapped_tag 
+    END, ''), ', ') as rock_type
+    from routes.routes r
+    LEFT JOIN estimated_lengths el on el.id = r.id
+    left join estimated_pitches ep on ep.id = r.id
+    LEFT JOIN analysis.taganalysisview tav on tav.route_id = r.id 
+    LEFT JOIN analysis.fa fa ON fa.route_id = r.id
+    {route_type_where_clause}
+    {climbed_condition}
+    {fa_condition}
+    {add_grade_filter(grade_system, grade_range)}
+    {fa_year_filter(fa_year_start, fa_year_end)}
+    group by r.id,
+    r.route_name, 
+    grade,
+    r.avg_stars,
+    r.num_votes,
+    r.region,
+    r.main_area,
+    r.sub_area,
+    r.specific_location,
+    r.route_type,
+    length_ft,
+    pitches,
+    r.fa,
+    el.estimated_length,
+    ep.estimated_pitches
+    {tag_filter}
+    order by choss_adjusted_benchmark desc, num_votes desc
+    LIMIT {routes_per_page} 
+    OFFSET {offset}
+    """
+    print(query)
+    return conn.query(query)
+
+
+def get_fifty_classics_details(conn, user_id=None):
+    """
+    Get detailed information about the Fifty Classic Climbs.
+    
+    Args:
+        conn: Database connection
+        user_id: User ID to check for ticks
+        
+    Returns:
+        DataFrame with detailed information about the Fifty Classic Climbs
+    """
+    query = f"""
+ WITH latest_ticks AS (
+    SELECT *,
+        ROW_NUMBER() OVER (
+            PARTITION BY route_id 
+            ORDER BY 
+                CASE 
+                    WHEN pitches_climbed IS NULL THEN 1  -- Nulls first
+                    ELSE 0
+                END DESC,
+                pitches_climbed DESC,
+                date DESC       
+        ) as rn
+    FROM routes.ticks t 
+    WHERE 1=1
+    {add_user_filter(user_id)}
+),
+classic_ticks AS (
+    SELECT 
+        route_id,
+        COUNT(*) as ascent_count,
+        (SELECT date FROM latest_ticks WHERE rn = 1 AND route_id = t.route_id) as date,
+        (SELECT type FROM latest_ticks WHERE rn = 1 AND route_id = t.route_id) as style,
+        (SELECT note FROM latest_ticks WHERE rn = 1 AND route_id = t.route_id) as note,
+        (SELECT pitches_climbed FROM latest_ticks WHERE rn = 1 AND route_id = t.route_id) as pitches_climbed
+    FROM routes.ticks t
+    WHERE 1=1
+    {add_user_filter(user_id)}
+    GROUP BY route_id
+)
+    SELECT 
+        r.id,
+        r.route_name,
+        TRIM(NULLIF(CONCAT_WS(' ', 
+            r.yds_rating,
+            r.hueco_rating,
+            r.aid_rating,
+            r.danger_rating,
+            r.commitment_grade), '')) as grade,
+        r.avg_stars,
+        r.pitches,
+        r.length_ft,
+        r.route_type,
+        r.main_area,
+        r.specific_location,
+        STRING_AGG(DISTINCT NULLIF(CASE 
+            WHEN tav.mapped_type = 'style' AND tav.mapped_tag IS NOT NULL 
+            THEN tav.mapped_tag 
+        END, ''), ', ') as styles,
+        STRING_AGG(DISTINCT NULLIF(CASE 
+            WHEN tav.mapped_type = 'feature' AND tav.mapped_tag IS NOT NULL 
+            THEN tav.mapped_tag 
+        END, ''), ', ') as features,
+        STRING_AGG(DISTINCT NULLIF(CASE 
+            WHEN tav.mapped_type = 'descriptor' AND tav.mapped_tag IS NOT NULL 
+            THEN tav.mapped_tag 
+        END, ''), ', ') as descriptors,
+        STRING_AGG(DISTINCT NULLIF(CASE 
+            WHEN tav.mapped_type = 'rock_type' AND tav.mapped_tag IS NOT NULL 
+            THEN tav.mapped_tag 
+        END, ''), ', ') as rock_type,
+        r.primary_photo_url,
+        r.route_url,
+        t.date as tick_date,
+        t.style as tick_style,
+        t.note as tick_notes,
+        CASE 
+            WHEN t.route_id IS NOT NULL THEN true 
+            ELSE false 
+        END as climbed
+    FROM routes.fifty_classics fc
+    JOIN routes.routes r ON r.id = fc.route_id 
+    LEFT JOIN classic_ticks t ON t.route_id = r.id 
+    LEFT JOIN analysis.taganalysisview tav on tav.route_id = r.id
+    GROUP BY 
+        r.id,
+        r.route_name,
+        r.yds_rating,
+        r.hueco_rating,
+        r.aid_rating,
+        r.danger_rating,
+        r.commitment_grade,
+        r.avg_stars,
+        r.pitches,
+        r.length_ft,
+        r.route_type,
+        r.main_area,
+        r.specific_location,
+        t.style,
+        t.note,
+        t.route_id,
+        t.date
+    ORDER BY climbed desc,t.date desc, avg_stars desc;
+    """
+    return conn.query(query)

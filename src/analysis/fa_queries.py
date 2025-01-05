@@ -25,6 +25,17 @@ def get_top_first_ascensionists(conn, user_id=None, year_start=None, year_end=No
     result = conn.query(query)
     return result.values.tolist()
 
+def get_all_top_first_ascensionists(conn, user_id=None, year_start=None, year_end=None):
+    query = f"""
+    SELECT fa_name, COUNT(*) as fa_count
+    FROM analysis.fa
+    WHERE fa_type IN ('FA', 'FFA', 'FCA')
+    GROUP BY fa_name
+    ORDER BY fa_count desc
+    """
+    result = conn.query(query)
+    return ['All FAs'] + result['fa_name'].tolist()
+
 def get_first_ascensionist_by_decade(conn, name, user_id=None, year_start=None, year_end=None):
     """
     Get a first ascensionist's activity by decade

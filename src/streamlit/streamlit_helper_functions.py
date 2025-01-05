@@ -8,6 +8,7 @@ from PIL import Image
 import requests
 from io import BytesIO
 import base64
+from streamlit_js_eval import streamlit_js_eval
 
 sqs = boto3.client('sqs',
         region_name=st.secrets["aws"]["region"],
@@ -83,7 +84,8 @@ def verify_user_exists(conn, user_id):
         with button_cols:
             col1, col2 = st.columns([1,2])
             with col1:
-                with st.empty():
+                refresh_container = st.empty()
+                with refresh_container:
                     if st.button("Refresh Data"):
                         info_msg.empty()
                         details_msg.empty()
@@ -94,12 +96,55 @@ def verify_user_exists(conn, user_id):
                             st.session_state.start_time = datetime.now()
                             st.rerun()
             with col2:
-                if st.button("Continue with existing data"):
-                    st.session_state.data_status = 'ready'
-                    return True
-            
-            if st.session_state.get('data_status') != 'ready':
-                st.stop()
+                if 'show_form' not in st.session_state:
+                    st.session_state.show_form = False
+
+                continue_container = st.empty()
+
+                if not st.session_state.show_form:
+                    # Only show continue button if form isn't showing
+                    with continue_container:
+                        if st.button("Continue with existing data"):
+                            continue_container.empty()
+                            st.session_state.show_form = True
+                            info_msg.empty()
+                            details_msg.empty()
+                            refresh_container.empty()
+                            
+
+                if st.session_state.show_form:
+                    st.info("Please indicate usage of pitch option for ticks:")
+                    
+                    with st.form("pitch_usage_form"):
+                        choice = st.radio(
+                            "For The Nose, would 11 pitches mean...", 
+                            options=["A", "B"],
+                            captions=[
+                                "Partial ascent (Dolt Run = 11/31 pitches)",
+                                "Pitch count of full ascent (simul in 11 pitches)"
+                            ],
+                            horizontal=True, 
+                            key="pitch_usage"
+                        )
+
+                        submitted = st.form_submit_button("Save Preference")
+                        if submitted:
+                            print("Form submitted!")
+                            if choice:
+                                continue_container.empty()
+                                st.session_state.show_form = True
+                                info_msg.empty()
+                                details_msg.empty()
+                                refresh_container.empty()
+                                preference = 'partial' if choice == "A" else 'simul'
+                                st.session_state.pitches_preference = preference
+                                st.session_state.data_status = 'ready'
+                                st.success(f"Preference saved: Racking up...")
+                                time.sleep(3)
+                                return True
+                            else:
+                                st.error("Please make a selection")
+                                return False
 
     else:
         info_msg.warning("Your data has not been collected yet.")
@@ -384,3 +429,65 @@ def get_squared_image(url):
     except Exception as e:
         print(f"Error loading image from {url}: {e}")
         return None
+
+
+def is_mobile():
+    js_code = """
+    (function() {
+        return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    })();
+    """
+    return streamlit_js_eval(js_expressions=js_code, key='mobile_check')
+
+def get_device_dimensions(key_suffix=''):
+    js_code = """
+    (function() {
+        const dims = {
+            screenWidth: window.screen.width,
+            screenHeight: window.screen.height,
+            devicePixelRatio: window.devicePixelRatio || 1
+        };
+        return dims;
+    })();
+    """
+    return streamlit_js_eval(js_expressions=js_code, key=f'device_dims_{key_suffix}')
+
+
+def is_iphone_dimensions():
+    # Get viewport dimensions
+    dims = get_device_dimensions('iphone_check')
+    if not dims:
+        return False
+    
+    # Use screen dimensions since they're reporting correctly
+    width = dims.get('screenWidth')
+    height = dims.get('screenHeight')
+
+    if not width or not height:
+        return False
+    
+    # Common iPhone viewport dimensions (width, height) in portrait mode
+    iphone_dimensions = [
+        (390, 844),  # iPhone 12, 13, 14 Pro
+        (393, 852),  # iPhone 15 Pro
+        (428, 926),  # iPhone 12, 13, 14 Pro Max
+        (430, 932),  # iPhone 15 Pro Max
+        (375, 812),  # iPhone X, XS, 11 Pro
+        (414, 896),  # iPhone XS Max, 11 Pro Max
+        (320, 568),  # iPhone 5/SE
+        (375, 667),  # iPhone 6/7/8
+        (414, 736),  # iPhone 6/7/8 Plus
+    ]
+    
+    # Allow for some flexibility in dimensions (±20 pixels)
+    tolerance = 20
+    dimensions = (width, height)
+    rotated_dimensions = (height, width)
+    
+    return any(
+        all(abs(a - b) <= tolerance for a, b in zip(dimensions, target))
+        or all(abs(a - b) <= tolerance for a, b in zip(rotated_dimensions, target))
+        for target in iphone_dimensions
+    )
+    
+
