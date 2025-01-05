@@ -11,23 +11,23 @@ from playwright.sync_api import sync_playwright
 from src.scraping.helper_functions import login_and_save_session, fetch_dynamic_page_content, parse_route_data, parse_route_comments_data, get_total_pages
 
 STATE_IDS = {
-    #"Alabama": "105905173",
-    #"Alaska": "105909311",
-    #"Arizona": "105708962",
-    #"Arkansas": "105901027",
-    #"California": "105708959",
-    #"Colorado": "105708956",
+    "Alabama": "105905173",
+    "Alaska": "105909311",
+    "Arizona": "105708962",
+    "Arkansas": "105901027",
+    "California": "105708959",
+    "Colorado": "105708956",
     "Connecticut": "105806977",
     "Delaware": "106861605",
     "Florida": "111721391",
     "Georgia": "105897947",
     "Hawaii": "106316122",
-    #"Idaho": "105708958",
+    "Idaho": "105708958",
     "Illinois": "105911816",
     "Indiana": "112389571",
     "Iowa": "106092653",
     "Kansas": "107235316",
-    #"Kentucky": "105868674",
+    "Kentucky": "105868674",
     "Louisiana": "116720343",
     "Maine": "105948977",
     "Maryland": "106029417",
@@ -38,29 +38,29 @@ STATE_IDS = {
     "Missouri": "105899020",
     "Montana": "105907492",
     "Nebraska": "116096758",
-    #"Nevada": "105708961",
+    "Nevada": "105708961",
     "New Hampshire": "105872225",
     "New Jersey": "106374428",
-    #"New Mexico": "105708964",
-    #"New York": "105800424",
+    "New Mexico": "105708964",
+    "New York": "105800424",
     "North Carolina": "105873282",
     "North Dakota": "106598130",
     "Ohio": "105994953",
     "Oklahoma": "105854466",
-    #"Oregon": "105708965",
+    "Oregon": "105708965",
     "Pennsylvania": "105913279",
     "Rhode Island": "106842810",
     "South Carolina": "107638915",
     "South Dakota": "105708963",
     "Tennessee": "105887760",
     "Texas": "105835804",
-    #"Utah": "105708957",
+    "Utah": "105708957",
     "Vermont": "105891603",
     "Virginia": "105852400",
-    #"Washington": "105708966",
-    #"West Virginia": "105855459",
+    "Washington": "105708966",
+    "West Virginia": "105855459",
     "Wisconsin": "105708968",
-    #"Wyoming": "105708960"
+    "Wyoming": "105708960"
 }
 
 states = list(STATE_IDS.keys())
@@ -70,14 +70,17 @@ def set_route_finder_filters(page, grade, state):
     try:
         page.goto("https://www.mountainproject.com/route-finder")
         # Set route type to Rock
-        page.select_option('select[id="type"][name="type"]', "Rock")
+        #page.select_option('select[id="type"][name="type"]', "Rock")
+        page.select_option('select[id="type"][name="type"]', "Boulder")
         
         # Set grade range
-        page.select_option('select[id="diffMinrock"][name="diffMinrock"]', grade)
-        page.select_option('select[id="diffMaxrock"][name="diffMaxrock"]', grade)
+        #page.select_option('select[id="diffMinrock"][name="diffMinrock"]', grade)
+        #page.select_option('select[id="diffMaxrock"][name="diffMaxrock"]', grade)
+        page.select_option('select[id="diffMinboulder"][name="diffMinboulder"]', grade)
+        page.select_option('select[id="diffMaxboulder"][name="diffMaxboulder"]', grade)
         
         # Check Trad, Sport, and Toprope
-        page.uncheck('input[id="check_is_top_rope"][name="is_top_rope"]')
+        #page.uncheck('input[id="check_is_top_rope"][name="is_top_rope"]')
 
         # Set stars filter to 3+ stars
         page.select_option('select[id="stars"][name="stars"]', "3.8")
@@ -107,11 +110,17 @@ def set_route_finder_filters(page, grade, state):
 def scrape_high_rated_routes():
     """Main function to scrape all 3+ star routes"""
 
-    grades = [
+    """grades = [
         "5.0", "5.1", "5.2", "5.3", "5.4", "5.5", 
         "5.6", "5.7", "5.8", "5.9", "5.10a", "5.10b", "5.10c", "5.10d",
         "5.11a", "5.11b", "5.11c", "5.11d", "5.12a", "5.12b", "5.12c", "5.12d",
         "5.13a", "5.13b", "5.13c", "5.13d", "5.14a", "5.14b", "5.14c", "5.14d"
+    ]
+"""
+    grades = [
+        "20000", "20050", "20150", "20250", "20350", "20450", "20550", 
+        "20650", "20750", "20850", "20950", "21050", "21150", "21250", "21350",
+        "21450", "21550"
     ]
 
     with create_connection() as conn:  # Single database connection for entire session
@@ -289,4 +298,4 @@ def scrape_fifty_classics():
 
 
 if __name__ == "__main__":
-    scrape_fifty_classics()
+    scrape_high_rated_routes()
