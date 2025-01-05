@@ -157,3 +157,14 @@ def add_grade_filter(grade_system, grade_range):
     AND {grade_column} IS NOT NULL
     AND {grade_column} BETWEEN '{min_grade}' AND '{max_grade}'
     """
+
+def fa_year_filter(fa_year_start, fa_year_end):
+    """Get routes based on filters including FA year"""
+    
+    fa_year_condition = ""
+    if fa_year_start and fa_year_end:
+        fa_year_condition = f"""
+            AND fa.year BETWEEN {fa_year_start} AND {fa_year_end}
+        """
+    
+    return fa_year_condition

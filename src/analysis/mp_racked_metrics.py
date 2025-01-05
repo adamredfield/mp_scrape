@@ -4,7 +4,7 @@ import streamlit as st
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(project_root)
 
-from src.analysis.filters_ctes import add_user_filter, route_type_filter, year_filter, estimated_lengths_cte, get_deduped_ticks_cte, get_pitch_preference_lengths, add_grade_filter
+from src.analysis.filters_ctes import add_user_filter, route_type_filter, year_filter, estimated_lengths_cte, get_deduped_ticks_cte, get_pitch_preference_lengths, add_grade_filter, fa_year_filter
 from src.streamlit.filters import generate_route_type_where_clause
 from operator import itemgetter
 import pandas as pd
@@ -776,7 +776,7 @@ def get_available_grades(conn, route_types=None):
     results = conn.query(query)
     return results.to_dict('records')
 
-def get_routes_for_route_finder(conn, offset=0, routes_per_page=None, route_types=None, tag_selections=None, user_id=None, climbed_filter='All Routes', fa_selection='All FAs', grade_system=None, grade_range=None):
+def get_routes_for_route_finder(conn, offset=0, routes_per_page=None, route_types=None, tag_selections=None, user_id=None, climbed_filter='All Routes', fa_selection='All FAs', grade_system=None, grade_range=None, fa_year_start=None, fa_year_end=None):
     tag_conditions = []
     if tag_selections:
         for tag_type, selected_tags in tag_selections.items():
@@ -1021,10 +1021,12 @@ def get_routes_for_route_finder(conn, offset=0, routes_per_page=None, route_type
     LEFT JOIN estimated_lengths el on el.id = r.id
     left join estimated_pitches ep on ep.id = r.id
     LEFT JOIN analysis.taganalysisview tav on tav.route_id = r.id 
+    LEFT JOIN analysis.fa fa ON fa.route_id = r.id
     {route_type_where_clause}
     {climbed_condition}
     {fa_condition}
     {add_grade_filter(grade_system, grade_range)}
+    {fa_year_filter(fa_year_start, fa_year_end)}
     group by r.id,
     r.route_name, 
     grade,
@@ -1045,6 +1047,7 @@ def get_routes_for_route_finder(conn, offset=0, routes_per_page=None, route_type
     LIMIT {routes_per_page} 
     OFFSET {offset}
     """
+    print(query)
     return conn.query(query)
 
 

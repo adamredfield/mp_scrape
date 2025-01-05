@@ -280,16 +280,11 @@ def fa_filter(conn):
 
 def grade_filter(conn, route_types=None, user_id=None, year_start=None, year_end=None):
     """Filter for climbing grades with type-specific handling"""
-    
-    print("Starting grade_filter function")
-
     try:
         grade_data = metrics.get_available_grades(
             conn=conn,
             route_types=route_types
         )
-
-        print(f"Grade data received: {grade_data[:5] if grade_data else 'No data'}")  # Debug
         
     except Exception as e:
         print(f"Error getting grade distribution: {str(e)}")  # Debug
@@ -319,13 +314,10 @@ def grade_filter(conn, route_types=None, user_id=None, year_start=None, year_end
         elif grade.startswith('5.'):
             grade_types['YDS'].append(grade)
 
-    print(f"Grade types populated: {grade_types}") 
-
     # Sort grades within each type
     for grade_type in grade_types:
         grade_types[grade_type] = sorted(list(set(grade_types[grade_type])), 
-                                       key=metrics.grade_sort_key)
-    print("Starting to create UI elements")  
+                                       key=metrics.grade_sort_key)  
     col1, col2 = st.columns([1, 3])
     with col1:
         with st.popover("Grade Filter", use_container_width=True):
@@ -358,6 +350,22 @@ def grade_filter(conn, route_types=None, user_id=None, year_start=None, year_end
     
     return None, None
 
+def fa_year_filter(df=None):
+    """Filter for FA year range using a slider"""
+
+    print("Starting FA year filter")
+    
+    fa_year_start, fa_year_end = st.select_slider(
+        'First Ascent Year Range',
+        options=list(range(1900, 2025)),
+        value=(1900, 2024),
+        key='fa_year_filter'
+    )
+    
+    print(f"FA year filter values: {fa_year_start} - {fa_year_end}")
+    
+    return fa_year_start, fa_year_end
+
 def render_filters(df=None, filters_to_include=None, filter_title="Filters", conn=None, user_id=None, default_years=None):
     """
     Render filter expander with specified filters
@@ -384,7 +392,8 @@ def render_filters(df=None, filters_to_include=None, filter_title="Filters", con
         'tick_type': tick_type_filter,
         'climbed_routes': climbed_routes_filter,
         'fa': fa_filter,
-        'grade': grade_filter
+        'grade': grade_filter,
+        'fa_year': fa_year_filter
     }
 
     st.markdown("""
@@ -423,7 +432,10 @@ def render_filters(df=None, filters_to_include=None, filter_title="Filters", con
             results['fa_filter'] = fa_filter(conn)
         if 'grade' in filters_to_include:
             results['grade_filter'] = grade_filter(conn, route_types=results.get('route_type'))
+        if 'fa_year' in filters_to_include:
+            fa_year_start, fa_year_end = fa_year_filter(df)
+            results['fa_year'] = (fa_year_start, fa_year_end)
         for filter_name in filters_to_include:
-            if filter_name not in ['date', 'route_tag', 'climbed_routes', 'fa', 'grade'] and filter_name in filter_functions:
+            if filter_name not in ['date', 'route_tag', 'climbed_routes', 'fa', 'grade', 'fa_year'] and filter_name in filter_functions:
                 results[filter_name] = filter_functions[filter_name](df)       
     return results
