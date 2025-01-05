@@ -190,7 +190,8 @@ def create_figure(sends_df, falls_df, ordered_grades):
 st.markdown("""
     <style>
     .block-container {
-        padding-top: 3rem !important; 
+        padding-top: 2rem !important; 
+        padding-bottom: 10rem !important;
     }
     .spotify-header {
         font-size: 1.5rem;
@@ -243,7 +244,7 @@ st.markdown("""
         margin-top: 1rem !important;
     }
     .stExpander {
-        margin-top: 0rem !important;
+        margin-top: -1rem !important;
         margin-bottom: -3rem !important;
     }
             

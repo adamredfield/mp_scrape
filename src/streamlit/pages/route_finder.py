@@ -51,6 +51,13 @@ st.markdown("""
         .streamlit-expanderHeader {
             background-color: black !important;
         }
+            
+        .stButton {
+            margin-bottom: 3rem !important;
+            position: relative;
+            z-index: 2;
+        }
+
     </style>
 """, unsafe_allow_html=True)
 

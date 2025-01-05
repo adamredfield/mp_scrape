@@ -14,18 +14,19 @@ from src.streamlit.chart_utils import create_gradient_bar_chart
 user_id = st.session_state.user_id
 conn = st.connection('postgresql', type='sql')
 
+
 try:
     df = metrics.get_bigwall_routes(conn,user_id=user_id, pitch_preference=st.session_state.pitches_preference)
     
     if df.empty:
         st.error("No big wall routes found for 2024")
         
+
     st.markdown(get_spotify_style(), unsafe_allow_html=True)
     st.markdown("""
         <style>
             .block-container {
-                padding-top: 1rem;
-                padding-bottom: 0;
+                padding-bottom: 5rem;
                 max-width: 100%;
             }
             
@@ -87,18 +88,6 @@ try:
                 font-weight: bold;
                 color: #b3b3b3;
             }
-
-            .streamlit-expanderHeader {
-                font-size: 0.9em !important;
-                color: #b3b3b3 !important;
-                background-color: transparent !important;
-                border: none !important;
-                padding: 4px 12px !important;
-                position: fixed !important;
-                top: 0.5rem !important;
-                left: 4rem !important;
-                z-index: 999 !important;
-            }
             
             .streamlit-expanderHeader svg {
                 font-size: 3em !important;
@@ -109,10 +98,13 @@ try:
                 border: none !important;
                 background-color: transparent !important;
             }
-            
-            .block-container {
-                padding-top: 3rem !important;
                 
+            /* Add space after the plotly chart */
+            .js-plotly-plot {
+                margin-bottom: 10rem !important;
+            } 
+        
+
         </style>
     """, unsafe_allow_html=True)
     

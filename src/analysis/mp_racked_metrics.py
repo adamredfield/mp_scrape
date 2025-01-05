@@ -350,16 +350,18 @@ def get_route_details(conn, grade, clicked_type=None,filtered_types=None, tick_t
         df = df.drop(['grouped_grade'], axis=1)
     return df
 
-def get_highest_rated_climbs(conn, selected_styles=None, route_types=None, year_start=None, year_end=None, tag_type=None, user_id=None):
-
-    """Get highest rated climbs"""
-    style_filter = ""
-    if selected_styles:
-        style_conditions = [
-            f"(',' || STRING_AGG(tav.mapped_tag, ',') || ',') ILIKE '%,{style},%'"
-            for style in selected_styles
-        ]
-        style_filter = f"HAVING {' AND '.join(style_conditions)}"
+def get_classic_climbs(conn, tag_selections=None, route_types=None, year_start=None, year_end=None, tag_type=None, user_id=None):
+    tag_conditions = []
+    if tag_selections:
+        for tag_type, selected_tags in tag_selections.items():
+            if selected_tags:
+                conditions = [
+                    f"(',' || STRING_AGG(CASE WHEN tav.mapped_type = '{tag_type}' THEN tav.mapped_tag END, ',') || ',') ILIKE '%,{tag},%'"
+                    for tag in selected_tags
+                ]
+                tag_conditions.append(f"({' AND '.join(conditions)})")
+    
+    tag_filter = f"HAVING {' AND '.join(tag_conditions)}" if tag_conditions else ""
 
     query = f"""
     {get_deduped_ticks_cte(user_id=user_id, year_start=year_start, year_end=year_end)}
@@ -380,16 +382,16 @@ def get_highest_rated_climbs(conn, selected_styles=None, route_types=None, year_
         r.route_url
     FROM routes.Routes r
     LEFT JOIN analysis.TagAnalysisView tav on r.id = tav.route_id 
-        AND tav.mapped_type = '{tag_type}'
     JOIN deduped_ticks t ON r.id = t.route_id
     WHERE r.num_votes >= 15
+    AND r.avg_stars >= 3.5
     {route_type_filter(route_types)}
     {year_filter(year_range=(year_start, year_end), use_where=False)}
     {add_user_filter(user_id)}
     GROUP BY r.route_name, r.main_area, r.specific_location, r.yds_rating, r.hueco_rating, 
              r.aid_rating, r.danger_rating, r.commitment_grade, r.avg_stars, r.num_votes,
              r.primary_photo_url, r.route_url
-    {style_filter}
+    {tag_filter}
     ORDER BY r.avg_stars DESC, num_votes DESC
     LIMIT 20
     """
@@ -722,27 +724,30 @@ def get_user_year_range(conn, user_id):
     result = conn.query(query)
     return result.iloc[0]['min_year'], result.iloc[0]['max_year']
 
-def get_classics_count(conn, user_id=None, year_start=None, year_end=None, route_types=None, tag_type=None, selected_styles=None):
-    style_filter = ""
-    if selected_styles:
-        style_conditions = [
-            f"(',' || STRING_AGG(tav.mapped_tag, ',') || ',') ILIKE '%,{style},%'"
-            for style in selected_styles
-        ]
-        style_filter = f"HAVING {' AND '.join(style_conditions)}"
+def get_classics_count(conn, user_id=None, year_start=None, year_end=None, route_types=None, tag_type=None, tag_selections=None):
+    tag_conditions = []
+    if tag_selections:
+        for tag_type, selected_tags in tag_selections.items():
+            if selected_tags:
+                conditions = [
+                    f"(',' || STRING_AGG(CASE WHEN tav.mapped_type = '{tag_type}' THEN tav.mapped_tag END, ',') || ',') ILIKE '%,{tag},%'"
+                    for tag in selected_tags
+                ]
+                tag_conditions.append(f"({' AND '.join(conditions)})")
+    
+    tag_filter = f"HAVING {' AND '.join(tag_conditions)}" if tag_conditions else ""
     query = f"""
         SELECT DISTINCT r.id
         FROM routes.Ticks t
         JOIN routes.Routes r ON t.route_id = r.id
         LEFT JOIN analysis.TagAnalysisView tav on r.id = tav.route_id 
-            AND tav.mapped_type = '{tag_type}'
         {year_filter(year_range=(year_start, year_end), use_where=True)}
         {add_user_filter(user_id)}
         {route_type_filter(route_types)}
         AND r.avg_stars >= 3.5
         AND r.num_votes >= 15
         GROUP BY r.id
-        {style_filter};
+        {tag_filter};
     """
     return len(conn.query(query))
 
@@ -772,9 +777,6 @@ def get_available_grades(conn, route_types=None):
     return results.to_dict('records')
 
 def get_routes_for_route_finder(conn, offset=0, routes_per_page=None, route_types=None, tag_selections=None, user_id=None, climbed_filter='All Routes', fa_selection='All FAs', grade_system=None, grade_range=None):
-    print(f"Debug - Route Finder Parameters:")
-    print(f"Grade System: {grade_system}")
-    print(f"Grade Range: {grade_range}")
     tag_conditions = []
     if tag_selections:
         for tag_type, selected_tags in tag_selections.items():
@@ -1043,5 +1045,112 @@ def get_routes_for_route_finder(conn, offset=0, routes_per_page=None, route_type
     LIMIT {routes_per_page} 
     OFFSET {offset}
     """
-    print(query)
+    return conn.query(query)
+
+
+def get_fifty_classics_details(conn, user_id=None):
+    """
+    Get detailed information about the Fifty Classic Climbs.
+    
+    Args:
+        conn: Database connection
+        user_id: User ID to check for ticks
+        
+    Returns:
+        DataFrame with detailed information about the Fifty Classic Climbs
+    """
+    query = f"""
+ WITH latest_ticks AS (
+    SELECT *,
+        ROW_NUMBER() OVER (
+            PARTITION BY route_id 
+            ORDER BY 
+                CASE 
+                    WHEN pitches_climbed IS NULL THEN 1  -- Nulls first
+                    ELSE 0
+                END DESC,
+                pitches_climbed DESC,
+                date DESC       
+        ) as rn
+    FROM routes.ticks t 
+    WHERE 1=1
+    {add_user_filter(user_id)}
+),
+classic_ticks AS (
+    SELECT 
+        route_id,
+        COUNT(*) as ascent_count,
+        (SELECT date FROM latest_ticks WHERE rn = 1 AND route_id = t.route_id) as date,
+        (SELECT type FROM latest_ticks WHERE rn = 1 AND route_id = t.route_id) as style,
+        (SELECT note FROM latest_ticks WHERE rn = 1 AND route_id = t.route_id) as note,
+        (SELECT pitches_climbed FROM latest_ticks WHERE rn = 1 AND route_id = t.route_id) as pitches_climbed
+    FROM routes.ticks t
+    WHERE 1=1
+    {add_user_filter(user_id)}
+    GROUP BY route_id
+)
+    SELECT 
+        r.id,
+        r.route_name,
+        TRIM(NULLIF(CONCAT_WS(' ', 
+            r.yds_rating,
+            r.hueco_rating,
+            r.aid_rating,
+            r.danger_rating,
+            r.commitment_grade), '')) as grade,
+        r.avg_stars,
+        r.pitches,
+        r.length_ft,
+        r.route_type,
+        r.main_area,
+        r.specific_location,
+        STRING_AGG(DISTINCT NULLIF(CASE 
+            WHEN tav.mapped_type = 'style' AND tav.mapped_tag IS NOT NULL 
+            THEN tav.mapped_tag 
+        END, ''), ', ') as styles,
+        STRING_AGG(DISTINCT NULLIF(CASE 
+            WHEN tav.mapped_type = 'feature' AND tav.mapped_tag IS NOT NULL 
+            THEN tav.mapped_tag 
+        END, ''), ', ') as features,
+        STRING_AGG(DISTINCT NULLIF(CASE 
+            WHEN tav.mapped_type = 'descriptor' AND tav.mapped_tag IS NOT NULL 
+            THEN tav.mapped_tag 
+        END, ''), ', ') as descriptors,
+        STRING_AGG(DISTINCT NULLIF(CASE 
+            WHEN tav.mapped_type = 'rock_type' AND tav.mapped_tag IS NOT NULL 
+            THEN tav.mapped_tag 
+        END, ''), ', ') as rock_type,
+        r.primary_photo_url,
+        r.route_url,
+        t.date as tick_date,
+        t.style as tick_style,
+        t.note as tick_notes,
+        CASE 
+            WHEN t.route_id IS NOT NULL THEN true 
+            ELSE false 
+        END as climbed
+    FROM routes.fifty_classics fc
+    JOIN routes.routes r ON r.id = fc.route_id 
+    LEFT JOIN classic_ticks t ON t.route_id = r.id 
+    LEFT JOIN analysis.taganalysisview tav on tav.route_id = r.id
+    GROUP BY 
+        r.id,
+        r.route_name,
+        r.yds_rating,
+        r.hueco_rating,
+        r.aid_rating,
+        r.danger_rating,
+        r.commitment_grade,
+        r.avg_stars,
+        r.pitches,
+        r.length_ft,
+        r.route_type,
+        r.main_area,
+        r.specific_location,
+        t.style,
+        t.note,
+        t.route_id,
+        t.date
+    ORDER BY climbed desc,t.date desc, avg_stars desc;
+    """
     return conn.query(query)

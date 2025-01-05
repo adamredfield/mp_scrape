@@ -30,9 +30,13 @@ st.markdown(get_spotify_style(), unsafe_allow_html=True)
 
 st.markdown("""
     <style>
-             
+        /* Main container */
+        .block-container {
+            padding-bottom: 10rem !important;
+            max-width: 100%;
+        }
         div[data-testid="stExpander"] {
-            margin-top: -80px !important;
+            margin-top: -30px !important;
         }
         
         /* Reset margins for expanders inside tab panels */

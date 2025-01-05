@@ -32,7 +32,6 @@ def get_all_top_first_ascensionists(conn, user_id=None, year_start=None, year_en
     WHERE fa_type IN ('FA', 'FFA', 'FCA')
     GROUP BY fa_name
     ORDER BY fa_count desc
-    LIMIT 10
     """
     result = conn.query(query)
     return ['All FAs'] + result['fa_name'].tolist()

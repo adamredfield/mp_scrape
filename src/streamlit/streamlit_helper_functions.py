@@ -8,6 +8,7 @@ from PIL import Image
 import requests
 from io import BytesIO
 import base64
+from streamlit_js_eval import streamlit_js_eval
 
 sqs = boto3.client('sqs',
         region_name=st.secrets["aws"]["region"],
@@ -428,6 +429,65 @@ def get_squared_image(url):
     except Exception as e:
         print(f"Error loading image from {url}: {e}")
         return None
+
+
+def is_mobile():
+    js_code = """
+    (function() {
+        return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    })();
+    """
+    return streamlit_js_eval(js_expressions=js_code, key='mobile_check')
+
+def get_device_dimensions(key_suffix=''):
+    js_code = """
+    (function() {
+        const dims = {
+            screenWidth: window.screen.width,
+            screenHeight: window.screen.height,
+            devicePixelRatio: window.devicePixelRatio || 1
+        };
+        return dims;
+    })();
+    """
+    return streamlit_js_eval(js_expressions=js_code, key=f'device_dims_{key_suffix}')
+
+
+def is_iphone_dimensions():
+    # Get viewport dimensions
+    dims = get_device_dimensions('iphone_check')
+    if not dims:
+        return False
     
+    # Use screen dimensions since they're reporting correctly
+    width = dims.get('screenWidth')
+    height = dims.get('screenHeight')
+
+    if not width or not height:
+        return False
+    
+    # Common iPhone viewport dimensions (width, height) in portrait mode
+    iphone_dimensions = [
+        (390, 844),  # iPhone 12, 13, 14 Pro
+        (393, 852),  # iPhone 15 Pro
+        (428, 926),  # iPhone 12, 13, 14 Pro Max
+        (430, 932),  # iPhone 15 Pro Max
+        (375, 812),  # iPhone X, XS, 11 Pro
+        (414, 896),  # iPhone XS Max, 11 Pro Max
+        (320, 568),  # iPhone 5/SE
+        (375, 667),  # iPhone 6/7/8
+        (414, 736),  # iPhone 6/7/8 Plus
+    ]
+    
+    # Allow for some flexibility in dimensions (±20 pixels)
+    tolerance = 20
+    dimensions = (width, height)
+    rotated_dimensions = (height, width)
+    
+    return any(
+        all(abs(a - b) <= tolerance for a, b in zip(dimensions, target))
+        or all(abs(a - b) <= tolerance for a, b in zip(rotated_dimensions, target))
+        for target in iphone_dimensions
+    )
     
 
