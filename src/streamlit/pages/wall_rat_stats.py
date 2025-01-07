@@ -1,7 +1,7 @@
-import os
-import sys
 import streamlit as st
 import pandas as pd
+import os
+import sys
 
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(project_root)
@@ -14,13 +14,11 @@ from src.streamlit.chart_utils import create_gradient_bar_chart
 user_id = st.session_state.user_id
 conn = st.connection('postgresql', type='sql')
 
-
 try:
     df = metrics.get_bigwall_routes(conn,user_id=user_id, pitch_preference=st.session_state.pitches_preference)
     
     if df.empty:
         st.error("No big wall routes found for 2024")
-        
 
     st.markdown(get_spotify_style(), unsafe_allow_html=True)
     st.markdown("""
@@ -103,13 +101,10 @@ try:
             .js-plotly-plot {
                 margin-bottom: 10rem !important;
             } 
-        
-
         </style>
     """, unsafe_allow_html=True)
     
     with st.expander("Filters"):
-
         available_grades = sorted([g for g in df['commitment_grade'].unique() if pd.notna(g)])
         selected_grades = st.multiselect(
             'Filter by Commitment Grade:',
@@ -193,14 +188,12 @@ try:
         unsafe_allow_html=True
     )
 
-    # Add spacing before route list
     st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
     
     st.markdown("<div class='list-container'>", unsafe_allow_html=True)
     for i, (_, route) in enumerate(filtered_df.iterrows(), 1):
         expander_label = f"{i}. {route.route_name} - {route.grade} {route.commitment_grade or ''}"
         with st.expander(expander_label):
-            # Route details
             st.markdown(
                 f"""
                 <div class='route-details' style='margin-bottom: 1rem;'>
@@ -218,7 +211,6 @@ try:
                 unsafe_allow_html=True
             )
             
-            # Photo if available
             if pd.notna(route.primary_photo_url):
                 img = get_squared_image(route.primary_photo_url)
                 if img:

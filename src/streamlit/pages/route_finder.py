@@ -1,8 +1,9 @@
 import streamlit as st
 import pandas as pd
+from streamlit_float import *
 import os
 import sys
-from streamlit_float import *
+
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(project_root)
 
@@ -134,7 +135,6 @@ with routes_container:
                     - **Rock Type:** {route['rock_type']}
                 """)
                 
-
     col1, col2, col3 = st.columns([1, 1, 1])
     with col2:
         if st.button("Load More Routes"):
@@ -154,7 +154,6 @@ filter_container.float(
     )
 )
 
-# Float the routes container
 routes_container.float(
     float_css_helper(
         top="10rem",

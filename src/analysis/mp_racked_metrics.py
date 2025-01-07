@@ -10,7 +10,6 @@ from operator import itemgetter
 import pandas as pd
 
 def get_grade_group(grade:str, level:str = 'base') -> str:
-
     if grade.startswith('V'):
         return grade
     if grade.startswith('A') or grade.startswith('C'):
@@ -70,7 +69,6 @@ def get_grade_distribution(conn, route_types=None, level='base', year_start=None
             AND t.type != 'Solo'
         )
         """
-    
     tag_type_filter = ""
     if tag_type:
         placeholders = ', '.join(['%s'] * len(tag_type))
@@ -226,7 +224,6 @@ def grade_sort_key(grade):
             }
             
             modifier_val = aid_modifier_values.get(modifier, 2)
-            
             # A harder than C
             prefix_value = 3000 if prefix == 'A' else 2000
             
@@ -241,7 +238,7 @@ def grade_sort_key(grade):
         if len(cleaned_grade) == 1:  # e.g. 5.9
             return (100, int(cleaned_grade), 0)
         
-  # Grades with letters or modifiers
+        # Grades with letters or modifiers
         base_part = ''
         modifier = ''
         
@@ -482,16 +479,19 @@ def get_length_climbed(conn, area_type="main_area", user_id=None, year_start=Non
     """
     return conn.query(query).itertuples(index=False)
 
-def total_routes(conn, user_id=None, year_start=None, year_end=None):
+def total_routes(conn, user_id=None, year_start=None, year_end=None, route_types=None):
     query = f"""
     SELECT
         date,
         COUNT(DISTINCT route_id)
     FROM routes.Ticks t
+    JOIN routes.routes r on r.id = t.route_id
     {year_filter(year_range=(year_start, year_end), use_where=True)}
     {add_user_filter(user_id)}
+    {route_type_filter(route_types)}
     GROUP BY date
     """
+    print(query)
     return conn.query(query)
 
 def most_climbed_route(conn, user_id=None, year_start=None, year_end=None):
@@ -691,13 +691,16 @@ def regions_sub_areas(conn, user_id=None, year_start=None, year_end=None):
     """
     return conn.query(query).iloc[0,0]
 
-def top_tags(conn, tag_type, user_id=None, year_start=None, year_end=None):
+def top_tags(conn, tag_type, user_id=None, year_start=None, year_end=None, route_types=None):
     
     query = f"""
         {get_deduped_ticks_cte(user_id=user_id, year_start=year_start, year_end=year_end)}
         SELECT tav.mapped_type, tav.mapped_tag tag_value, count(*) as count
         FROM analysis.TagAnalysisView tav 
         JOIN deduped_ticks dt on dt.route_id = tav.route_id
+        JOIN routes.routes r on r.id = dt.route_id
+        WHERE 1=1
+        {route_type_filter(route_types)}
         GROUP BY tav.mapped_type, tav.mapped_tag
         ORDER BY count DESC;
     """
@@ -1050,7 +1053,6 @@ def get_routes_for_route_finder(conn, offset=0, routes_per_page=None, route_type
     print(query)
     return conn.query(query)
 
-
 def get_fifty_classics_details(conn, user_id=None):
     """
     Get detailed information about the Fifty Classic Climbs.
@@ -1157,3 +1159,68 @@ classic_ticks AS (
     ORDER BY climbed desc,t.date desc, avg_stars desc;
     """
     return conn.query(query)
+
+def tag_relationships(conn, primary_type, secondary_type,  route_types=None, year_start=None, year_end=None, user_id=None):
+    query = f"""
+        WITH filtered_routes AS (
+            SELECT DISTINCT r.id as route_id
+            FROM routes.Routes r
+            LEFT JOIN routes.Ticks t ON t.route_id = r.id
+            WHERE 1=1
+            {route_type_filter(route_types)}
+            {year_filter(year_range=(year_start, year_end), use_where=False, table_alias='t')}
+            {add_user_filter(user_id, table_alias='t')}
+        ),
+        primary_counts AS (
+            SELECT 
+                mapped_tag as primary_tag,
+                COUNT(DISTINCT tav.route_id) as count
+            FROM analysis.TagAnalysisView tav
+            JOIN filtered_routes fr ON fr.route_id = tav.route_id
+            WHERE mapped_type = '{primary_type}'
+            GROUP BY mapped_tag
+            HAVING COUNT(DISTINCT tav.route_id) >= 3
+        ),
+        related_counts AS (
+            SELECT 
+                p.mapped_tag as primary_tag,
+                r.mapped_tag as related_tag,
+                COUNT(DISTINCT r.route_id) as count,
+                COUNT(DISTINCT r.route_id)::float / 
+                    (SELECT pc.count 
+                     FROM primary_counts pc 
+                     WHERE pc.primary_tag = p.mapped_tag) as percentage,  -- Fixed this line
+                ROW_NUMBER() OVER (PARTITION BY p.mapped_tag 
+                    ORDER BY COUNT(DISTINCT r.route_id) DESC) as rank
+            FROM analysis.TagAnalysisView p
+            JOIN analysis.TagAnalysisView r ON r.route_id = p.route_id
+            JOIN filtered_routes fr ON fr.route_id = p.route_id
+            WHERE p.mapped_type = '{primary_type}'
+            AND r.mapped_type = '{secondary_type}'
+            AND p.mapped_tag IN (SELECT primary_tag FROM primary_counts)
+            GROUP BY p.mapped_tag, r.mapped_tag
+            HAVING COUNT(DISTINCT r.route_id) >= 3
+        )
+        SELECT 
+            primary_tag || '_' || related_tag as id,
+            related_tag || '<br>' || ROUND(percentage * 100) || '%' as label,
+            primary_tag as parent,
+            count
+        FROM related_counts
+        UNION ALL
+        SELECT 
+            primary_tag as id,
+            primary_tag || '<br>' || count || ' routes' as label,
+            'Root' as parent,
+            count
+        FROM primary_counts
+        UNION ALL
+        SELECT 
+            'Root' as id,
+            '{primary_type.title()}s' as label,
+            '' as parent,
+            (SELECT SUM(count) FROM primary_counts)
+    """
+    print(query)
+    return conn.query(query)
+

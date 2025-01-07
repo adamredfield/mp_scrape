@@ -24,6 +24,9 @@ partnerships = fa_queries.get_collaborative_ascensionists(conn, "All FAs", user_
 st.markdown(get_spotify_style(), unsafe_allow_html=True)
 st.markdown("""
     <style>
+        .st-emotion-cache-ule1sg {
+            margin-top: -.5rem !important;
+        }
         .block-container {
             padding-bottom: 0rem;
             max-width: 100%;
@@ -31,7 +34,7 @@ st.markdown("""
         }
         
         .stDataFrame {
-            margin-bottom: 5rem !important;  /* Extra space after dataframe */
+            margin-bottom: 5rem !important; 
         }
         
         .spotify-header {
@@ -88,10 +91,10 @@ st.markdown("""
         .route-list {
             display: none;
             position: absolute;
-            left: 105%;  /* Position to the right */
+            left: 105%; 
             top: 0;
-            background-color: rgba(26, 26, 26, 0.98);  /* Slightly transparent */
-            backdrop-filter: blur(8px);  /* Blur effect behind */
+            background-color: rgba(26, 26, 26, 0.98); 
+            backdrop-filter: blur(8px);
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 8px;
             padding: 1rem;
@@ -126,10 +129,10 @@ st.markdown("""
     
         .item-details {
             color: #b3b3b3;
-                        margin-right: 2rem;  /* Add right margin to move text left */
+            margin-right: 2rem;
         }
         .list-item:hover {
-            opacity: 0.8;  /* Subtle hover effect */
+            opacity: 0.8;
         }
         .streamlit-expander {
             border: none !important;

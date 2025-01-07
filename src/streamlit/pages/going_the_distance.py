@@ -24,13 +24,10 @@ def get_day_type(length):
         if length >= threshold:
             return f"{name} {emoji}"
 
-
 st.markdown(get_spotify_style(), unsafe_allow_html=True)
-
 
 st.markdown("""
     <style>
-        /* Main container */
         .block-container {
             padding-bottom: 10rem !important;
             max-width: 100%;
@@ -39,7 +36,6 @@ st.markdown("""
             margin-top: -30px !important;
         }
         
-        /* Reset margins for expanders inside tab panels */
         div[role="tabpanel"] div[data-testid="stExpander"] {
             margin-top: 0 !important;
             margin-bottom: 10px !important;
@@ -60,19 +56,16 @@ st.markdown("""
             gap: 0.2rem
         }
             
-        /* Target the container of the stat-card */
         div:has(> .stat-card) {
             margin-top: 1rem !important;
         }
         
-        /* Card title styling */
         .stat-card h3 {
             color: #b3b3b3 !important;
             font-size: 1.1rem !important;
             margin-bottom: -1rem !important;
             font-weight: normal !important;
-            line-height: 1;
-            
+            line-height: 1;        
         }
         
         .big-number {
@@ -89,7 +82,7 @@ st.markdown("""
             margin: 0.2rem !important;
             line-height: 1 !important;
         }
-        /* Biggest Day specific styles */
+            
         .total-section {
             background: rgba(30, 215, 96, 0.1);
             border-radius: 8px;
@@ -108,7 +101,6 @@ st.markdown("""
             text-align: center;
             padding: 0.25rem 0;
         }
-        
         
         .total-label {
             color: #888;
@@ -151,12 +143,10 @@ st.markdown("""
             margin-top: -10px;  /* Add this line to pull cards up */
         }
 
-        /* Also adjust the container margin */
         [data-testid="stTabs"] {
             margin-top: -1rem !important;  /* Reduce from 2rem to 1rem */
         }
         
-        /* Mobile responsiveness */
         @media (max-width: 768px) {
             .total-section {
                 min-width: 150px;
@@ -172,7 +162,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Check authentication
 if 'authenticated' not in st.session_state or not st.session_state['authenticated']:
     st.warning('⚠️ Please enter your Mountain Project URL or User ID on the home page first.')
     st.stop()
@@ -191,10 +180,8 @@ try:
     start_year = filters.get('year_start')
     end_year = filters.get('year_end')
     
-    # Create three columns for the top stats
     col1, col2, col3 = st.columns(3)
     
-    # Column 1: Total Length
     with col1:
         length_data = metrics.get_length_climbed(conn, user_id=user_id, year_start=start_year, year_end=end_year, pitch_preference=st.session_state.pitches_preference)
         length_df = pd.DataFrame(length_data, columns=['Year', 'Location', 'Length'])
@@ -221,11 +208,9 @@ try:
             gap: 100px;
             justify-content: center !important;
         }
-                
-        
-        /* If needed, also adjust the container padding */
+                 
         .stTabs {
-            padding: 0 12px;  /* Add horizontal padding to the tab container */
+            padding: 0 12px;
         }
     </style>
     """, unsafe_allow_html=True)
@@ -244,7 +229,6 @@ try:
             </div>
         """, unsafe_allow_html=True)
         
-        # Add spacing between "Group Areas By" and radio buttons
         st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
 
         container = st.container()
@@ -278,7 +262,6 @@ try:
 
         st.markdown("</div>", unsafe_allow_html=True)
 
-        # Get data based on selected filter
         if area_type[0] == 'region':
             areas_data = metrics.states_climbed(conn, user_id=user_id, year_start=start_year, year_end=end_year)
             total_count = metrics.regions_climbed(conn, user_id=user_id, year_start=start_year, year_end=end_year)
@@ -311,7 +294,7 @@ try:
                     margin-bottom: 0.5rem;
                     padding: 0.5rem;
                     border-radius: 4px;
-                    max-width: 400px;  /* Add this to control width */
+                    max-width: 400px;
                     margin-left: auto;
                     margin-right: auto;
                 }
@@ -346,7 +329,6 @@ try:
                 }
         """, unsafe_allow_html=True)
 
-        # Create the areas HTML string
         for i, (area, days, routes) in enumerate(areas_data[:5], 1):
             st.markdown(
                 f"""
@@ -370,7 +352,6 @@ try:
             unsafe_allow_html=True
         )
 
-        # Get length data and create chart
         length_data = metrics.get_length_climbed(
             conn, 
             area_type=area_type[0],
@@ -382,7 +363,6 @@ try:
         
         st.markdown("<div style='margin-top: 40px;'></div>", unsafe_allow_html=True)
 
-            # Create horizontal bar chart
         fig = go.Figure(data=[
             go.Bar(
                 y=length_df['Location'],
@@ -392,7 +372,6 @@ try:
             )
         ])
         
-        # Update layout
         fig.update_layout(
             paper_bgcolor='black',
             plot_bgcolor='black',
@@ -425,11 +404,9 @@ try:
                 color='#b3b3b3'
             )
         )
-        
         st.plotly_chart(fig, use_container_width=True)
     
-    with tab2:
-        
+    with tab2: 
         try:
             if 'previous_filter_state' not in st.session_state:
                 st.session_state.previous_filter_state = (None, None)
@@ -443,7 +420,6 @@ try:
                 st.session_state.previous_filter_state = current_filter_state
 
             day_types = {
-                # Regular achievements
                 "Cragging Day": (0, "🧗‍♂️"),        
                 "Castleton Day": (400, "🏰"),       
                 "Devil's Tower Day": (700, "😈"),   
@@ -459,7 +435,7 @@ try:
                 "Cerro Torre Day": (4000, "🗡️"),    
                 "Great Trango Day": (4400, "🌎"),   
                 "Emperor Face Day": (4900, "👑"),   #
-                # Special combinations
+
                 "Yosemite Double Day": (5000, "⚡🌓"),     # El Cap + Half Dome
                 "El Cap Double Day": (6000, "⚡⚡"),        # Two El Cap routes
                 "Yosemite Triple Day": (7200, "👑⚡🌓"),    # El Cap + Half Dome + Mt Watkins
@@ -500,7 +476,6 @@ try:
 
                 major_routes_exist = any(grade.strip() in ["V", "VI", "VII"] for grade in commitment_grades)
           
-
                 if st.session_state.needs_verification and major_routes_exist:
                     major_route = next((route for route, grade in zip(route_list, commitment_grades) 
                                         if grade.strip() in ["V", "VI", "VII"]), None)
@@ -508,7 +483,6 @@ try:
                     if major_route:
                         route_name = major_route.split(" ~ ")[0]
 
-                        # this controls just the buttons in tab 2 leaving filter and sidebar buttons unaffected
                         st.markdown("""
                             <style>
                             .element-container:has(#verify-radio-after) + div div[role="radiogroup"] {
@@ -591,7 +565,6 @@ try:
                     else:
                         formatted_date = date.strftime('%b %d, %Y')
                         
-                    
                     with st.container():
                         st.markdown(f"""
                             <div style="
@@ -662,10 +635,8 @@ try:
                                         """,
                                         unsafe_allow_html=True
                                     )
-
         except Exception as e:
             st.error(f"Error: {str(e)}")
                 
-
 except Exception as e:
     st.error(f"Error: {str(e)}")

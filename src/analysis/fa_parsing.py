@@ -7,7 +7,6 @@ def parse_section(section, ascent_type, date_patterns, year_pattern) -> list[dic
     
     year = None
     
-    # First try to find a full year anywhere in the text
     full_year_match = re.search(r'\b(?:18|19|20)\d{2}\b', section)
     if full_year_match:
         year = full_year_match.group()
@@ -26,7 +25,7 @@ def parse_section(section, ascent_type, date_patterns, year_pattern) -> list[dic
                     year_num = int(year)
                     year = f"20{year}" if year_num < 50 else f"19{year}"
                 elif len(year) == 4:
-                    year = year  # Keep 4-digit years as is
+                    year = year
                     
                 section = re.sub(pattern, '', section)
                 break
@@ -41,7 +40,6 @@ def parse_section(section, ascent_type, date_patterns, year_pattern) -> list[dic
                 # Remove the entire match from the section
                 matched_text = re.escape(full_match)
                 section = re.sub(f'{matched_text}', '', section).strip()
-
     # Process names
     for name in process_names(section):
         cleaned_name = clean_name(name)
@@ -51,7 +49,6 @@ def parse_section(section, ascent_type, date_patterns, year_pattern) -> list[dic
                 'type': ascent_type,
                 'year': year
             })
-    
     return results
 
 def parse_fa_data(fa_string) -> list[dict]:
@@ -82,20 +79,15 @@ def parse_fa_data(fa_string) -> list[dict]:
         ('fa', 'FA'),    # First Ascent
     ]
 
-    # Split and process each section
     remaining_text = fa_string
     for search_type, result_type in ascent_types:
         sections = re.split(rf'{search_type}\W*', remaining_text, maxsplit=1, flags=re.IGNORECASE)
         if len(sections) > 1:
-            # Process this section
             results.extend(parse_section(sections[1], result_type, date_patterns, year_pattern))
-            # Update remaining text to be everything before this section
             remaining_text = sections[0]
     
-    # Process any remaining text as FA if it contains names
     if remaining_text.strip():
         results.extend(parse_section(remaining_text, 'FA', date_patterns, year_pattern))
-
     return results
 
 def clean_year(year_str):
@@ -104,13 +96,13 @@ def clean_year(year_str):
         return None
     
     try:
-        # First check if it's a decade (ends with 's or s)
+        # check if it's a decade (ends with 's or s)
         if year_str.lower().endswith('s') or year_str.lower().endswith("'s"):
-            # Extract the base year
+            # Extract base year
             base_year = re.search(r'(?:18|19|20)?\d{2}|\d{4}', year_str).group()
             if len(base_year) == 2:
                 base_year = f"19{base_year}"
-            # Return middle of decade
+            # Return middle of decade (1950s = 1965)
             return str(int(base_year) + 5)
         
         # Handle 4-digit years
@@ -136,58 +128,56 @@ def clean_year(year_str):
 
 def clean_name(name):
     """Clean and standardize climber names"""
-    # Remove leading/trailing punctuation and #b3b3b3space
+    # Remove leading/trailing punctuation
     name = re.sub(r'^[\W_]+|[\W_]+$', '', name)
 
     # Remove common noise words and patterns
     noise_patterns = [
-        r'\b(?:and|with)\b',  # Common conjunctions
-        r'\b(?:trad|sport|mixed|aid|free|solo|1st|first|then|bolted)\b',  # Climbing terms
-        r'\b(?:gear|now|retrobolted)\b',  # Gear-related terms
-        r'\b(?:or earlier|or later)\b',  # Approximate date terms
-        r'\b(?:did|the|ascent|first|free|ascent)\b',  # Ascent-related terms
-        r'\b(?:company|partner|partners)\b',  # Generic climber terms
-        r'\b(?:lead|leads|leader|leading|led)\b',  # Lead-related terms
-        r'\b(?:original|originally)\b',  # Original-related terms
-        r'\b(?:1st|first)\b',  # Ordinal indicators
-        r'(?:P|p)\d+(?:[-:]|\s+[-:]|\s*[.:])\s*',  # Single pitch indicators with flexible spacing
-        r'(?:P|p)\d+[-\s]*[-–]\s*(?:P|p)?\d+[-:]?\s*[.:]?\s*',  # Pitch ranges with flexible format
-        r'(?:^|\s*\.?\s*)(?:P|p)?\d+[-:]?\s*[.:]',  # Leading pitch indicators with optional P
-        r'(?:^|\s*\.?\s*)(?:P|p)?\d+[-\s]*[-–]\s*\d+[-:]?\s*[.:]?',  # Pitch ranges without requiring P
-        r'(?:^|\s*\.?\s*)(?:P|p)?\d+(?:[-:]|\s+[-:]|\s*[.:])\s*',  # Single pitch indicators
-        r'\.\s*\d+[-:]?\s*[.:]',  # Just numbers with dots/colons
-        r'\d{1,2}[-/]\d{1,2}[-/](?:20)?\d{2}',  # Modern date formats
-        r'\d{1,2}/\d{1,2}(?:/\d{2,4})?',  # Other date formats
+        r'\b(?:and|with)\b', 
+        r'\b(?:trad|sport|mixed|aid|free|solo|1st|first|then|bolted)\b', 
+        r'\b(?:gear|now|retrobolted)\b', 
+        r'\b(?:or earlier|or later)\b', 
+        r'\b(?:did|the|ascent|first|free|ascent)\b',
+        r'\b(?:company|partner|partners)\b',
+        r'\b(?:lead|leads|leader|leading|led)\b',
+        r'\b(?:original|originally)\b', 
+        r'\b(?:1st|first)\b', 
+        r'(?:P|p)\d+(?:[-:]|\s+[-:]|\s*[.:])\s*', 
+        r'(?:P|p)\d+[-\s]*[-–]\s*(?:P|p)?\d+[-:]?\s*[.:]?\s*', 
+        r'(?:^|\s*\.?\s*)(?:P|p)?\d+[-:]?\s*[.:]', 
+        r'(?:^|\s*\.?\s*)(?:P|p)?\d+[-\s]*[-–]\s*\d+[-:]?\s*[.:]?',  
+        r'(?:^|\s*\.?\s*)(?:P|p)?\d+(?:[-:]|\s+[-:]|\s*[.:])\s*',  
+        r'\.\s*\d+[-:]?\s*[.:]',
+        r'\d{1,2}[-/]\d{1,2}[-/](?:20)?\d{2}', 
+        r'\d{1,2}/\d{1,2}(?:/\d{2,4})?', 
         r'\b(?:january|february|march|april|may|june|july|august|september|october|november|december)\b(?:\s+(?:\d{1,4}|early|late|mid|spring|summer|fall|winter)|\s*$)',
         r'\b(?:jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)\b(?:\s+(?:\d{1,4}|early|late|mid|spring|summer|fall|winter)|\s*$)',
-        r'\b(?:spring|summer|fall|winter)\b',  # Seasons
-        r'\b(?:early|late|mid)\b',  # Time period modifiers
-        r'\b(?:circa|c\.|ca\.|approximately|approx\.)\b',  # Approximate date indicators
-        r'\b(?:unknown|various)\b',  # Unknown climbers
-        r'\b(?:et\.? al\.?)\b',  # Et al.
-        r'\b(?:did the first free ascent)\b',  # Common phrases
-        r'\b(?:ffa|fa)\b',  # Remove type indicators within names
-        r'\b(?:on|in|at|by|the)\b',  # Common prepositions and articles
-        r'\b\d{4}\b',  # Years
-        r'\?',  # Question marks
+        r'\b(?:spring|summer|fall|winter)\b', 
+        r'\b(?:early|late|mid)\b',  
+        r'\b(?:circa|c\.|ca\.|approximately|approx\.)\b', 
+        r'\b(?:unknown|various)\b', 
+        r'\b(?:et\.? al\.?)\b',  
+        r'\b(?:did the first free ascent)\b',  
+        r'\b(?:ffa|fa)\b', 
+        r'\b(?:on|in|at|by|the)\b', 
+        r'\b\d{4}\b',  
+        r'\?',  
     ]
     
     for pattern in noise_patterns:
         name = re.sub(pattern, '', name, flags=re.IGNORECASE)
     
     # Clean up any remaining artifacts
-    name = re.sub(r'\s+', ' ', name)  # Replace multiple spaces with single space
+    name = re.sub(r'\s+', ' ', name) 
     name = name.strip()
     
     # Skip if only numbers/spaces/symbols remain or if it's a generic term
     if (not name or 
         re.match(r'^[\d\s\W]+$', name) or 
-        name.lower() in ['company', 'partner', 'partners', 'lead', 'original']):  # Added more skip words
+        name.lower() in ['company', 'partner', 'partners', 'lead', 'original']): 
         return ""
     
-    # Capitalize first letter of each word
     name = ' '.join(word.capitalize() for word in name.split())
-    
     return name
 
 def process_names(section):
@@ -200,7 +190,6 @@ def process_names(section):
     for part in parts:
         # If we have "and" or "&", check for shared last name pattern
         if ' and ' in part.lower() or ' & ' in part.lower():
-            # First split the entire string into words
             words = part.split()
             
             # Find the position of 'and' or '&'
@@ -213,7 +202,7 @@ def process_names(section):
             # Check for the shared last name pattern (two first names followed by one last name ie "Jan and Herb Conn")
             if (connector_pos > 0 and 
                 connector_pos < len(words) - 1 and 
-                len(words) == connector_pos + 3 and  # Exactly: FirstName and FirstName LastName
+                len(words) == connector_pos + 3 and 
                 # Make sure first parts don't already contain spaces (full names)
                 ' ' not in words[0] and 
                 ' ' not in words[connector_pos + 1]):
@@ -228,11 +217,9 @@ def process_names(section):
                     name_pairs.append(f"{first2} {last_name}")
                     continue
             
-            # If pattern doesn't match or it's not a known case, split normally
             names = re.split(r'\s+(?:and|&)\s+', part, flags=re.IGNORECASE)
             name_pairs.extend(names)
         else:
-            # No "and" or "&", just add the whole part
             name_pairs.append(part)
     
     return [name.strip() for name in name_pairs if name.strip()]

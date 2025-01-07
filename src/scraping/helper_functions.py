@@ -28,7 +28,6 @@ def get_proxy_url():
     return proxy_url
 
 def login_and_save_session(playwright):
-
     browser = None
     context = None
     page = None
@@ -95,8 +94,8 @@ def fetch_dynamic_page_content(page, route_link, max_retries=3):
                 while True:
                     page.evaluate("window.scrollTo(0, document.body.scrollHeight)")  # Scroll down
                     page.wait_for_timeout(1000)
-                    new_height = page.evaluate("document.body.scrollHeight")  # Get new scroll height
-                    if new_height == last_height:  # Stop if no change in scroll height
+                    new_height = page.evaluate("document.body.scrollHeight")
+                    if new_height == last_height:
                         break
                     last_height = new_height
                     

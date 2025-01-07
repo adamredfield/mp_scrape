@@ -22,7 +22,6 @@ filters = render_filters(
     filters_to_include=['grade_grain', 'route_type', 'date', 'tick_type'],
     filter_title="Filter your data") 
 
-
 @st.cache_data
 def get_chart_data(_conn, user_id, grade_grain, route_type, year_start, year_end, tick_types=None):
     """Cache the data fetching"""
@@ -127,7 +126,7 @@ def create_figure(sends_df, falls_df, ordered_grades):
     else:
         tick_interval = 10
         
-    # Generate evenly spaced ticks
+    # evenly spaced ticks
     tick_vals = []
     tick_texts = []
     current = -max_val
@@ -299,7 +298,6 @@ chart_container = st.container()
 details_container = st.container()
 
 with chart_container:
-    # Enable selection events
     selected = st.plotly_chart(
         fig,
         use_container_width=True,
@@ -335,7 +333,6 @@ with chart_container:
         key="grade_dist_chart"
                 )
 
-# Handle selection events
 if selected and selected.selection and len(selected.selection.points) > 0:
         point = selected.selection.points[0]
         

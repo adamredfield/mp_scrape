@@ -12,7 +12,6 @@ def create_bar_chart(
     BAR_GAP = 0.2
     MARGIN = dict(l=30, r=20, t=30, b=40)
     
-    # Create figure with swapped coordinates if horizontal orientation
     fig = go.Figure(data=[
         go.Bar(
             x=y_data if orientation == 'h' else x_data,
@@ -30,7 +29,6 @@ def create_bar_chart(
         tickfont=dict(size=10)
     )
     
-    # Update layout
     fig.update_layout(
         title=dict(
             text=title,
@@ -90,7 +88,6 @@ def create_gradient_bar_chart(df, x_col, y_col, title):
 
     fig = go.Figure()
     
-    # Group by area and apply color gradient
     for area in df[y_col].unique():
         area_data = df[df[y_col] == area]
         colors = generate_color_gradient(len(area_data))

@@ -2,7 +2,9 @@ import os
 import sys
 import streamlit as st
 import pandas as pd
+import plotly.graph_objects as go
 from streamlit_float import *
+import streamlit.components.v1 as components
 
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(project_root)
@@ -11,18 +13,18 @@ from src.streamlit.streamlit_helper_functions import get_squared_image, image_to
 import src.analysis.mp_racked_metrics as metrics
 from src.streamlit.filters import render_filters
 from src.analysis.filters_ctes import available_years
-import streamlit.components.v1 as components
 from src.streamlit.styles import get_spotify_style
-import plotly.graph_objects as go
 
 st.markdown("""
     <style>
         /* Add bottom padding to tab panels to prevent cutoff */
         .stTabs [data-baseweb="tab-panel"] {
             padding-top: 0 !important;
-            padding-bottom: 10rem !important;  /* Add space at bottom */
+            padding-bottom: 10rem !important;
         }
-        
+        .st-emotion-cache-ule1sg {
+            margin-top: -.25rem !important;
+        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -38,8 +40,6 @@ def process_image(photo_url, route_name):
 
 @st.fragment
 def load_and_display_image(route_id, photo_url, route_name):
-    """Fragment for handling image loading and display"""
-
     container = st.empty()
 
     if route_id not in st.session_state.loaded_images:
@@ -172,8 +172,7 @@ st.markdown("""
             margin-top: -1rem !important; 
             position: relative;
             z-index: 2;
-        }
-            
+        }       
     </style>
 """, unsafe_allow_html=True)      
 
@@ -238,7 +237,6 @@ with tab1:
                     <div class="style-subtitle">{date_text}</div>
                     <div style="color: #B3B3B3; font-size: 0.8rem; margin-top: 0.5rem;">
                         Routes with 3.5 stars and 15 votes<br>
-                        *Highlighted in Gold below
                     </div>
                 </div>
             </div>
@@ -257,7 +255,6 @@ with tab1:
 
 
 with tab2:
-
     def create_radial_gauge(value, max_value=50):
 
         percentage = (value / max_value) * 100
@@ -293,7 +290,6 @@ with tab2:
             margin=dict(l=30, r=30, t=50, b=20)
         )
         
-        # Add percentage as a subtitle
         fig.add_annotation(
             text=f"{value}/50 • {int(percentage)}%",
             xref="paper",
@@ -311,11 +307,8 @@ with tab2:
     total_climbed = fifty_classics['climbed'].sum()
     total_classics = 50
 
-
     st.markdown("""
         <style> 
-            
-            /* Reduce space around the plotly chart */
             .js-plotly-plot {
                 margin-top: 0rem !important;
                 margin-bottom: 0rem !important;
@@ -354,10 +347,9 @@ with tab2:
                     - **Length:** {int(route['length_ft']) if pd.notna(route['length_ft']) else 'N/A'} ft
                     - **Pitches:** {int(route['pitches']) if pd.notna(route['pitches']) else 'N/A'}
                     - **Rating:** {'⭐' * int(route['avg_stars']) if pd.notna(route['avg_stars']) else 'N/A'}
-                    
-                    **Style:** {route['styles'] if pd.notna(route['styles']) else 'N/A'}  
-                    **Features:** {route['features'] if pd.notna(route['features']) else 'N/A'}  
-                    **Rock Type:** {route['rock_type'] if pd.notna(route['rock_type']) else 'N/A'}
+                    - **Style:** {route['styles'] if pd.notna(route['styles']) else 'N/A'}  
+                    - **Features:** {route['features'] if pd.notna(route['features']) else 'N/A'}  
+                    - **Rock Type:** {route['rock_type'] if pd.notna(route['rock_type']) else 'N/A'}
                     
                     [:green[View on Mountain Project ↗]]({route['route_url']})
                 """)

@@ -11,7 +11,7 @@ from playwright.sync_api import sync_playwright
 from src.scraping.helper_functions import login_and_save_session, fetch_dynamic_page_content, parse_route_data, parse_route_comments_data, get_total_pages
 
 STATE_IDS = {
-    "Alabama": "105905173",
+    '''"Alabama": "105905173",
     "Alaska": "105909311",
     "Arizona": "105708962",
     "Arkansas": "105901027",
@@ -59,7 +59,7 @@ STATE_IDS = {
     "Virginia": "105852400",
     "Washington": "105708966",
     "West Virginia": "105855459",
-    "Wisconsin": "105708968",
+    "Wisconsin": "105708968",'''
     "Wyoming": "105708960"
 }
 
