@@ -35,7 +35,7 @@ st.markdown("""
         }
         
         .stDataFrame {
-            margin-bottom: 5rem !important; 
+            margin-bottom: 10rem !important; 
         }
         
         .spotify-header {
