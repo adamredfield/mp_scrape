@@ -1054,7 +1054,12 @@ def get_routes_for_route_finder(conn, offset=0, routes_per_page=None, route_type
         STRING_AGG(DISTINCT NULLIF(CASE 
             WHEN tav.mapped_type = 'rock_type' AND tav.mapped_tag IS NOT NULL 
             THEN tav.mapped_tag 
-        END, ''), ', ') as rock_type
+        END, ''), ', ') as rock_type,
+        EXISTS (
+            SELECT 1 FROM routes.Ticks t 
+            WHERE t.route_id = r.id 
+            AND t.user_id = '{user_id}'
+        ) as climbed
         from routes.routes r
         LEFT JOIN estimated_lengths el on el.id = r.id
         left join estimated_pitches ep on ep.id = r.id
@@ -1099,7 +1104,7 @@ def get_routes_for_route_finder(conn, offset=0, routes_per_page=None, route_type
     except Exception as e:
         print(f"Error in get_routes_for_route_finder: {str(e)}")
         print(f"Query was: {query}")
-        return pd.DataFrame()  # Return empty DataFrame instead of None
+        return pd.DataFrame()
 
 def get_fifty_classics_details(conn, user_id=None):
     """

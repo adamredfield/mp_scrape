@@ -122,9 +122,16 @@ with routes_container:
     )
     
     if not new_routes.empty:
-        st.session_state.all_loaded_routes.extend(new_routes.to_dict('records'))
+        new_records = new_routes.to_dict('records')
+        existing_ids = {route['id'] for route in st.session_state.all_loaded_routes}
+        new_unique_routes = [
+            route for route in new_records 
+            if route['id'] not in existing_ids
+        ]
+        st.session_state.all_loaded_routes.extend(new_unique_routes)
     for i, route in enumerate(st.session_state.all_loaded_routes):
-        expander_title = f' **{i + 1}. {route['route_name']}** - {route['main_area']} :green[{route['grade']}]'
+        climbed_icon = "✅ " if route['climbed'] else ""
+        expander_title = f' **{climbed_icon}{i + 1}. {route['route_name']}** - {route['main_area']} :green[{route['grade']}]'
         
         with st.expander(expander_title, expanded=False):
             col1, col2 = st.columns([1, 2])
