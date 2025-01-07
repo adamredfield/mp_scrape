@@ -131,11 +131,20 @@ def add_grade_filter(grade_system, grade_range):
     """
 
 def fa_year_filter(fa_year_start, fa_year_end):
-    """Get routes based on filters including FA year"""
+    if fa_year_start is None and fa_year_end is None:
+        return ""  # No year filter, return all routes including NULL years
     
-    fa_year_condition = ""
     if fa_year_start and fa_year_end:
-        fa_year_condition = f"""
+        return f"""
             AND fa.year BETWEEN {fa_year_start} AND {fa_year_end}
         """
-    return fa_year_condition
+    elif fa_year_start:
+        return f"""
+            AND fa.year >= {fa_year_start}
+        """
+    elif fa_year_end:
+        return f"""
+            AND fa.year <= {fa_year_end}
+        """
+    
+    return ""

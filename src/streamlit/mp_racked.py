@@ -47,7 +47,7 @@ if not (is_mobile_device or is_iphone_dims):
         st.error(f"""
             This app requires either:
             1. A mobile device, or
-            2. A browser window set to iPhone dimensions
+            2. A browser window set to mobile dimensions
             
             Current screen dimensions: {dims.get('screenWidth')}x{dims.get('screenHeight')}
             Device pixel ratio: {dims.get('devicePixelRatio')}

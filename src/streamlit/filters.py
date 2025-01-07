@@ -346,20 +346,33 @@ def grade_filter(conn, route_types=None, user_id=None, year_start=None, year_end
     return None, None
 
 def fa_year_filter(df=None):
-    """Filter for FA year range using a slider"""
+    """Filter for FA year range using a select slider with None option"""
 
     print("Starting FA year filter")
     
-    fa_year_start, fa_year_end = st.select_slider(
-        'First Ascent Year Range',
-        options=list(range(1900, 2025)),
-        value=(1900, 2024),
-        key='fa_year_filter'
+    # Create options list with None option
+    year_options = [None] + list(range(1900, 2025))
+    
+    # Add radio to toggle between all years and specific range
+    filter_type = st.radio(
+        "FA Year Filter",
+        ["All Years", "Specific Range"],
+        label_visibility="collapsed"
     )
     
-    print(f"FA year filter values: {fa_year_start} - {fa_year_end}")
-    
-    return fa_year_start, fa_year_end
+    if filter_type == "All Years":
+        return None, None
+    else:
+        fa_year_start, fa_year_end = st.select_slider(
+            'First Ascent Year Range',
+            options=list(range(1900, 2025)),
+            value=(1900, 2024),
+            key='fa_year_filter'
+        )
+        
+        print(f"FA year filter values: {fa_year_start} - {fa_year_end}")
+        
+        return fa_year_start, fa_year_end
 
 def render_filters(df=None, filters_to_include=None, filter_title="Filters", conn=None, user_id=None, default_years=None):
     """

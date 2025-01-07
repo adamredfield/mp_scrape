@@ -108,49 +108,7 @@ def verify_user_exists(conn, user_id):
             st.rerun()
         return False
 
-def pitch_preference_form(continue_container, info_msg, details_msg, refresh_container):
-    
-    st.info("Please indicate usage of pitch option for ticks:")
-                    
-    with st.form("pitch_usage_form"):
-        choice = st.radio(
-            "For The Nose, would 11 pitches mean...", 
-            options=["A", "B"],
-            captions=[
-                "Partial ascent (Dolt Run = 11/31 pitches)",
-                "Pitch count of full ascent (simul in 11 pitches)"
-            ],
-            horizontal=True, 
-            key="pitch_usage"
-        )
-
-        submitted = st.form_submit_button("Save Preference")
-        if submitted:
-            print("Form submitted!")
-            if choice:
-                continue_container.empty()
-                st.session_state.show_form = True
-                info_msg.empty()
-                details_msg.empty()
-                refresh_container.empty()
-                preference = 'partial' if choice == "A" else 'simul'
-                st.session_state.pitches_preference = preference
-                st.session_state.data_status = 'ready'
-                st.success(f"Preference saved: Racking up...")
-                time.sleep(1.5)
-                return True
-            else:
-                st.error("Please make a selection")
-                return False
-
 def get_user_id(conn):
-    debug = st.empty()
-    debug.text(f"""[DEBUG] Session States:
-    - user_id: {st.session_state.get('user_id')}
-    - data_status: {st.session_state.get('data_status')}
-    - pitches_preference: {st.session_state.get('pitches_preference')}
-    - waiting_for_update: {st.session_state.get('waiting_for_update')}
-    """)
     """Handle user identification"""
     if 'user_id' not in st.session_state:
         st.session_state.user_id = None
@@ -442,7 +400,6 @@ def get_squared_image(url):
     except Exception as e:
         print(f"Error loading image from {url}: {e}")
         return None
-
 
 def is_mobile():
     js_code = """

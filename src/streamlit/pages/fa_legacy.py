@@ -25,12 +25,13 @@ st.markdown(get_spotify_style(), unsafe_allow_html=True)
 st.markdown("""
     <style>
         .st-emotion-cache-ule1sg {
-            margin-top: -.5rem !important;
+            margin-top: -.1rem !important;
         }
         .block-container {
             padding-bottom: 0rem;
             max-width: 100%;
-            padding: 2rem 1rem 10rem 1rem !important;
+            padding: -2rem!important;
+            margin-top: -2rem !important;
         }
         
         .stDataFrame {
@@ -124,11 +125,11 @@ st.markdown("""
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);  
         }
         .item-name {
-            color: #b3b3b3;
+            color: #F5F5F5;
         }
     
         .item-details {
-            color: #b3b3b3;
+            color: #F5F5F5;
             margin-right: 2rem;
         }
         .list-item:hover {
@@ -143,7 +144,7 @@ st.markdown("""
 
         .streamlit-expanderHeader {
             border-bottom: none !important;
-            color: #b3b3b3 !important;
+            color: #F5F5F5 !important;
             font-size: 1em !important;
             padding: 0.5rem 0 !important;
         }
@@ -167,7 +168,7 @@ st.markdown("""
             max-width: 800px;
         }
         .dataframe td {
-            #b3b3b3-space: normal !important;
+            #F5F5F5-space: normal !important;
             padding: 0.5rem !important;
         }
     """, unsafe_allow_html=True)

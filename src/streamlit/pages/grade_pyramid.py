@@ -148,16 +148,16 @@ def create_figure(sends_df, falls_df, ordered_grades):
             'y': 1.02,
             'xanchor': 'center',
             'x': 0.4,
-            'font': {'color': '#b3b3b3'},
+            'font': {'color': '#F5F5F5'},
             'groupclick': 'toggleitem', 
             'itemsizing': 'constant'
         },
         xaxis=dict(
             title='Number of Climbs',
-            color='#b3b3b3',
+            color='#F5F5F5',
             gridcolor='rgba(255,255,255,0.1)',
             zeroline=True,
-            zerolinecolor='#b3b3b3',
+            zerolinecolor='#F5F5F5',
             zerolinewidth=0.5,
             tickmode='array',
             ticktext=tick_texts,
@@ -168,7 +168,7 @@ def create_figure(sends_df, falls_df, ordered_grades):
         ),
         yaxis=dict(
             title='Grade',
-            color='#b3b3b3',
+            color='#F5F5F5',
             gridcolor='rgba(255,255,255,0.1)',
             categoryorder='array',
             categoryarray=ordered_grades[::-1],
@@ -217,7 +217,7 @@ st.markdown("""
     }
     
     .total-label {
-        color: #b3b3b3;
+        color: #F5F5F5;
         font-size: 1rem;
         margin-bottom: 0.5rem;
     }

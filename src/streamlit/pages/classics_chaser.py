@@ -235,7 +235,7 @@ with tab1:
                 <div style="text-align: center;">
                     <div class="style-title">{classics_count} Classic Routes Climbed 🏆</div>
                     <div class="style-subtitle">{date_text}</div>
-                    <div style="color: #B3B3B3; font-size: 0.8rem; margin-top: 0.5rem;">
+                    <div style="color: #F5F5F5; font-size: 0.8rem; margin-top: 0.5rem;">
                         Routes with 3.5 stars and 15 votes<br>
                     </div>
                 </div>
@@ -269,7 +269,7 @@ with tab2:
                     'range': [None, 50], 
                     'tickwidth': 1, 
                     'tickcolor': "#1ed760",
-                    'tickfont': {'color': '#B3B3B3'}
+                    'tickfont': {'color': '#F5F5F5'}
                 },
                 'bar': {'color': "#1ed760"},
                 'bgcolor': "rgba(0,0,0,0)",
@@ -317,6 +317,7 @@ with tab2:
             /* Ensure no extra padding at top of container */
             .block-container {
                 padding-top: 0 !important;
+                margin-top: -2rem !important;
             }
         </style>
     """, unsafe_allow_html=True)

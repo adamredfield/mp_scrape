@@ -30,12 +30,12 @@ def get_spotify_style():
         }
         
         .item-name {
-            color: #b3b3b3;
+            color: #F5F5F5;
             font-size: 1.2rem;
         }
         
         .item-details {
-            color: #b3b3b3;
+            color: #F5F5F5;
             font-size: 0.9rem;
             margin-top: -0.2rem;
         }
@@ -54,7 +54,7 @@ def get_spotify_style():
         .total-value {
             font-size: 2.5rem;
             font-weight: bold;
-            color: #b3b3b3;
+            color: #F5F5F5;
         }
         </style>
     """
@@ -74,7 +74,7 @@ def get_navigation_style():
 
         /* Navigation text */
         .st-emotion-cache-eczf16 [data-testid="stVerticalBlock"] {
-            color: #b3b3b3 !important;  /* Spotify's inactive text color */
+            color: #F5F5F5 !important;  /* Spotify's inactive text color */
         }
 
         /* Navigation links */

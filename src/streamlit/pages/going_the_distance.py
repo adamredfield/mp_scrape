@@ -42,14 +42,14 @@ st.markdown("""
         }
             
         .stat-card {
-            background: rgba(18, 18, 18, 0.95) !important;  /* Darker, more Spotify-like background */
+            background: black !important;  
             border: 1px solid #1ed760 !important;
             border-radius: 10px !important;
             padding: 1rem 0.3rem !important;
             text-align: center !important;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3)
             margin-bottom: 0.5rem !important;
-            color: #b3b3b3 !important;
+            color: #F5F5F5 !important;
             display: flex !important;
             flex-direction: column;
             justify-content: center !important;
@@ -61,7 +61,7 @@ st.markdown("""
         }
         
         .stat-card h3 {
-            color: #b3b3b3 !important;
+            color: #F5F5F5 !important;
             font-size: 1.1rem !important;
             margin-bottom: -1rem !important;
             font-weight: normal !important;
@@ -69,7 +69,7 @@ st.markdown("""
         }
         
         .big-number {
-            color: #b3b3b3 !important;
+            color: #F5F5F5 !important;
             font-size: 1.5rem !important;
             font-weight: bold !important;
             margin: .3rem 0 !important;
@@ -77,7 +77,7 @@ st.markdown("""
         }
         
         .subtitle {
-            color: #b3b3b3 !important;
+            color: #F5F5F5 !important;
             font-size: 1rem !important;
             margin: 0.2rem !important;
             line-height: 1 !important;
@@ -222,7 +222,7 @@ try:
         st.markdown("""
             <div style='
                 text-align: center;
-                color: #b3b3b3;
+                color: #F5F5F5;
                 margin-bottom: 5px;
             '>
                 Group Areas By
@@ -281,7 +281,7 @@ try:
                 }
                 
                 .section-title {
-                    color: #b3b3b3;
+                    color: #F5F5F5;
                     font-size: 1.3rem;
                     margin-bottom: 1rem;
                     text-align: center;
@@ -309,12 +309,12 @@ try:
                 }
                 
                 .name {
-                    color: #b3b3b3;
+                    color: #F5F5F5;
                     flex-grow: 1;
                 }
                 
                 .stats {
-                    color: #b3b3b3;
+                    color: #F5F5F5;
                     font-size: 0.8rem;
                     text-align: right;
                 }
@@ -345,7 +345,7 @@ try:
 
         st.markdown(
             f"""
-            <div style='text-align: center; padding: 12px; color: #b3b3b3; font-size: 1.4rem;'>
+            <div style='text-align: center; padding: 12px; color: #F5F5F5; font-size: 1.4rem;'>
                 Total {title.split()[1]}: <span style='color: #1ed760;'>{total_count}</span>
             </div>
             """,
@@ -381,27 +381,27 @@ try:
                 'x': 0.5,
                 'xanchor': 'center',
                 'yanchor': 'top',
-                'font': {'color': '#b3b3b3', 'size': 20}
+                'font': {'color': '#F5F5F5', 'size': 20}
             },
             xaxis_title="Distance Climbed (Feet)",
             yaxis_title=None,
             margin=dict(l=5, r=5, t=50, b=20),
             height=400,
             xaxis=dict(
-                color='#b3b3b3',
+                color='#F5F5F5',
                 gridcolor='#333333',
                 showgrid=True,
                 fixedrange=True
             ),
             yaxis=dict(
-                color='#b3b3b3',
+                color='#F5F5F5',
                 gridcolor='#333333',
                 showgrid=False,
                 categoryorder='total ascending',
                 fixedrange=True
             ),
             font=dict(
-                color='#b3b3b3'
+                color='#F5F5F5'
             )
         )
         st.plotly_chart(fig, use_container_width=True)
@@ -499,7 +499,7 @@ try:
                                 border: 1px solid #1ed760 !important;
                                 border-radius: 20px;
                                 background: rgba(30, 215, 96, 0.1)
-                                color: #b3b3b3 !important;
+                                color: #F5F5F5 !important;
                                 transition: all 0.3s ease !important;
                             }
                             </style>
@@ -508,7 +508,7 @@ try:
 
                         st.markdown(f"""
                             <div style="
-                                background: rgba(18, 18, 18, 0.95);
+                                background: black;
                                 border: 1px solid #1ed760;
                                 border-radius: 10px;
                                 padding: 1rem;
@@ -522,7 +522,7 @@ try:
                                     text-align: center;
                                 ">🚨 Big Fucking Wall Detected 🚨</div>
                                 <div style="
-                                    color: #b3b3b3;
+                                    color: #F5F5F5;
                                     font-size: 1rem;
                                     line-height: 1.5;
                                     margin-bottom: 4rem;
@@ -586,7 +586,7 @@ try:
                                         <div style="color: #FEFEFE;">Date</div>
                                         <div style="color: #FEFEFE; font-size: 1.1rem; font-weight: bold; margin: 0.5rem 0;">{formatted_date}</div>
                                         <div style="color: #FEFEFE;">Area</div>
-                                        <div style="color: #FEFEFE; font-size: 1.1rem;#b3b3b3-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{areas}</div>
+                                        <div style="color: #FEFEFE; font-size: 1.1rem;F5F5F5-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{areas}</div>
                                     </div>
                                 </div>
                             </div>
