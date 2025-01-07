@@ -1,6 +1,7 @@
 import streamlit as st
 import os
 import sys
+import pandas as pd
 
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(project_root)
@@ -94,7 +95,7 @@ st.markdown("""
             color: #F5F5F5;
             font-size: 1.3rem;
         }
-        
+        f
         .journey-title {
             color: #F5F5F5;
             font-size: 1.5rem;
@@ -146,24 +147,40 @@ date_text = (f"in {filters['year_start']}"
 
 total_routes_count = total_routes_df['count'].sum() if not total_routes_df.empty else 0
 
-if not route_data.empty:
+if not route_data.empty and len(route_data) > 0 and route_data.iloc[0]['times_climbed'] > 1:
+    if isinstance(route_data, pd.Series):
+        route_data = pd.DataFrame([route_data])
+    if len(route_data) > 1:
+        route_options = [f"{row['route_name']} ({row['grade']})" for _, row in route_data.iterrows()]
+        
+        selected_route = st.selectbox(
+            "",
+            options=route_options,
+            label_visibility="collapsed"
+        )
+        
+        # Get index of selected route and filter routes_data
+        selected_idx = route_options.index(selected_route)
+        display_route_data = route_data.iloc[selected_idx]
+    else:
+        display_route_data = route_data.iloc[0]
 
-    times_climbed = route_data['times_climbed']
-    formatted_date = route_data['first_climbed'].strftime('%b %d')
-    day = route_data['first_climbed'].day
+    times_climbed = display_route_data['times_climbed']
+    formatted_date = display_route_data['first_climbed'].strftime('%b %d')
+    day = display_route_data['first_climbed'].day
     suffix = 'th' if 11 <= day <= 13 else {1: 'st', 2: 'nd', 3: 'rd'}.get(day % 10, 'th')
-    length = route_data['length']
+    length = display_route_data['length']
     total_length = length * times_climbed
     formatted_total_length = "{:,}".format(total_length)
-    squared_image = get_squared_image(route_data['primary_photo_url'])
-    route_url = route_data['route_url']
+    squared_image = get_squared_image(display_route_data['primary_photo_url'])
+    route_url = display_route_data['route_url']
 
     needs_break = "between" in date_text.lower()
 
     st.markdown(f"""
         <div style="
             text-align: center;
-            margin: -5.5rem 0 1.5rem;
+            margin: {'-9rem' if len(route_data) > 1 else '-5rem'} 0 0.5rem;
         ">
             <div style="
                 color: #F5F5F5;
@@ -177,7 +194,7 @@ if not route_data.empty:
                 font-size: 1.4rem;
                 font-weight: 500;
             ">
-                You couldn't get enough of
+                {"You climbed these routes the most" if len(route_data) > 1 else "You couldn't get enough of"}
             </div>
         </div>
     """, unsafe_allow_html=True)
@@ -196,10 +213,10 @@ if not route_data.empty:
                 font-size: 1.1rem;
                 margin-bottom: 0.5rem;
             ">
-                <a href="{route_data['route_url']}" target="_blank" style="color: #F5F5F5; text-decoration: none;">
-                    {route_data['route_name']}
+                <a href="{display_route_data['route_url']}" target="_blank" style="color: #F5F5F5; text-decoration: none;">
+                    {display_route_data['route_name']}
                 </a> 
-                ~ {route_data['grade']}
+                ~ {display_route_data['grade']}
             </div>
             <div style="
                 color: #F5F5F5;
@@ -219,34 +236,34 @@ if not route_data.empty:
     """, unsafe_allow_html=True)
 
     with st.expander("🏷️ Route Tags"):
-        has_tags = any(route_data.get(tag_type) for tag_type in ['styles', 'features', 'descriptors', 'rock_type'])
+        has_tags = any(display_route_data.get(tag_type) for tag_type in ['styles', 'features', 'descriptors', 'rock_type'])
         
         if not has_tags:
             st.markdown("<div class='no-tags'>No tags available for this route</div>", unsafe_allow_html=True)
         else:
-            if route_data.get('styles'):
+            if display_route_data.get('styles'):
                 st.markdown(f"""
                     <div class="tag-category">
                         <div class="tag-header">
                             <span class="tag-icon">⚡</span>
                             <span class="tag-title">Style</span>
                         </div>
-                        <div class="tag-list">{route_data['styles']}</div>
+                        <div class="tag-list">{display_route_data['styles']}</div>
                     </div>
                 """, unsafe_allow_html=True)
                 
-            if route_data.get('features'):
+            if display_route_data.get('features'):
                 st.markdown(f"""
                     <div class="tag-category">
                         <div class="tag-header">
                             <span class="tag-icon">🏔️</span>
                             <span class="tag-title">Features</span>
                         </div>
-                        <div class="tag-list">{route_data['features']}</div>
+                        <div class="tag-list">{display_route_data['features']}</div>
                     </div>
                 """, unsafe_allow_html=True)
                 
-            if route_data.get('descriptors'):
+            if display_route_data.get('descriptors'):
                 st.markdown(f"""
                     <div class="tag-category">
                         <div class="tag-header">
@@ -257,19 +274,19 @@ if not route_data.empty:
                     </div>
                 """, unsafe_allow_html=True)
                 
-            if route_data.get('rock_type'):
+            if display_route_data.get('rock_type'):
                 st.markdown(f"""
                     <div class="tag-category">
                         <div class="tag-header">
                             <span class="tag-icon">🪨</span>
                             <span class="tag-title">Rock Type</span>
                         </div>
-                        <div class="tag-list">{route_data['rock_type']}</div>
+                        <div class="tag-list">{display_route_data['rock_type']}</div>
                     </div>
                 """, unsafe_allow_html=True)
 
     with st.expander("Click to initiate nostalgia sequence &nbsp;&nbsp;&nbsp;&nbsp;🕹️ &nbsp;&nbsp; 🎮 "):
-        if route_data['primary_photo_url']:
+        if display_route_data['primary_photo_url']:
             col1, col2, col3 = st.columns([1,2,1])
             with col2:
                 st.markdown(f"""
@@ -278,10 +295,10 @@ if not route_data.empty:
                     </div>
                 """, unsafe_allow_html=True)
     
-    if route_data is not None:
-        ascents = list(zip(route_data['dates'], 
-                route_data['types'], 
-                route_data['notes']))
+    if display_route_data is not None:
+        ascents = list(zip(display_route_data['dates'], 
+                display_route_data['types'], 
+                display_route_data['notes']))
         st.markdown('<div class="journey-title">Your Journey Dialing it in</div>', unsafe_allow_html=True)
 
         for i, (date, tick_type, note) in enumerate(ascents, 1):
@@ -296,3 +313,5 @@ if not route_data.empty:
                     <div class="ascent-note">{note if note else ''}</div>
                 </div>
             """, unsafe_allow_html=True)
+else:
+    st.info(f"You didn't climb any routes more than once {date_text}.")

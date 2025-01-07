@@ -25,12 +25,13 @@ st.markdown(get_spotify_style(), unsafe_allow_html=True)
 st.markdown("""
     <style>
         .st-emotion-cache-ule1sg {
-            margin-top: -.5rem !important;
+            margin-top: -.1rem !important;
         }
         .block-container {
             padding-bottom: 0rem;
             max-width: 100%;
-            padding: 2rem 1rem 10rem 1rem !important;
+            padding: -2rem!important;
+            margin-top: -2rem !important;
         }
         
         .stDataFrame {

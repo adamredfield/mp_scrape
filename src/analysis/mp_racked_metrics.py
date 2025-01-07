@@ -514,8 +514,10 @@ def most_climbed_route(conn, user_id=None, year_start=None, year_end=None):
                 END, ''), ', ') as rock_type
         FROM analysis.taganalysisview
         GROUP BY route_id
-    )
-    SELECT DISTINCT     
+    ),
+    route_counts AS (
+    SELECT
+        DISTINCT 
         r.route_name,
         r.specific_location,
         TRIM(NULLIF(CONCAT_WS(' ', r.yds_rating, r.hueco_rating, r.aid_rating, r.danger_rating, r.commitment_grade), '')) grade,
@@ -531,23 +533,27 @@ def most_climbed_route(conn, user_id=None, year_start=None, year_end=None):
         COUNT(*) times_climbed,
         r.primary_photo_url,
         r.route_url
-        FROM routes.Ticks t
-        JOIN routes.Routes r ON t.route_id = r.id
-        LEFT JOIN estimated_lengths el on el.id = t.route_id
-		LEFT JOIN route_tags rt on rt.route_id = r.id	
-        {year_filter(year_range=(year_start, year_end), use_where=True)}
-        {add_user_filter(user_id)}
-        GROUP BY r.route_name, r.specific_location, r.yds_rating, r.hueco_rating, 
-                 r.aid_rating, r.danger_rating, r.commitment_grade, el.estimated_length, r.length_ft,
-                 r.primary_photo_url, r.route_url, rt.styles, rt.features, rt.descriptors, rt.rock_type
-        ORDER BY COUNT(*) DESC
-        LIMIT 1
+    FROM routes.Ticks t
+    JOIN routes.Routes r ON t.route_id = r.id
+    LEFT JOIN estimated_lengths el on el.id = t.route_id
+    LEFT JOIN route_tags rt on rt.route_id = r.id	
+    {year_filter(year_range=(year_start, year_end), use_where=True)}
+    {add_user_filter(user_id)}
+    GROUP BY r.route_name, r.specific_location, r.yds_rating, r.hueco_rating, 
+            r.aid_rating, r.danger_rating, r.commitment_grade, el.estimated_length, r.length_ft,
+            r.primary_photo_url, r.route_url, rt.styles, rt.features, rt.descriptors, rt.rock_type
+    ),
+    max_count AS (
+        SELECT MAX(times_climbed) as max_times
+        FROM route_counts
+    )
+    SELECT *
+    FROM route_counts
+    WHERE times_climbed = (SELECT max_times FROM max_count)
+    ORDER BY times_climbed DESC, route_name;
     """
-    result = conn.query(query)
-    if result.empty:
-        return None
-
-    return result.iloc[0]
+    print(query)
+    return conn.query(query)
 
 def days_climbed(conn, user_id=None):
     query = f"""
