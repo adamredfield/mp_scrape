@@ -23,7 +23,6 @@ def lambda_handler(event, context):
 
                 print(f"Processing page {page_number} for user {user_id} using url: {ticks_url}")
                 
-                # Process single page
                 helper_functions.process_page(
                     page_number=page_number,
                     ticks_url=ticks_url,

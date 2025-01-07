@@ -64,17 +64,6 @@ def route_type_filter(route_types):
     return type_filter
 
 def year_filter(year=None, year_range=None, use_where=True, table_alias='t'):
-    """Generate SQL clause for year filtering
-    
-    Args:
-        year: Optional single year to filter by
-        year_range: Optional tuple of (start_year, end_year) to filter between
-        use_where: If True, starts with WHERE, otherwise starts with AND (default True)
-        table_alias: Table alias to use (default 't')
-    
-    Returns:
-        str: SQL filter clause
-    """
     if not year and not year_range:
         return ''
         
@@ -87,24 +76,9 @@ def year_filter(year=None, year_range=None, use_where=True, table_alias='t'):
         return f"{prefix} EXTRACT(YEAR FROM {table_alias}.date) = {year}"
 
 def add_user_filter(user_id, table_alias='t'):
-    """
-    Add user filtering to a query
-    Args:
-        query: SQL query string (can be empty)
-        user_id: User ID to filter by
-        table_alias: Alias of the Ticks table in the query (default 't')
-    """
     return f"AND {table_alias}.user_id = '{user_id}'"
 
 def add_fa_name_filter(fa_name, use_where=False, table_alias='fa'):
-    """
-    Add first ascensionist filtering to a query
-    Args:
-        fa_name: First ascensionist name or partnership to filter by
-        table_alias: Alias of the FA table in the query (default 'fa')
-    Returns:
-        SQL filter string
-    """
     if not fa_name or fa_name == "All FAs":
         return ""
 
@@ -128,7 +102,6 @@ def add_fa_name_filter(fa_name, use_where=False, table_alias='fa'):
     fa_name = fa_name.replace("'", "''")
     return f"{prefix} {table_alias}.fa_name = '{fa_name}'"
 
-
 def available_years(conn,user_id):
     years_query = f"""
     SELECT DISTINCT EXTRACT(YEAR FROM date)::int as year
@@ -142,7 +115,6 @@ def available_years(conn,user_id):
     return years_df
 
 def add_grade_filter(grade_system, grade_range):
-    """Add grade filter to SQL query"""
     if not grade_system or not grade_range:
         return ""
     
@@ -166,5 +138,4 @@ def fa_year_filter(fa_year_start, fa_year_end):
         fa_year_condition = f"""
             AND fa.year BETWEEN {fa_year_start} AND {fa_year_end}
         """
-    
     return fa_year_condition

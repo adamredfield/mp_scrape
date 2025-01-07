@@ -29,7 +29,6 @@ def trigger_user_scrape(user_id):
         'source': 'streamlit_app',
         'action': 'new_user_scrape'
     }
-
     try:
         sqs.send_message(
             QueueUrl=new_scrape_queue_url,
@@ -50,7 +49,6 @@ def verify_user_exists(conn, user_id):
     button_cols = st.empty()
 
     if 'waiting_for_update' in st.session_state and st.session_state.waiting_for_update:
-        # Clear any existing content
         info_msg.empty()
         details_msg.empty()
         button_cols.empty()
@@ -58,7 +56,6 @@ def verify_user_exists(conn, user_id):
         status_text = st.empty()
         status_text.text("Processing your data. This can take up to 15 minutes...")
 
-        # Get initial message count for this user
         if 'total_messages' not in st.session_state:
             queue_status, total_messages = check_queue_status(user_id, sqs)
             st.session_state.total_messages = total_messages
@@ -84,8 +81,7 @@ def verify_user_exists(conn, user_id):
         with button_cols:
             col1, col2 = st.columns([1,2])
             with col1:
-                refresh_container = st.empty()
-                with refresh_container:
+                with st.empty():
                     if st.button("Refresh Data"):
                         info_msg.empty()
                         details_msg.empty()
@@ -96,55 +92,12 @@ def verify_user_exists(conn, user_id):
                             st.session_state.start_time = datetime.now()
                             st.rerun()
             with col2:
-                if 'show_form' not in st.session_state:
-                    st.session_state.show_form = False
-
-                continue_container = st.empty()
-
-                if not st.session_state.show_form:
-                    # Only show continue button if form isn't showing
-                    with continue_container:
-                        if st.button("Continue with existing data"):
-                            continue_container.empty()
-                            st.session_state.show_form = True
-                            info_msg.empty()
-                            details_msg.empty()
-                            refresh_container.empty()
-                            
-
-                if st.session_state.show_form:
-                    st.info("Please indicate usage of pitch option for ticks:")
-                    
-                    with st.form("pitch_usage_form"):
-                        choice = st.radio(
-                            "For The Nose, would 11 pitches mean...", 
-                            options=["A", "B"],
-                            captions=[
-                                "Partial ascent (Dolt Run = 11/31 pitches)",
-                                "Pitch count of full ascent (simul in 11 pitches)"
-                            ],
-                            horizontal=True, 
-                            key="pitch_usage"
-                        )
-
-                        submitted = st.form_submit_button("Save Preference")
-                        if submitted:
-                            print("Form submitted!")
-                            if choice:
-                                continue_container.empty()
-                                st.session_state.show_form = True
-                                info_msg.empty()
-                                details_msg.empty()
-                                refresh_container.empty()
-                                preference = 'partial' if choice == "A" else 'simul'
-                                st.session_state.pitches_preference = preference
-                                st.session_state.data_status = 'ready'
-                                st.success(f"Preference saved: Racking up...")
-                                time.sleep(3)
-                                return True
-                            else:
-                                st.error("Please make a selection")
-                                return False
+                if st.button("Continue with existing data"):
+                    st.session_state.data_status = 'ready'
+                    return True
+            
+            if st.session_state.get('data_status') != 'ready':
+                st.stop()
 
     else:
         info_msg.warning("Your data has not been collected yet.")
@@ -155,15 +108,57 @@ def verify_user_exists(conn, user_id):
             st.rerun()
         return False
 
+def pitch_preference_form(continue_container, info_msg, details_msg, refresh_container):
+    
+    st.info("Please indicate usage of pitch option for ticks:")
+                    
+    with st.form("pitch_usage_form"):
+        choice = st.radio(
+            "For The Nose, would 11 pitches mean...", 
+            options=["A", "B"],
+            captions=[
+                "Partial ascent (Dolt Run = 11/31 pitches)",
+                "Pitch count of full ascent (simul in 11 pitches)"
+            ],
+            horizontal=True, 
+            key="pitch_usage"
+        )
+
+        submitted = st.form_submit_button("Save Preference")
+        if submitted:
+            print("Form submitted!")
+            if choice:
+                continue_container.empty()
+                st.session_state.show_form = True
+                info_msg.empty()
+                details_msg.empty()
+                refresh_container.empty()
+                preference = 'partial' if choice == "A" else 'simul'
+                st.session_state.pitches_preference = preference
+                st.session_state.data_status = 'ready'
+                st.success(f"Preference saved: Racking up...")
+                time.sleep(1.5)
+                return True
+            else:
+                st.error("Please make a selection")
+                return False
 
 def get_user_id(conn):
+    debug = st.empty()
+    debug.text(f"""[DEBUG] Session States:
+    - user_id: {st.session_state.get('user_id')}
+    - data_status: {st.session_state.get('data_status')}
+    - pitches_preference: {st.session_state.get('pitches_preference')}
+    - waiting_for_update: {st.session_state.get('waiting_for_update')}
+    """)
     """Handle user identification"""
     if 'user_id' not in st.session_state:
         st.session_state.user_id = None
     if 'data_status' not in st.session_state:
         st.session_state.data_status = None
+    if 'pitches_preference' not in st.session_state:
+        st.session_state.pitches_preference = None
 
-    # First check if we're in an update
     if ('waiting_for_update' in st.session_state and 
         st.session_state.waiting_for_update):
         verify_user_exists(conn, st.session_state.user_id)
@@ -194,7 +189,6 @@ def get_user_id(conn):
         with col2:
             if st.button("Submit"):
                 if user_input:
-                    # Extract user_id from URL or use direct input
                     if "mountainproject.com" in user_input:
                         try:
                             user_id = user_input.split("/user/")[1].strip("/")
@@ -218,11 +212,39 @@ def get_user_id(conn):
         3. Copy your profile URL or ID from the address bar
         """)
         return None
+
     if st.session_state.data_status is None:     
-        # Verify user exists in database
         if verify_user_exists(conn, st.session_state.user_id):
+            old_preference = st.session_state.get('pitches_preference')
+            st.session_state.data_status = 'ready'
+            if old_preference:
+                st.session_state.pitches_preference = old_preference
             st.session_state.data_status = 'ready'
             st.rerun()
+        return None
+
+    if st.session_state.pitches_preference is None:
+        st.info("Before we collect your data, please indicate how you log pitches:")
+        
+        with st.form("pitch_usage_form"):
+            choice = st.radio(
+                "For The Nose, would 11 pitches mean...", 
+                options=["A", "B"],
+                captions=[
+                    "Partial ascent (Dolt Run = 11/31 pitches)",
+                    "Pitch count of full ascent (simul in 11 pitches)"
+                ],
+                horizontal=True, 
+                key="pitch_usage"
+            )
+
+            if st.form_submit_button("Continue"):
+                if choice:
+                    preference = 'partial' if choice == "A" else 'simul'
+                    st.session_state.pitches_preference = preference
+                    st.rerun()
+                else:
+                    st.error("Please make a selection")
         return None
 
     return st.session_state.user_id
@@ -264,7 +286,6 @@ def handle_queue_processing(conn, user_id, sqs):
     status_text = st.empty()
     pages_text = st.empty()
 
-    # Initialize progress tracking with more precise timing
     if 'progress_start_time' not in st.session_state:
         st.session_state.progress_start_time = time.time()
         st.session_state.current_progress = 0.0
@@ -282,7 +303,6 @@ def handle_queue_processing(conn, user_id, sqs):
     synthetic_progress_bar.progress(st.session_state.current_progress)
     status_text.text(f"Processing: {int(st.session_state.current_progress * 100)}%")
 
-    # Handle initial delay in background
     if st.session_state.get('initial_delay', False):
         if 'delay_start_time' not in st.session_state:
             st.session_state.delay_start_time = datetime.now()
@@ -307,7 +327,6 @@ def handle_queue_processing(conn, user_id, sqs):
             pages_text.write(pages_message)
             st.rerun()
     else:
-        # Queue is empty, but let's verify data was actually inserted
         tick_count = verify_data_inserted(conn, user_id)
         if tick_count > 0:
             if 'total_messages' in st.session_state:
@@ -337,12 +356,11 @@ def check_messages(queue_url, sqs, user_id):
         QueueUrl=queue_url,
         AttributeNames=['All'],
         MessageAttributeNames=['All'],
-        MaxNumberOfMessages=10,  # Max messages we can get at once
+        MaxNumberOfMessages=10,
         VisibilityTimeout=30,
         WaitTimeSeconds=1
     )
 
-    # Check messages in batch of 10
     if 'Messages' in response:
         for message in response['Messages']:
             message_body = json.loads(message['Body'])
@@ -412,17 +430,12 @@ def get_squared_image(url):
         response = requests.get(url)
         img = Image.open(BytesIO(response.content))
         
-        # Get the largest dimension
         max_dim = max(img.width, img.height)
-        
-        # Create a square black background of the largest dimension
         square_img = Image.new('RGB', (max_dim, max_dim), (0, 0, 0))
         
-        # Calculate position to paste (center)
         paste_x = (max_dim - img.width) // 2
         paste_y = (max_dim - img.height) // 2
         
-        # Paste original onto square background
         square_img.paste(img, (paste_x, paste_y))
         return square_img
         
@@ -454,19 +467,16 @@ def get_device_dimensions(key_suffix=''):
 
 
 def is_iphone_dimensions():
-    # Get viewport dimensions
     dims = get_device_dimensions('iphone_check')
     if not dims:
         return False
     
-    # Use screen dimensions since they're reporting correctly
     width = dims.get('screenWidth')
     height = dims.get('screenHeight')
 
     if not width or not height:
         return False
     
-    # Common iPhone viewport dimensions (width, height) in portrait mode
     iphone_dimensions = [
         (390, 844),  # iPhone 12, 13, 14 Pro
         (393, 852),  # iPhone 15 Pro
@@ -479,7 +489,6 @@ def is_iphone_dimensions():
         (414, 736),  # iPhone 6/7/8 Plus
     ]
     
-    # Allow for some flexibility in dimensions (±20 pixels)
     tolerance = 20
     dimensions = (width, height)
     rotated_dimensions = (height, width)
@@ -490,4 +499,3 @@ def is_iphone_dimensions():
         for target in iphone_dimensions
     )
     
-

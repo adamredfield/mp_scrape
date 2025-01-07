@@ -16,7 +16,6 @@ sys.path.append(project_root)
 from src.streamlit.streamlit_helper_functions import get_user_id, get_device_dimensions, is_mobile, is_iphone_dimensions
 from src.streamlit.styles import get_navigation_style
 
-# Add this at the top after imports
 st.markdown("""
     <style>
     /* Hide JS eval iframes but keep messages visible */
@@ -29,17 +28,10 @@ st.markdown("""
 
 st.markdown('<div style="padding-top: 1rem;"></div>', unsafe_allow_html=True)
 
-# Remove the separate navigation style application
-# st.markdown(get_navigation_style(), unsafe_allow_html=True)  # Comment this out
-
-# Rest of your code...
-
-
 dims_container = st.empty()
 error_container = st.empty()
 button_container = st.empty()
 info_container = st.empty()
-
 
 dims = get_device_dimensions('initial') or {}
 is_mobile_device = is_mobile()

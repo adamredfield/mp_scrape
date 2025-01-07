@@ -156,9 +156,7 @@ def process_route(route: dict, max_retries = 2) -> dict:
                 temperature=0.2
             )
 
-            # Process responses
             response_text = response.choices[0].message.content.strip()
-
             response_text = response_text.replace('```json', '').replace('```', '')  # Remove code blocks
             response_text = response_text.replace('\n', ' ')  # Remove newlines
             response_text = response_text.strip()  # Clean up #b3b3b3space   
@@ -240,7 +238,6 @@ def process_route_response(ai_response: dict) -> dict:
 
 def save_analysis_results(cursor, result):
     try:
-        # Insert RouteAnalysis
         analysis_insert_sql = """
         INSERT INTO analysis.RouteAnalysis_v2  (
             route_id,
@@ -254,7 +251,6 @@ def save_analysis_results(cursor, result):
         ))
         analysis_id = cursor.fetchone()[0]
 
-        # Insert RouteAnalysisTags
         tag_insert_sql = """
         INSERT INTO analysis.RouteAnalysisTags_v2  (
             analysis_id,

@@ -4,18 +4,15 @@ div[data-testid="stExpander"] {
     background: black !important;
 }
 
-/* Expander content styling */
 div[data-testid="stExpander"] details > div {
     border: none !important;
     border-radius: 4px !important;
 }
 
-/* Hover effect */
 div[data-testid="stExpander"] details summary:hover {
     background: black !important;
 }
 
-/* Filter expander specific styling */
 div[data-testid="stExpander"]:first-of-type {
     border: 1px solid rgba(255, 255, 255, 0.1) !important;
     border-radius: 8px !important;
@@ -26,14 +23,12 @@ div[data-testid="stExpander"].regular-route details {
     border: none !important;
 }
 
-/* Classic route styling - collapsed state */
 div[data-testid="stExpander"].classic-route details summary.st-emotion-cache-s1invk {
     background: black !important;
     border: 1px solid #a28b06 !important;
     border-radius: 8px !important;
 }
 
-/* Classic route styling - open state */
 div[data-testid="stExpander"].classic-route details[open] {
     background: black !important;
     border: 1px solid #a28b06 !important;
@@ -42,21 +37,18 @@ div[data-testid="stExpander"].classic-route details[open] {
     padding-bottom: 1px !important;
 }
 
-/* Remove border from summary when open (both types) */
 div[data-testid="stExpander"].classic-route details[open] summary.st-emotion-cache-s1invk,
 div[data-testid="stExpander"].regular-route details[open] summary.st-emotion-cache-s1invk {
     border: none !important;
     border-radius: 8px 8px 0 0 !important;
 }
 
-/* Regular route styling - collapsed state */
 div[data-testid="stExpander"].regular-route details summary.st-emotion-cache-s1invk {
     background: black !important;
     border: 1px solid rgba(255, 255, 255, 0.1) !important;
     border-radius: 8px !important;
 }
 
-/* Regular route styling - open state */
 div[data-testid="stExpander"].regular-route details[open] {
     background: black !important;
     border: 1px solid rgba(255, 255, 255, 0.1) !important;
@@ -65,24 +57,20 @@ div[data-testid="stExpander"].regular-route details[open] {
     padding-bottom: 1px !important;
 }
 
-/* Ensure regular routes don't get classic styling */
 div[data-testid="stExpander"]:not(.classic-route) details summary.st-emotion-cache-s1invk {
     border: 1px solid rgba(255, 255, 255, 0.1) !important;
 }
 
-/* Hover states - only when collapsed */
 div[data-testid="stExpander"].classic-route details:not([open]) summary.st-emotion-cache-s1invk:hover {
     background-color: rgba(255, 255, 255, 0.05) !important;
     border: 2px solid #a28b06 !important;
 }
 
-/* Hover states - only when collapsed */
 div[data-testid="stExpander"].regular-route details:not([open]) summary.st-emotion-cache-s1invk:hover {
     background-color: rgba(255, 255, 255, 0.05) !important;
     border: 1px solid rgba(255, 255, 255, 0.1) !important;
 }
 
-/* Hover state when open - no border for both types */
 div[data-testid="stExpander"].classic-route details[open] summary.st-emotion-cache-s1invk:hover,
 div[data-testid="stExpander"].regular-route details[open] summary.st-emotion-cache-s1invk:hover {
     background-color: rgba(255, 255, 255, 0.05) !important;

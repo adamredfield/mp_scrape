@@ -39,7 +39,6 @@ def lambda_handler(event, context):
 
             except Exception as e:
                 print(f"Page {message['page_number']} exceeded max retries")
-                # Add new error context for this retry attempt
                 error_context = {
                     "original_message": message,
                     "error_type": str(type(e).__name__),

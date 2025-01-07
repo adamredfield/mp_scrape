@@ -217,7 +217,6 @@ def route_tag_filter(df=None, conn=None, user_id=None, year_start=None, year_end
 def tick_type_filter(df=None):
     """Filter for different tick types"""
     
-    # Default send types
     default_sends = [
         'Lead / Pinkpoint',
         'Lead / Onsight',
@@ -226,7 +225,6 @@ def tick_type_filter(df=None):
         'Solo'
     ]
     
-    # All available tick types
     all_tick_types = [
         'Lead / Pinkpoint',
         'Lead / Onsight',
@@ -314,7 +312,6 @@ def grade_filter(conn, route_types=None, user_id=None, year_start=None, year_end
         elif grade.startswith('5.'):
             grade_types['YDS'].append(grade)
 
-    # Sort grades within each type
     for grade_type in grade_types:
         grade_types[grade_type] = sorted(list(set(grade_types[grade_type])), 
                                        key=metrics.grade_sort_key)  
@@ -345,9 +342,7 @@ def grade_filter(conn, route_types=None, user_id=None, year_start=None, year_end
                         index=len(max_grade_options)-1,
                         key='max_grade'
                     )
-            
                 return grade_system, (min_grade, max_grade)
-    
     return None, None
 
 def fa_year_filter(df=None):

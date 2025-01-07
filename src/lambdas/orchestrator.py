@@ -60,7 +60,7 @@ def scrape_user(user_id):
                 })
             if batch:
                 QUEUE_URL = os.environ['QUEUE_URL']
-                # Send batch to SQS
+
                 sqs.send_message_batch(
                     QueueUrl=QUEUE_URL,
                     Entries=batch

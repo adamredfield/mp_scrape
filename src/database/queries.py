@@ -85,13 +85,11 @@ cursor.mogrify(
 
 @with_retry()
 def insert_ticks_batch(cursor, tick_data):
-
     for tick in tick_data:
         if tick['type'] is None:
             tick['type'] = ''
         if tick['pitches_climbed'] is None:
             tick['pitches_climbed'] = None 
-
 
     args_str = ','.join(
         cursor.mogrify(

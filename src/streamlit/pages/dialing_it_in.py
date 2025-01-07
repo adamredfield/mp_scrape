@@ -219,13 +219,11 @@ if not route_data.empty:
     """, unsafe_allow_html=True)
 
     with st.expander("🏷️ Route Tags"):
-        # Check if any tags exist
         has_tags = any(route_data.get(tag_type) for tag_type in ['styles', 'features', 'descriptors', 'rock_type'])
         
         if not has_tags:
             st.markdown("<div class='no-tags'>No tags available for this route</div>", unsafe_allow_html=True)
         else:
-            # Only show categories that exist and have tags
             if route_data.get('styles'):
                 st.markdown(f"""
                     <div class="tag-category">
@@ -280,8 +278,6 @@ if not route_data.empty:
                     </div>
                 """, unsafe_allow_html=True)
     
-    
-    # Process notes
     if route_data is not None:
         ascents = list(zip(route_data['dates'], 
                 route_data['types'], 
