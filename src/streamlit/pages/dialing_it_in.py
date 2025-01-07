@@ -31,7 +31,7 @@ st.markdown("""
             max-width: 100%;
         }
         .intro-text {
-            color: #b3b3b3;
+            color: #F5F5F5;
             font-size: 1.75rem;
             text-align: center;
             line-height: 1.4;
@@ -48,13 +48,13 @@ st.markdown("""
         }
         
         .route-title {
-            color: #b3b3b3;
+            color: #F5F5F5;
             font-size: 1.5rem;
             margin-bottom: 1rem;
         }
             
         .location-text {
-            color: #b3b3b3;
+            color: #F5F5F5;
             font-size: 1.1rem;
             margin-top: -1rem;
             margin-bottom: .5rem;
@@ -64,17 +64,17 @@ st.markdown("""
         .route-link:link,
         .route-link:visited,
         .route-link:active {
-            color: #b3b3b3 !important;
+            color: #F5F5F5 !important;
             text-decoration: underline !important;
         }
         
         .route-link:hover {
-            color: #b3b3b3 !important;
+            color: #F5F5F5 !important;
             text-decoration: underline !important;
         }
         
         .grade-text {
-            color: #b3b3b3;
+            color: #F5F5F5;
         }
             
         .stat-container {
@@ -91,12 +91,12 @@ st.markdown("""
         }
         
         .stat-label {
-            color: #b3b3b3;
+            color: #F5F5F5;
             font-size: 1.3rem;
         }
         
         .journey-title {
-            color: #b3b3b3;
+            color: #F5F5F5;
             font-size: 1.5rem;
             margin: 0rem 1rem 1rem;
             text-align: center;
@@ -124,12 +124,12 @@ st.markdown("""
         }
         
         .ascent-date {
-            color: #b3b3b3;
+            color: #F5F5F5;
             font-size: 1rem;
         }
         
         .ascent-note {
-            color: #b3b3b3;
+            color: #F5F5F5;
             font-size: 1rem;
             margin-top: 0.5rem;
             line-height: 1.4;
@@ -166,14 +166,14 @@ if not route_data.empty:
             margin: -5.5rem 0 1.5rem;
         ">
             <div style="
-                color: #b3b3b3;
+                color: #F5F5F5;
                 font-size: 1.3rem;
                 margin-bottom: 0.3rem;
             ">
                 Out of {total_routes_count} routes {date_text}
             </div>
             <div style="
-                color: #b3b3b3;
+                color: #F5F5F5;
                 font-size: 1.4rem;
                 font-weight: 500;
             ">
@@ -192,17 +192,17 @@ if not route_data.empty:
             margin-bottom: 1rem;
         ">
             <div style="
-                color: #b3b3b3;
+                color: #F5F5F5;
                 font-size: 1.1rem;
                 margin-bottom: 0.5rem;
             ">
-                <a href="{route_data['route_url']}" target="_blank" style="color: #b3b3b3; text-decoration: none;">
+                <a href="{route_data['route_url']}" target="_blank" style="color: #F5F5F5; text-decoration: none;">
                     {route_data['route_name']}
                 </a> 
                 ~ {route_data['grade']}
             </div>
             <div style="
-                color: #b3b3b3;
+                color: #F5F5F5;
                 font-size: 1.5rem;
                 font-weight: bold;
                 margin: 0.5rem 0;
@@ -210,7 +210,7 @@ if not route_data.empty:
                 {formatted_total_length} ft
             </div>
             <div style="
-                color: #b3b3b3;
+                color: #F5F5F5;
                 font-size: 1rem;
             ">
                 ≈ {times_climbed} Laps on {formatted_date}{suffix}

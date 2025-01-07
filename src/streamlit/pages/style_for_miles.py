@@ -62,7 +62,7 @@ st.markdown("""
         }
         
         .count {
-            color: #B3B3B3;
+            color: #F5F5F5;
             font-size: 0.9rem;
             min-width: 80px;
             text-align: right;

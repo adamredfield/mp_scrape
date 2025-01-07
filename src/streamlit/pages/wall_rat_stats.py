@@ -44,7 +44,7 @@ try:
             .streamlit-expanderHeader {
                 background-color: transparent !important;
                 font-size: 1em !important;
-                color: #b3b3b3 !important;
+                color: #F5F5F5 !important;
                 padding: 0.5rem !important;
             }
             
@@ -84,7 +84,7 @@ try:
             .stat-value {
                 font-size: 1.2rem;
                 font-weight: bold;
-                color: #b3b3b3;
+                color: #F5F5F5;
             }
             
             .streamlit-expanderHeader svg {
