@@ -49,7 +49,6 @@ def verify_user_exists(conn, user_id):
     button_cols = st.empty()
 
     if 'waiting_for_update' in st.session_state and st.session_state.waiting_for_update:
-        # Clear any existing content
         info_msg.empty()
         details_msg.empty()
         button_cols.empty()
@@ -57,7 +56,6 @@ def verify_user_exists(conn, user_id):
         status_text = st.empty()
         status_text.text("Processing your data. This can take up to 15 minutes...")
 
-        # Get initial message count for user
         if 'total_messages' not in st.session_state:
             queue_status, total_messages = check_queue_status(user_id, sqs)
             st.session_state.total_messages = total_messages
@@ -83,8 +81,7 @@ def verify_user_exists(conn, user_id):
         with button_cols:
             col1, col2 = st.columns([1,2])
             with col1:
-                refresh_container = st.empty()
-                with refresh_container:
+                with st.empty():
                     if st.button("Refresh Data"):
                         info_msg.empty()
                         details_msg.empty()
@@ -95,55 +92,12 @@ def verify_user_exists(conn, user_id):
                             st.session_state.start_time = datetime.now()
                             st.rerun()
             with col2:
-                if 'show_form' not in st.session_state:
-                    st.session_state.show_form = False
-
-                continue_container = st.empty()
-
-                if not st.session_state.show_form:
-                    # Only show continue button if form isn't showing
-                    with continue_container:
-                        if st.button("Continue with existing data"):
-                            continue_container.empty()
-                            st.session_state.show_form = True
-                            info_msg.empty()
-                            details_msg.empty()
-                            refresh_container.empty()
-                            
-
-                if st.session_state.show_form:
-                    st.info("Please indicate usage of pitch option for ticks:")
-                    
-                    with st.form("pitch_usage_form"):
-                        choice = st.radio(
-                            "For The Nose, would 11 pitches mean...", 
-                            options=["A", "B"],
-                            captions=[
-                                "Partial ascent (Dolt Run = 11/31 pitches)",
-                                "Pitch count of full ascent (simul in 11 pitches)"
-                            ],
-                            horizontal=True, 
-                            key="pitch_usage"
-                        )
-
-                        submitted = st.form_submit_button("Save Preference")
-                        if submitted:
-                            print("Form submitted!")
-                            if choice:
-                                continue_container.empty()
-                                st.session_state.show_form = True
-                                info_msg.empty()
-                                details_msg.empty()
-                                refresh_container.empty()
-                                preference = 'partial' if choice == "A" else 'simul'
-                                st.session_state.pitches_preference = preference
-                                st.session_state.data_status = 'ready'
-                                st.success(f"Preference saved: Racking up...")
-                                time.sleep(1.5)
-                                return True
-                            else:
-                                st.error("Please make a selection")
-                                return False
+                if st.button("Continue with existing data"):
+                    st.session_state.data_status = 'ready'
+                    return True
+            
+            if st.session_state.get('data_status') != 'ready':
+                st.stop()
 
     else:
         info_msg.warning("Your data has not been collected yet.")
@@ -154,13 +108,56 @@ def verify_user_exists(conn, user_id):
             st.rerun()
         return False
 
+def pitch_preference_form(continue_container, info_msg, details_msg, refresh_container):
+    
+    st.info("Please indicate usage of pitch option for ticks:")
+                    
+    with st.form("pitch_usage_form"):
+        choice = st.radio(
+            "For The Nose, would 11 pitches mean...", 
+            options=["A", "B"],
+            captions=[
+                "Partial ascent (Dolt Run = 11/31 pitches)",
+                "Pitch count of full ascent (simul in 11 pitches)"
+            ],
+            horizontal=True, 
+            key="pitch_usage"
+        )
+
+        submitted = st.form_submit_button("Save Preference")
+        if submitted:
+            print("Form submitted!")
+            if choice:
+                continue_container.empty()
+                st.session_state.show_form = True
+                info_msg.empty()
+                details_msg.empty()
+                refresh_container.empty()
+                preference = 'partial' if choice == "A" else 'simul'
+                st.session_state.pitches_preference = preference
+                st.session_state.data_status = 'ready'
+                st.success(f"Preference saved: Racking up...")
+                time.sleep(1.5)
+                return True
+            else:
+                st.error("Please make a selection")
+                return False
 
 def get_user_id(conn):
+    debug = st.empty()
+    debug.text(f"""[DEBUG] Session States:
+    - user_id: {st.session_state.get('user_id')}
+    - data_status: {st.session_state.get('data_status')}
+    - pitches_preference: {st.session_state.get('pitches_preference')}
+    - waiting_for_update: {st.session_state.get('waiting_for_update')}
+    """)
     """Handle user identification"""
     if 'user_id' not in st.session_state:
         st.session_state.user_id = None
     if 'data_status' not in st.session_state:
         st.session_state.data_status = None
+    if 'pitches_preference' not in st.session_state:
+        st.session_state.pitches_preference = None
 
     if ('waiting_for_update' in st.session_state and 
         st.session_state.waiting_for_update):
@@ -215,10 +212,39 @@ def get_user_id(conn):
         3. Copy your profile URL or ID from the address bar
         """)
         return None
+
     if st.session_state.data_status is None:     
         if verify_user_exists(conn, st.session_state.user_id):
+            old_preference = st.session_state.get('pitches_preference')
+            st.session_state.data_status = 'ready'
+            if old_preference:
+                st.session_state.pitches_preference = old_preference
             st.session_state.data_status = 'ready'
             st.rerun()
+        return None
+
+    if st.session_state.pitches_preference is None:
+        st.info("Before we collect your data, please indicate how you log pitches:")
+        
+        with st.form("pitch_usage_form"):
+            choice = st.radio(
+                "For The Nose, would 11 pitches mean...", 
+                options=["A", "B"],
+                captions=[
+                    "Partial ascent (Dolt Run = 11/31 pitches)",
+                    "Pitch count of full ascent (simul in 11 pitches)"
+                ],
+                horizontal=True, 
+                key="pitch_usage"
+            )
+
+            if st.form_submit_button("Continue"):
+                if choice:
+                    preference = 'partial' if choice == "A" else 'simul'
+                    st.session_state.pitches_preference = preference
+                    st.rerun()
+                else:
+                    st.error("Please make a selection")
         return None
 
     return st.session_state.user_id
