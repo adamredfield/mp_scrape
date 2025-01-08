@@ -1394,7 +1394,7 @@ def get_period_stats(conn, user_id, period_type='all', period_value=None, year_s
         ),
     period_stats AS (
     SELECT 
-        'All Time'::text as period,
+        'Full Year'::text as period,
         COUNT(DISTINCT date) as days_logged,
         max(trad_grade_sort) as trad_grade_sort,
         MAX(sport_grade_sort) as sport_grade_sort,
@@ -1442,7 +1442,7 @@ def get_period_stats(conn, user_id, period_type='all', period_value=None, year_s
 ),
 route_counts AS (
     SELECT 
-        'All Time' as period,
+        'Full Year' as period,
         COUNT(DISTINCT r.id) as total_unique_routes,
         COUNT(*) as total_ascents,
         ROUND(AVG(CASE 
@@ -1500,7 +1500,7 @@ route_counts AS (
     SELECT DISTINCT ON (
         CASE {period_type_sql}
             WHEN 'all' THEN 
-                CASE WHEN ps.period = 'All Time' THEN '0' ELSE '1' END
+                CASE WHEN ps.period = 'Full Year' THEN '0' ELSE '1' END
             WHEN 'season' THEN 
                 CASE SPLIT_PART(ps.period, ' ', 1)
                     WHEN 'Winter' THEN '1'
@@ -1509,7 +1509,7 @@ route_counts AS (
                     WHEN 'Fall' THEN '4'
                 END || SPLIT_PART(ps.period, ' ', 2)
             WHEN 'month' THEN 
-                CASE WHEN ps.period = 'All Time' THEN '0'
+                CASE WHEN ps.period = 'Full Year' THEN '0'
                      ELSE TO_CHAR(TO_DATE(ps.period, 'Mon YYYY'), 'YYYY-MM')
                 END
         END
@@ -1542,11 +1542,11 @@ route_counts AS (
         LEFT JOIN routes.grade_sort aid ON 
             aid.grade_system = 'Aid' AND 
             aid.sort_order = ps.aid_grade_sort
-        WHERE ({period_type_sql} = 'all' OR ps.period != 'All Time')
+        WHERE ({period_type_sql} = 'all' OR ps.period != 'Full Year')
     ORDER BY 
         CASE {period_type_sql}
             WHEN 'all' THEN 
-                CASE WHEN ps.period = 'All Time' THEN '0' ELSE '1' END
+                CASE WHEN ps.period = 'Full Year' THEN '0' ELSE '1' END
             WHEN 'season' THEN 
                 CASE SPLIT_PART(ps.period, ' ', 1)
                     WHEN 'Winter' THEN '1'
@@ -1555,7 +1555,7 @@ route_counts AS (
                     WHEN 'Fall' THEN '4'
                 END || SPLIT_PART(ps.period, ' ', 2)
             WHEN 'month' THEN 
-                CASE WHEN ps.period = 'All Time' THEN '0'
+                CASE WHEN ps.period = 'Full Year' THEN '0'
                      ELSE TO_CHAR(TO_DATE(ps.period, 'Mon YYYY'), 'YYYY-MM')
                 END
         END;
