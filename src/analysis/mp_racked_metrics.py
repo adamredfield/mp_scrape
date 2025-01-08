@@ -1283,3 +1283,282 @@ def tag_relationships(conn, primary_type, secondary_type,  route_types=None, yea
     print(query)
     return conn.query(query)
 
+def get_period_stats(conn, user_id, period_type='all', period_value=None, year_start=None, year_end=None):
+    period_type_sql = f"'{period_type}'"
+    query = f"""
+    {estimated_lengths_cte},
+    estimated_pitches AS (
+            SELECT id,
+                CASE 
+                    WHEN pitches IS NOT NULL THEN pitches
+                    WHEN route_type NOT ILIKE '%trad%' 
+                        AND route_type NOT ILIKE '%sport%' 
+                        AND route_type NOT ILIKE '%aid%' 
+                        AND route_type NOT ILIKE '%alpine%' THEN NULL
+                    WHEN length_ft <= 230 THEN 1
+                    WHEN length_ft IS NOT NULL and length_ft < 1000 THEN
+                        CASE 
+                            WHEN route_type ILIKE '%trad%' THEN 
+                                CEIL(length_ft / (
+                                    SELECT avg(length_ft / pitches) 
+                                    FROM routes.Routes 
+                                    WHERE route_type ILIKE '%trad%' 
+                                    AND length_ft IS NOT NULL 
+                                    AND pitches > 2
+                                ))
+                            WHEN route_type ILIKE '%sport%' THEN 
+                                CEIL(length_ft / (
+                                    SELECT avg(length_ft / pitches) 
+                                    FROM routes.Routes 
+                                    WHERE route_type ILIKE '%sport%' 
+                                    AND length_ft IS NOT NULL 
+                                    AND pitches > 2
+                                ))
+                            WHEN route_type ILIKE '%aid%' THEN 
+                                CEIL(length_ft / (
+                                    SELECT avg(length_ft / pitches) 
+                                    FROM routes.Routes 
+                                    WHERE route_type ILIKE '%aid%' 
+                                    AND length_ft IS NOT NULL 
+                                    AND pitches > 2
+                                ))
+                            WHEN route_type ILIKE '%alpine%' THEN 
+                                CEIL(length_ft / (
+                                    SELECT avg(length_ft / pitches) 
+                                    FROM routes.Routes 
+                                    WHERE route_type ILIKE '%alpine%' 
+                                    AND length_ft IS NOT NULL 
+                                    AND pitches > 2
+                                ))
+                            ELSE NULL
+                        END
+                    ELSE NULL
+                END AS estimated_pitches
+            FROM routes.Routes r
+        ),
+    daily_stats AS (
+        SELECT 
+            t.date,
+            EXTRACT(YEAR FROM t.date) as year,         
+            EXTRACT(MONTH FROM t.date) as month,       
+            CASE 
+                WHEN EXTRACT(MONTH FROM t.date) IN (12, 1, 2) THEN 'Winter'
+                WHEN EXTRACT(MONTH FROM t.date) IN (3, 4, 5) THEN 'Spring'
+                WHEN EXTRACT(MONTH FROM t.date) IN (6, 7, 8) THEN 'Summer'
+                WHEN EXTRACT(MONTH FROM t.date) IN (9, 10, 11) THEN 'Fall'
+            END as season,     
+            SUM(coalesce(t.pitches_climbed,r.pitches,ep.estimated_pitches)) pitches,
+            SUM(COALESCE(r.length_ft, el.estimated_length)) as distance_ft,
+            COUNT(*) as routes_climbed,
+	        MAX(CASE
+            WHEN t.type IN (
+                'Lead / Pinkpoint',
+                'Lead / Onsight',
+                'Lead / Redpoint',
+                'Lead / Flash'
+            ) 
+            AND r.route_type ILIKE '%trad%'
+            THEN gs_yds.sort_order 
+	        END) as trad_grade_sort,
+	        MAX(CASE 
+            WHEN t.type IN (
+                'Lead / Pinkpoint',
+                'Lead / Onsight',
+                'Lead / Redpoint',
+                'Lead / Flash'
+            ) 
+            AND r.route_type ILIKE '%sport%'
+            THEN gs_yds.sort_order 
+	        END) as sport_grade_sort,
+	        MAX(CASE 
+            WHEN t.type != 'Attempt' 
+            THEN gs_boulder.sort_order 
+	        END) as boulder_grade_sort,
+	        MAX(gs_aid.sort_order) as aid_grade_sort
+        FROM routes.ticks t
+        JOIN routes.routes r ON t.route_id = r.id
+        left join estimated_pitches ep on ep.id = r.id
+        left join estimated_lengths el on el.id = r.id
+        LEFT JOIN routes.grade_sort gs_yds ON 
+	        gs_yds.grade_system = 'YDS' AND 
+	        gs_yds.grade = r.yds_rating
+	    LEFT JOIN routes.grade_sort gs_boulder ON 
+	        gs_boulder.grade_system = 'Boulder' AND 
+	        gs_boulder.grade = r.hueco_rating
+	    LEFT JOIN routes.grade_sort gs_aid ON 
+	        gs_aid.grade_system = 'Aid' AND 
+	        gs_aid.grade = r.aid_rating
+        {year_filter(year_range=(year_start, year_end), use_where=True)}
+        {add_user_filter(user_id)}
+        GROUP BY t.date
+        ),
+    period_stats AS (
+    SELECT 
+        'All Time'::text as period,
+        COUNT(DISTINCT date) as days_logged,
+        max(trad_grade_sort) as trad_grade_sort,
+        MAX(sport_grade_sort) as sport_grade_sort,
+        MAX(boulder_grade_sort) as boulder_grade_sort,
+        MAX(aid_grade_sort) as aid_grade_sort,
+        ROUND(AVG(distance_ft), 2) as avg_distance_per_day,
+        ROUND(AVG(pitches), 2) as avg_pitches_per_day,
+        ROUND(SUM(distance_ft), 2) as total_distance,
+        ROUND(SUM(pitches), 2) as total_pitches,
+        ROUND(AVG(routes_climbed), 2) as avg_routes_per_day
+    FROM daily_stats
+    WHERE {period_type_sql} = 'all'
+    UNION ALL
+    SELECT 
+        season || ' ' || year::text as period,
+        COUNT(DISTINCT date),
+        max(trad_grade_sort),
+        MAX(sport_grade_sort),
+        MAX(boulder_grade_sort),
+        MAX(aid_grade_sort),
+        ROUND(AVG(distance_ft), 2),
+        ROUND(AVG(pitches), 2),
+        ROUND(SUM(distance_ft), 2),
+        ROUND(SUM(pitches), 2),
+        ROUND(AVG(routes_climbed), 2)
+    FROM daily_stats
+    WHERE {period_type_sql} = 'season'
+    GROUP BY season, year
+    UNION ALL
+    SELECT 
+        TO_CHAR(date_trunc('month', date), 'Mon YYYY') as period,
+        COUNT(DISTINCT date),
+        max(trad_grade_sort),
+        MAX(sport_grade_sort),
+        MAX(boulder_grade_sort),
+        MAX(aid_grade_sort),
+        ROUND(AVG(distance_ft), 2),
+        ROUND(AVG(pitches), 2),
+        ROUND(SUM(distance_ft), 2),
+        ROUND(SUM(pitches), 2),
+        ROUND(AVG(routes_climbed), 2)
+    FROM daily_stats
+    WHERE {period_type_sql} = 'month'
+    GROUP BY date_trunc('month', date)
+),
+route_counts AS (
+    SELECT 
+        'All Time' as period,
+        COUNT(DISTINCT r.id) as total_unique_routes,
+        COUNT(*) as total_ascents,
+        ROUND(AVG(CASE 
+            WHEN r.route_type NOT ILIKE '%boulder%' 
+            THEN COALESCE(r.length_ft, 0) 
+        END), 2) as avg_route_length
+    FROM routes.ticks t
+    JOIN routes.routes r ON t.route_id = r.id
+    {add_user_filter(user_id)}
+    {year_filter(year_range=(year_start, year_end), use_where=False)}
+    WHERE {period_type_sql} = 'all'
+    UNION ALL
+    SELECT 
+        CASE
+            WHEN EXTRACT(MONTH FROM t.date) IN (12, 1, 2) THEN 'Winter'
+            WHEN EXTRACT(MONTH FROM t.date) IN (3, 4, 5) THEN 'Spring'
+            WHEN EXTRACT(MONTH FROM t.date) IN (6, 7, 8) THEN 'Summer'
+            WHEN EXTRACT(MONTH FROM t.date) IN (9, 10, 11) THEN 'Fall'
+        END || ' ' || EXTRACT(YEAR FROM t.date)::text as period,
+        COUNT(DISTINCT r.id),
+        COUNT(*),
+        ROUND(AVG(CASE 
+            WHEN r.route_type NOT ILIKE '%boulder%' 
+            THEN COALESCE(r.length_ft, 0) 
+        END), 2)
+    FROM routes.ticks t
+    JOIN routes.routes r ON t.route_id = r.id
+    {add_user_filter(user_id)}
+    {year_filter(year_range=(year_start, year_end), use_where=False)}
+    WHERE {period_type_sql} = 'season'
+    GROUP BY 
+        CASE
+            WHEN EXTRACT(MONTH FROM t.date) IN (12, 1, 2) THEN 'Winter'
+            WHEN EXTRACT(MONTH FROM t.date) IN (3, 4, 5) THEN 'Spring'
+            WHEN EXTRACT(MONTH FROM t.date) IN (6, 7, 8) THEN 'Summer'
+            WHEN EXTRACT(MONTH FROM t.date) IN (9, 10, 11) THEN 'Fall'
+        END,
+        EXTRACT(YEAR FROM t.date)
+    UNION ALL
+    SELECT 
+        TO_CHAR(date_trunc('month', t.date), 'Mon YYYY') as period,
+        COUNT(DISTINCT r.id),
+        COUNT(*),
+        ROUND(AVG(CASE 
+            WHEN r.route_type NOT ILIKE '%boulder%' 
+            THEN COALESCE(r.length_ft, 0) 
+        END), 2)
+    FROM routes.ticks t
+    JOIN routes.routes r ON t.route_id = r.id
+    {add_user_filter(user_id)}
+    {year_filter(year_range=(year_start, year_end), use_where=False)}
+    WHERE {period_type_sql} = 'month'
+    GROUP BY date_trunc('month', t.date)
+)
+    SELECT DISTINCT ON (
+        CASE {period_type_sql}
+            WHEN 'all' THEN 
+                CASE WHEN ps.period = 'All Time' THEN '0' ELSE '1' END
+            WHEN 'season' THEN 
+                CASE SPLIT_PART(ps.period, ' ', 1)
+                    WHEN 'Winter' THEN '1'
+                    WHEN 'Spring' THEN '2'
+                    WHEN 'Summer' THEN '3'
+                    WHEN 'Fall' THEN '4'
+                END || SPLIT_PART(ps.period, ' ', 2)
+            WHEN 'month' THEN 
+                CASE WHEN ps.period = 'All Time' THEN '0'
+                     ELSE TO_CHAR(TO_DATE(ps.period, 'Mon YYYY'), 'YYYY-MM')
+                END
+        END
+    )
+        ps.period,
+        ps.days_logged,
+        trad.grade as highest_trad_grade,
+        sport.grade as highest_sport_grade,
+        boulder.grade as highest_boulder,
+        aid.grade as highest_aid,
+        ps.avg_distance_per_day,
+        ps.avg_pitches_per_day,
+        ps.total_distance,
+        ps.total_pitches,
+        rc.total_ascents as total_routes_climbed,
+        rc.total_unique_routes,
+        ps.avg_routes_per_day,
+        rc.avg_route_length
+        FROM period_stats ps
+        LEFT JOIN route_counts rc ON ps.period = rc.period 
+        LEFT JOIN routes.grade_sort trad ON 
+            trad.grade_system = 'YDS' AND 
+            trad.sort_order = ps.trad_grade_sort
+        LEFT JOIN routes.grade_sort sport ON 
+            sport.grade_system = 'YDS' AND 
+            sport.sort_order = ps.sport_grade_sort
+        LEFT JOIN routes.grade_sort boulder ON 
+            boulder.grade_system = 'Boulder' AND 
+            boulder.sort_order = ps.boulder_grade_sort
+        LEFT JOIN routes.grade_sort aid ON 
+            aid.grade_system = 'Aid' AND 
+            aid.sort_order = ps.aid_grade_sort
+        WHERE ({period_type_sql} = 'all' OR ps.period != 'All Time')
+    ORDER BY 
+        CASE {period_type_sql}
+            WHEN 'all' THEN 
+                CASE WHEN ps.period = 'All Time' THEN '0' ELSE '1' END
+            WHEN 'season' THEN 
+                CASE SPLIT_PART(ps.period, ' ', 1)
+                    WHEN 'Winter' THEN '1'
+                    WHEN 'Spring' THEN '2'
+                    WHEN 'Summer' THEN '3'
+                    WHEN 'Fall' THEN '4'
+                END || SPLIT_PART(ps.period, ' ', 2)
+            WHEN 'month' THEN 
+                CASE WHEN ps.period = 'All Time' THEN '0'
+                     ELSE TO_CHAR(TO_DATE(ps.period, 'Mon YYYY'), 'YYYY-MM')
+                END
+        END;
+        """
+    print(query)
+    return conn.query(query)

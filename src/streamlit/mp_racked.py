@@ -103,6 +103,9 @@ if not st.session_state['authenticated']:
 
 pg = st.navigation({
     "Overview": [
+        st.Page("pages/thousand_meter_view.py", 
+                title= "Thousand Meter View", 
+                icon="🦅"),
         st.Page("pages/grade_pyramid.py", 
                 title="Grade Pyramid of Giza", 
                 icon="📊", 
