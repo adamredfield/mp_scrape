@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 import sys
+from datetime import datetime
 
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(project_root)
@@ -374,6 +375,35 @@ def fa_year_filter(df=None):
         
         return fa_year_start, fa_year_end
 
+def period_filter():
+    period_filter_type = st.radio(
+        "",
+        options=["All Time", "By Season", "By Month"],
+        horizontal=True,
+        key="period_filter__type_radio",
+        label_visibility="collapsed"
+    )
+
+    if period_filter_type == "All Time":
+        return "all", None
+    
+    elif period_filter_type == "By Season":
+        season = st.selectbox(
+            "Season",
+            options=['Winter', 'Spring', 'Summer', 'Fall'],
+            format_func=lambda x: x
+        )
+        return "season", season
+    
+    else: 
+        month = st.selectbox(
+            "Month",
+            options=range(1, 13),
+            format_func=lambda x: datetime(2000, x, 1).strftime('%B')
+        )
+        return "month", month
+
+
 def render_filters(df=None, filters_to_include=None, filter_title="Filters", conn=None, user_id=None, default_years=None):
     """
     Render filter expander with specified filters
@@ -401,7 +431,8 @@ def render_filters(df=None, filters_to_include=None, filter_title="Filters", con
         'climbed_routes': climbed_routes_filter,
         'fa': fa_filter,
         'grade': grade_filter,
-        'fa_year': fa_year_filter
+        'fa_year': fa_year_filter,
+        'period': period_filter
     }
 
     st.markdown("""
@@ -425,6 +456,10 @@ def render_filters(df=None, filters_to_include=None, filter_title="Filters", con
             year_start, year_end = filter_functions['date'](df)
             results['year_start'] = year_start
             results['year_end'] = year_end
+        if 'period' in filters_to_include:
+            period_type, period_value = filter_functions['period']()
+            results['period_type'] = period_type
+            results['period_value'] = period_value
         if 'route_tag' in filters_to_include:
             tag_selections = route_tag_filter(
                 df=df,
@@ -444,6 +479,6 @@ def render_filters(df=None, filters_to_include=None, filter_title="Filters", con
             fa_year_start, fa_year_end = fa_year_filter(df)
             results['fa_year'] = (fa_year_start, fa_year_end)
         for filter_name in filters_to_include:
-            if filter_name not in ['date', 'route_tag', 'climbed_routes', 'fa', 'grade', 'fa_year'] and filter_name in filter_functions:
+            if filter_name not in ['date', 'route_tag', 'climbed_routes', 'fa', 'grade', 'fa_year', 'period'] and filter_name in filter_functions:
                 results[filter_name] = filter_functions[filter_name](df)       
     return results

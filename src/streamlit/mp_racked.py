@@ -102,36 +102,41 @@ if not st.session_state['authenticated']:
     st.stop()
 
 pg = st.navigation({
-    "Overview": [
+    "Performance Dashboard": [
+        st.Page("pages/thousand_meter_view.py", 
+                title= "Thousand Meter View", 
+                icon="🦅", 
+                default=True),
         st.Page("pages/grade_pyramid.py", 
                 title="Grade Pyramid of Giza", 
-                icon="📊", 
-                default=True),
+                icon="📊"),
+        st.Page("pages/wall_rat_stats.py", 
+                title="Wall Rat Stats", 
+                icon="🐀")
+    ],
+    "Personal Analytics": [ 
         st.Page("pages/going_the_distance.py", 
                 title="Going the Distance", 
                 icon="🏃"),
+        st.Page("pages/dialing_it_in.py", 
+            title="Dialing It In", 
+            icon="🎯"),
+        st.Page("pages/style_for_miles.py", 
+            title="Style for Miles", 
+            icon="🕺")
+    ],
+    "Route Explorer": [ 
         st.Page("pages/classics_chaser.py", 
                 title="Classics Collector", 
                 icon="⭐"),
         st.Page("pages/route_finder.py", 
                 title="Advanced Route Finder", 
                 icon="🔍"),        
-    ],
-    "Analysis": [
-        st.Page("pages/wall_rat_stats.py", 
-                title="Wall Rat Stats", 
-                icon="🐀"),
         st.Page("pages/fa_legacy.py", 
                 title="FA Legacy", 
                 icon="⚡"),
-        st.Page("pages/dialing_it_in.py", 
-                title="Dialing It In", 
-                icon="🎯"),
-        st.Page("pages/style_for_miles.py", 
-                title="Style for Miles", 
-                icon="🕺")
-    ],
-})
+        ]
+    })
 
 try:
     pg.run()
