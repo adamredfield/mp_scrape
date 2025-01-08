@@ -158,16 +158,22 @@ if year_start is not None and year_end is not None:
             'avg_route_length': float(total_distance) / float(total_routes) if total_routes > 0 else 0
         }])
     elif period_type == 'all':
-        stats_df = stats_df[stats_df['period'] == 'All Time']
+        stats_df = stats_df[stats_df['period'] == 'Full Year']
     
     st.markdown("""
     <style>
                 
-                    .stExpander {
+    .stExpander {
         margin-top: -1rem !important;
         margin-bottom: -1rem !important;
     }
-      
+    .card-subtitle {
+        color: rgba(255, 255, 255, 0.7); 
+        font-size: 0.9rem;
+        text-align: center;
+        margin: -15px 0 10px 0;  /* Negative top margin to bring it closer to title */
+    }
+        
     /* Reduce space between filter expander and first card */
     block-container {
         padding-bottom: 10rem !important;
@@ -244,10 +250,10 @@ if year_start is not None and year_end is not None:
         stats_df['total_routes_climbed'].iloc[0]
     ), unsafe_allow_html=True)
 
-    # Personal Leaderboard Section
     st.markdown("""
     <div class="stat-card">
         <div class="card-title">🏆 Personal Leaderboard</div>
+        <div class="card-subtitle">Highest Grade Sent</div>
         <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; text-align: center;">
             <div>
                 <div class="stat-label">Sport</div>

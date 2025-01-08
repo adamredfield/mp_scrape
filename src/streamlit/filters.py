@@ -378,13 +378,13 @@ def fa_year_filter(df=None):
 def period_filter():
     period_filter_type = st.radio(
         "",
-        options=["All Time", "By Season", "By Month"],
+        options=["Full Year", "By Season", "By Month"],
         horizontal=True,
         key="period_filter__type_radio",
         label_visibility="collapsed"
     )
 
-    if period_filter_type == "All Time":
+    if period_filter_type == "Full Year":
         return "all", None
     
     elif period_filter_type == "By Season":
