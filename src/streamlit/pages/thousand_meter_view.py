@@ -9,7 +9,7 @@ sys.path.append(project_root)
 
 import src.analysis.mp_racked_metrics as metrics
 from src.streamlit.styles import get_spotify_style
-from src.streamlit.filters import  date_filter
+from src.streamlit.filters import  date_filter, render_filters
 from src.analysis.filters_ctes import available_years
 import pandas as pd
 
@@ -19,6 +19,19 @@ user_id = st.session_state.user_id
 conn = st.connection('postgresql', type='sql')
 
 years_df = available_years(conn, user_id)
+
+filter_results = render_filters(
+    df=years_df,
+    filters_to_include=['date', 'period'],
+    filter_title="Filter Options",
+    conn=conn,
+    user_id=user_id
+)
+
+year_start = filter_results['year_start']
+year_end = filter_results['year_end']
+period_type = filter_results['period_type']
+period_value = filter_results['period_value']
 
 def get_highest_grade(grades, grade_sort_df):
     if grades.isna().all():
@@ -37,34 +50,6 @@ def get_highest_grade(grades, grade_sort_df):
         return None
     return grade_orders.loc[grade_orders['sort_order'].idxmax(), 'grade']
 
-def period_filter():
-    period_filter_type = st.radio(
-        "",
-        options=["All Time", "By Season", "By Month"],
-        horizontal=True,
-        key="period_filter__type_radio",
-        label_visibility="collapsed"
-    )
-
-    if period_filter_type == "All Time":
-        return "all", None
-    
-    elif period_filter_type == "By Season":
-        season = st.selectbox(
-            "Season",
-            options=['Winter', 'Spring', 'Summer', 'Fall'],
-            format_func=lambda x: x
-        )
-        return "season", season
-    
-    else: 
-        month = st.selectbox(
-            "Month",
-            options=range(1, 13),
-            format_func=lambda x: datetime(2000, x, 1).strftime('%B')
-        )
-        return "month", month
-
 if 'filter_state' not in st.session_state:
     st.session_state.filter_state = {
         'period_type': None,
@@ -72,9 +57,6 @@ if 'filter_state' not in st.session_state:
         'year_start': None,
         'year_end': None
     }
-
-year_start, year_end = date_filter(years_df)
-period_type, period_value = period_filter()
 
 current_state = {
     'period_type': period_type,
@@ -180,9 +162,16 @@ if year_start is not None and year_end is not None:
     
     st.markdown("""
     <style>
-                        .block-container {
-            padding-bottom: 10rem !important;
-            max-width: 100%;
+                
+                    .stExpander {
+        margin-top: -1rem !important;
+        margin-bottom: -1rem !important;
+    }
+      
+    /* Reduce space between filter expander and first card */
+    block-container {
+        padding-bottom: 10rem !important;
+        max-width: 100%;
         }
     .stat-card {
         background-color: rgba(32, 33, 35, 0.7);
@@ -303,7 +292,7 @@ if year_start is not None and year_end is not None:
                 <div class="stat-value">{:.1f}</div>
             </div>
             <div>
-                <div class="stat-label">Avg Route Height</div>
+                <div class="stat-label">Avg Route Length</div>
                 <div class="stat-value">{:.0f} ft</div>
             </div>
         </div>
