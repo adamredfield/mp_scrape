@@ -1326,8 +1326,7 @@ def tag_relationships(conn, primary_type, secondary_type,
     return conn.query(query)
 
 
-def get_period_stats(conn, user_id, period_type='all',
-                     period_value=None, year_start=None, year_end=None, pitch_preference=None):
+def get_period_stats(conn, user_id, period_type='all', period_value=None, year_start=None, year_end=None, pitch_preference=None):
     period_type_sql = f"'{period_type}'"
     query = f"""
     {estimated_lengths_cte},
@@ -1407,8 +1406,12 @@ def get_period_stats(conn, user_id, period_type='all',
             COUNT(CASE WHEN r.route_type NOT ILIKE '%boulder%' THEN 1 END) as non_boulder_routes,
             SUM(CASE
                 WHEN r.route_type NOT ILIKE '%boulder%'
-                THEN COALESCE(r.length_ft, el.estimated_length, 0)
+                THEN {get_pitch_preference_lengths(pitch_preference)}
             END) as non_boulder_distance,
+            SUM(CASE
+                WHEN r.route_type ILIKE '%boulder%'
+                THEN COALESCE(r.length_ft, el.estimated_length, 0)
+            END) as boulder_distance,
 	        MAX(CASE
             WHEN t.type IN (
                 'Lead / Pinkpoint',
@@ -1465,6 +1468,7 @@ def get_period_stats(conn, user_id, period_type='all',
         ROUND(SUM(distance_ft), 2) as total_distance,
         ROUND(SUM(pitches), 2) as total_pitches,
         SUM(non_boulder_distance) as non_boulder_distance,
+        SUM(boulder_distance) as boulder_distance,
         SUM(non_boulder_routes) as non_boulder_routes,
         SUM(is_rope_day) as roped_days
     FROM daily_stats
@@ -1480,6 +1484,7 @@ def get_period_stats(conn, user_id, period_type='all',
         ROUND(SUM(distance_ft), 2),
         ROUND(SUM(pitches), 2),
         SUM(non_boulder_distance) as non_boulder_distance,
+        SUM(boulder_distance) as boulder_distance,
         SUM(non_boulder_routes) as non_boulder_routes,
         SUM(is_rope_day) as roped_days
     FROM daily_stats
@@ -1496,6 +1501,7 @@ def get_period_stats(conn, user_id, period_type='all',
         ROUND(SUM(distance_ft), 2),
         ROUND(SUM(pitches), 2),
         SUM(non_boulder_distance) as non_boulder_distance,
+        SUM(boulder_distance) as boulder_distance,
         SUM(non_boulder_routes) as non_boulder_routes,
         SUM(is_rope_day) as roped_days
     FROM daily_stats
@@ -1576,6 +1582,7 @@ route_counts AS (
         rc.total_unique_routes,
         ps.non_boulder_distance,
         ps.non_boulder_routes,
+        ps.boulder_distance,
         ps.roped_days
         FROM period_stats ps
         LEFT JOIN route_counts rc ON ps.period = rc.period

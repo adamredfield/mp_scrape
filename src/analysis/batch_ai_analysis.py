@@ -127,8 +127,7 @@ def upload_batch_file(file_path: str) -> Optional[str]:
                 purpose="batch"
             )
             print(
-                f"File uploaded successfully. File ID: {
-                    batch_input_file.id}")
+                f"File uploaded successfully. File ID: {batch_input_file.id}")
             return batch_input_file
     except Exception as e:
         print(f"Error uploading file: {e}")
@@ -228,8 +227,7 @@ def process_batch_results(batch_id: str):
                             conn.commit()
                             processed_count += 1
                             print(
-                                f"Processed and saved analysis for route {
-                                    processed_result['route_id']}")
+                                f"Processed and saved analysis for route {processed_result['route_id']}")
                     except Exception as e:
                         failed_count += 1
                         print(f"Error processing route: {e}")
@@ -269,9 +267,7 @@ def main():
                         "model": "gpt-4o",
                         "messages": [
                             {"role": "system", "content": get_system_prompt()},
-                            {"role": "user",
-                             "content": construct_prompt(route)}
-                        ],
+                            {"role": "user","content": construct_prompt(route)}],
                         "max_tokens": 1000,
                         "temperature": 0.2
                     }
