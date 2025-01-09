@@ -472,6 +472,7 @@ def get_bigwall_routes(conn, user_id=None, route_types=None,
     r.pitches
     ORDER BY commitment_grade DESC, length DESC;
     '''
+    print(query)
     return conn.query(query)
 
 

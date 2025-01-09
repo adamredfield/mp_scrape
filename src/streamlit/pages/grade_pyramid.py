@@ -296,6 +296,7 @@ if sends_df.empty:
 
 ordered_grades = sends_df['grade'].tolist()
 
+
 fig = create_figure(sends_df, falls_df, ordered_grades)
 
 
@@ -341,7 +342,6 @@ with chart_container:
 if selected and selected.selection and len(selected.selection.points) > 0:
     point = selected.selection.points[0]
 
-    # Check if we have the expected data
     if all(key in point for key in ['y', 'x', 'curve_number']):
         grade = point['y']
         is_send = float(point['x']) < 0
