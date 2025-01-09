@@ -36,12 +36,17 @@ st.markdown("""
             display: flex;
             justify-content: center;
         }
+        
+        /* If needed, also adjust the space between tabs and first card */
+        .stTabs [data-baseweb="tab-list"] {
+            margin-top: 1rem;  /* Adjust this value as needed */
+        }
 
         /* Center the radio options themselves */
         div[role="radiogroup"] {
             display: flex;
             justify-content: center;
-            gap: 1rem;
+            gap: 1rem;         
         }
     </style>
 """, unsafe_allow_html=True)
@@ -147,10 +152,8 @@ def display_year(
     text = [f"{d.strftime('%Y-%m-%d')}: {int(dist)}ft climbed"
             for d, dist in zip(dates_in_year, data)]
 
-    # Custom color scale matching your previous style
     colorscale = [
         [0, 'rgb(15,15,15)'],        # Darker background for 0
-        # More visible blue for low values (~300ft)
         [0.1, 'rgb(45,50,120)'],
         [0.25, 'rgb(65,105,180)'],   # Brighter blue (~600ft)
         [0.4, 'rgb(80,180,180)'],    # Teal (~1000ft)
@@ -161,23 +164,18 @@ def display_year(
     if time_period == 'season' or time_period == 'month':
         unique_weeks = sorted(set(weeknumber_of_dates))
         if time_period == 'season':
-            # Divide the weeks into three sections for the three months
             total_weeks = len(unique_weeks)
             if total_weeks < 3:
-                # If less than 3 weeks, space evenly
                 month_positions = unique_weeks
             else:
-                # Position months at the start, middle, and end of the period
                 month_positions = [
-                    unique_weeks[0],  # First week
-                    unique_weeks[total_weeks // 2],  # Middle week
-                    unique_weeks[-1]  # Last week
+                    unique_weeks[0], 
+                    unique_weeks[total_weeks // 2], 
+                    unique_weeks[-1]  
                 ]
-        else:  # month view
-            # Center the month label
+        else:  
             month_positions = [unique_weeks[len(unique_weeks) // 2]]
     else:
-        # Original calculation for full year
         month_days = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
         if number_of_days == 366:
             month_days[1] = 29
@@ -267,7 +265,8 @@ def display_year(
             zeroline=False,
             autorange="reversed",
             ticks="",
-            showticksuffix="none"
+            showticksuffix="none",
+            fixedrange=True  # Add this line
         ),
         xaxis=dict(
             showline=False,
@@ -276,9 +275,9 @@ def display_year(
             tickmode='array',
             ticktext=month_names,
             tickvals=month_positions,
+            fixedrange=True  # Add this line
         ),
         font={'size': 10, 'color': '#9e9e9e'},
-
         margin=dict(
             t=0,
             l=0,
@@ -334,10 +333,12 @@ if year_start is not None and year_end is not None:
         period_type=period_type,
         period_value=period_value,
         year_start=year_start,
-        year_end=year_end
+        year_end=year_end,
+        pitch_preference=st.session_state.pitches_preference
     )
 
 tab1, tab2 = st.tabs(["Stats", "Visualizations"])
+
 with tab1:
     if current_state != st.session_state.filter_state:
         st.session_state.filter_state = current_state.copy()
@@ -618,7 +619,6 @@ with tab1:
         stats_df['highest_aid'].iloc[0] or '-'
     ), unsafe_allow_html=True)
 
-    # Getting After It Section
     st.markdown(
         """
     <div class="stat-card">
@@ -715,7 +715,11 @@ with tab2:
         )
         st.plotly_chart(
             fig, use_container_width=True, config={
-                'displayModeBar': False})
+                'displayModeBar': False,
+                'scrollZoom': False,
+                'doubleClick': False,
+                'modeBarButtonsToRemove': ['zoom2d', 'pan2d', 'select2d', 'lasso2d', 'zoomIn2d', 'zoomOut2d', 'autoScale2d'],
+            })
         if len(years) > 1:
             with st.expander("📅 View Previous Years"):
                 for year in years[1:]:
@@ -739,9 +743,11 @@ with tab2:
                     )
                     st.plotly_chart(
                         fig, use_container_width=True, config={
-                            'displayModeBar': False})
-
-    st.markdown("<br>", unsafe_allow_html=True)
+                            'displayModeBar': False,
+                            'scrollZoom': False,
+                            'doubleClick': False,
+                            'modeBarButtonsToRemove': ['zoom2d', 'pan2d', 'select2d', 'lasso2d', 'zoomIn2d', 'zoomOut2d', 'autoScale2d'],
+                        })
 
     metric = st.radio(
         "",
@@ -875,13 +881,20 @@ with tab2:
             title=dict(
                 text=metric,
                 font=dict(color='#E6EAF1')
-            )),
+            ),
+            fixedrange=True  # Add this line
+        ),
         xaxis=dict(
             tickformat='%b',
-            gridcolor='rgba(255, 255, 255, 0.1)'
+            gridcolor='rgba(255, 255, 255, 0.1)',
+            fixedrange=True  
         )
     )
 
     st.plotly_chart(
         fig, use_container_width=True, config={
-            'displayModeBar': False})
+            'displayModeBar': False,
+            'scrollZoom': False,
+            'doubleClick': False,
+            'modeBarButtonsToRemove': ['zoom2d', 'pan2d', 'select2d', 'lasso2d', 'zoomIn2d', 'zoomOut2d', 'autoScale2d'],
+        })
