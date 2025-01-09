@@ -1,39 +1,40 @@
+import streamlit as st
+import pandas as pd
+from operator import itemgetter
 import os
 import sys
-import streamlit as st
+
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(project_root)
 
-from src.analysis.filters_ctes import add_user_filter, route_type_filter, year_filter, estimated_lengths_cte, get_deduped_ticks_cte, get_pitch_preference_lengths, add_grade_filter, fa_year_filter
 from src.streamlit.filters import generate_route_type_where_clause
-from operator import itemgetter
-import pandas as pd
+from src.analysis.filters_ctes import add_user_filter, route_type_filter, year_filter, estimated_lengths_cte, get_deduped_ticks_cte, get_pitch_preference_lengths, fa_year_filter
 
-def get_grade_group(grade:str, level:str = 'base') -> str:
+def get_grade_group(grade: str, level: str = 'base') -> str:
     if grade.startswith('V'):
         return grade
     if grade.startswith('A') or grade.startswith('C'):
-        return grade 
+        return grade
 
     if grade.startswith('5.'):
         grade_prefix = '5.'
         cleaned_grade = grade.replace('5.', '')
     else:
         return grade
-    
-    if len(cleaned_grade) == 1: # e.g. 5.9
+
+    if len(cleaned_grade) == 1:  # e.g. 5.9
         base_grade = cleaned_grade
         grade_suffix = None
-    elif cleaned_grade[1].isdigit(): # e.g. 5.10 or 5.10a
+    elif cleaned_grade[1].isdigit():  # e.g. 5.10 or 5.10a
         base_grade = cleaned_grade[:2]
         if len(cleaned_grade) == 3:
             grade_suffix = cleaned_grade[2]
         else:
             grade_suffix = None
-    else: # e.g. 5.9+
+    else:  # e.g. 5.9+
         base_grade = cleaned_grade[0]
         grade_suffix = cleaned_grade[1]
-    
+
     if level == 'base':
         return f'{grade_prefix}{base_grade}'
     elif level == 'granular':
@@ -44,10 +45,11 @@ def get_grade_group(grade:str, level:str = 'base') -> str:
         else:
             return f'{grade_prefix}{base_grade}'
     else:
-        return grade 
+        return grade
 
 
-def get_grade_distribution(conn, route_types=None, level='base', year_start=None, year_end=None, user_id=None, tick_type='send', tick_types=None, tag_type=None):
+def get_grade_distribution(conn, route_types=None, level='base', year_start=None,
+                           year_end=None, user_id=None, tick_type='send', tick_types=None, tag_type=None):
     """Get distribution of sends by grade with configurable grouping and route"""
 
     if tick_type == 'send':
@@ -58,14 +60,14 @@ def get_grade_distribution(conn, route_types=None, level='base', year_start=None
                 'Lead / Redpoint',
                 'Lead / Flash',
                 'Solo'
-        ]
+            ]
         send_conditions = [f"t.type = '{t}'" for t in tick_types]
         tick_filter = f"({' OR '.join(send_conditions)})"
     else:
         tick_filter = """
         (
             r.route_type NOT ILIKE '%Aid%'  -- Exclude aid climbs from falls
-            AND t.type = 'Lead / Fell/Hung'  
+            AND t.type = 'Lead / Fell/Hung'
             AND t.type != 'Solo'
         )
         """
@@ -75,22 +77,22 @@ def get_grade_distribution(conn, route_types=None, level='base', year_start=None
         tag_type_filter = f"WHERE ur.tag_type IN ({placeholders})"
 
     grade_column = """
-    CASE 
-        WHEN r.route_type ILIKE '%Boulder%' THEN r.hueco_rating 
-        WHEN r.route_type ILIKE '%Aid%' THEN r.aid_rating 
+    CASE
+        WHEN r.route_type ILIKE '%Boulder%' THEN r.hueco_rating
+        WHEN r.route_type ILIKE '%Aid%' THEN r.aid_rating
     ELSE r.yds_rating END"""
 
     query = f"""
     WITH base_data AS (
-        SELECT 
+        SELECT
             {grade_column} AS grade,
-            CASE 
+            CASE
                 WHEN r.route_type ILIKE '%Alpine%' THEN 'Alpine'
                 WHEN r.route_type ILIKE '%Aid%' THEN 'Aid'
                 WHEN r.route_type ILIKE '%Trad%' THEN 'Trad'
                 WHEN r.route_type ILIKE '%Sport%' THEN 'Sport'
                 WHEN r.route_type ILIKE '%TR%' THEN 'TR'
-                ELSE r.route_type 
+                ELSE r.route_type
             END AS route_type,
             1 as count  -- Count each climb once
         FROM routes.Routes r
@@ -101,7 +103,7 @@ def get_grade_distribution(conn, route_types=None, level='base', year_start=None
         {year_filter(year_range=(year_start, year_end), use_where=False)}
         {add_user_filter(user_id)}
     )
-    SELECT 
+    SELECT
         grade,
         route_type,
         SUM(count) as count,
@@ -111,14 +113,14 @@ def get_grade_distribution(conn, route_types=None, level='base', year_start=None
     ORDER BY grade DESC;
     """
 
-    results =  conn.query(query)
+    results = conn.query(query)
 
     if results.empty:
         if tick_type == 'send':
             st.write("")
             st.write("")
             st.write(f"No sends found for {tick_types}")
-        return[]
+        return []
 
     grouped_grades = {}
 
@@ -137,7 +139,7 @@ def get_grade_distribution(conn, route_types=None, level='base', year_start=None
         grouped_grades[grouped_grade][route_type] += count
 
     total_count = sum(
-        sum(type_counts.values()) 
+        sum(type_counts.values())
         for type_counts in grouped_grades.values()
     )
 
@@ -150,21 +152,26 @@ def get_grade_distribution(conn, route_types=None, level='base', year_start=None
                 'route_type': route_type,
                 'percentage': round(count * 100.0 / total_count, 2)
             })
-    
-    filtered_results.sort(key=lambda x: (grade_sort_key(x['grade']), x['route_type']))
-    
+
+    filtered_results.sort(
+        key=lambda x: (
+            grade_sort_key(
+                x['grade']),
+            x['route_type']))
+
     return filtered_results
+
 
 def grade_sort_key(grade):
     # Handle V grades
     if grade.startswith('V'):
         if grade == 'V-easy':
             return (1000, -1, 2)  # Sort below V0
-        
+
         grade = grade[1:]  # Remove 'V' prefix
         base_part = ''
         modifier = ''
-        
+
         # Handle range grades (V0-1, V2-3, etc) and modifiers
         if '-' in grade:
             parts = grade.split('-')
@@ -179,7 +186,7 @@ def grade_sort_key(grade):
                     return (1000, base_grade, 1)
             except ValueError:
                 return (1000, 0, 0)
-        
+
         # Handle plus grades and plain grades
         if '+' in grade:
             try:
@@ -187,24 +194,24 @@ def grade_sort_key(grade):
                 return (1000, base_grade, 3)
             except ValueError:
                 return (1000, 0, 0)
-        
+
         # Plain V grade
         try:
             base_grade = int(grade)
             return (1000, base_grade, 2)
         except ValueError:
             return (1000, 0, 0)
-        
+
     if grade.startswith('A') or grade.startswith('C'):
         base_part = ''
         modifier = ''
-        
+
         # Get the prefix (A or C)
         prefix = grade[0]
-        
+
         # Skip the A or C prefix
         grade = grade[1:]
-        
+
         # Extract base grade and modifier
         for i, char in enumerate(grade):
             if char.isdigit():
@@ -212,36 +219,36 @@ def grade_sort_key(grade):
             else:
                 modifier = grade[i:]
                 break
-        
+
         try:
             base_grade = int(base_part)
-            
+
             # Aid grade modifier values
             aid_modifier_values = {
-                '-': 1, 
+                '-': 1,
                 '': 2,
-                '+': 3 
+                '+': 3
             }
-            
+
             modifier_val = aid_modifier_values.get(modifier, 2)
             # A harder than C
             prefix_value = 3000 if prefix == 'A' else 2000
-            
+
             return (prefix_value, base_grade, modifier_val)
         except ValueError:
             return (2000, 0, 0)
-        
+
     # YDS grades
     if grade.startswith('5.'):
         cleaned_grade = grade.replace('5.', '')
-        
+
         if len(cleaned_grade) == 1:  # e.g. 5.9
             return (100, int(cleaned_grade), 0)
-        
+
         # Grades with letters or modifiers
         base_part = ''
         modifier = ''
-        
+
         # Get base grade
         for i, char in enumerate(cleaned_grade):
             if char.isdigit():
@@ -249,9 +256,9 @@ def grade_sort_key(grade):
             else:
                 modifier = cleaned_grade[i:]
                 break
-        
+
         base_grade = int(base_part)
-        
+
         # Order modifiers: -, a, b, c, d, +
         modifier_values = {
             '-': 1,
@@ -265,13 +272,15 @@ def grade_sort_key(grade):
             'd': 6,
             '+': 7
         }
-        
+
         modifier_val = modifier_values.get(modifier.lower(), 0)
         return (100, base_grade, modifier_val)
-    
+
     return (0, 0, 0)
 
-def get_route_details(conn, grade, clicked_type=None,filtered_types=None, tick_type='send', tick_types=None, user_id=None, grade_grain='base', year_start=None, year_end=None):
+
+def get_route_details(conn, grade, clicked_type=None, filtered_types=None, tick_type='send',
+                      tick_types=None, user_id=None, grade_grain='base', year_start=None, year_end=None):
     """Get detailed route information for a specific grade and type"""
 
     if tick_type == 'send':
@@ -295,25 +304,25 @@ def get_route_details(conn, grade, clicked_type=None,filtered_types=None, tick_t
         """
 
     grade_column = """
-    CASE 
-        WHEN r.route_type ILIKE '%Boulder%' THEN r.hueco_rating 
-        WHEN r.route_type ILIKE '%Aid%' THEN r.aid_rating 
+    CASE
+        WHEN r.route_type ILIKE '%Boulder%' THEN r.hueco_rating
+        WHEN r.route_type ILIKE '%Aid%' THEN r.aid_rating
     ELSE r.yds_rating END"""
 
     query = f"""
-    
+
     WITH route_data AS (
-        SELECT 
+        SELECT
             r.route_name,
             r.main_area,
             r.route_type,
-            CASE 
+            CASE
                 WHEN r.route_type ILIKE '%Alpine%' THEN 'Alpine'
                 WHEN r.route_type ILIKE '%Aid%' THEN 'Aid'
                 WHEN r.route_type ILIKE '%Trad%' THEN 'Trad'
                 WHEN r.route_type ILIKE '%Sport%' THEN 'Sport'
                 WHEN r.route_type ILIKE '%TR%' THEN 'TR'
-                ELSE r.route_type 
+                ELSE r.route_type
             END AS route_type_calc,
             t.date,
             t.type as tick_type,
@@ -335,7 +344,7 @@ def get_route_details(conn, grade, clicked_type=None,filtered_types=None, tick_t
     params = {
         'clicked_type': clicked_type
     }
-    
+
     results = conn.query(query, params=params)
     df = pd.DataFrame(results)
 
@@ -347,7 +356,9 @@ def get_route_details(conn, grade, clicked_type=None,filtered_types=None, tick_t
         df = df.drop(['grouped_grade'], axis=1)
     return df
 
-def get_classic_climbs(conn, tag_selections=None, route_types=None, year_start=None, year_end=None, tag_type=None, user_id=None):
+
+def get_classic_climbs(conn, tag_selections=None, route_types=None,
+                       year_start=None, year_end=None, tag_type=None, user_id=None):
     tag_conditions = []
     if tag_selections:
         for tag_type, selected_tags in tag_selections.items():
@@ -357,16 +368,17 @@ def get_classic_climbs(conn, tag_selections=None, route_types=None, year_start=N
                     for tag in selected_tags
                 ]
                 tag_conditions.append(f"({' AND '.join(conditions)})")
-    
-    tag_filter = f"HAVING {' AND '.join(tag_conditions)}" if tag_conditions else ""
+
+    tag_filter = f"HAVING {
+        ' AND '.join(tag_conditions)}" if tag_conditions else ""
 
     query = f"""
     {get_deduped_ticks_cte(user_id=user_id, year_start=year_start, year_end=year_end)}
-    SELECT 
+    SELECT
         DISTINCT r.route_name,
         r.main_area,
         r.specific_location,
-        TRIM(NULLIF(CONCAT_WS(' ', 
+        TRIM(NULLIF(CONCAT_WS(' ',
             r.yds_rating,
             r.hueco_rating,
             r.aid_rating,
@@ -378,14 +390,14 @@ def get_classic_climbs(conn, tag_selections=None, route_types=None, year_start=N
         r.primary_photo_url,
         r.route_url
     FROM routes.Routes r
-    LEFT JOIN analysis.TagAnalysisView tav on r.id = tav.route_id 
+    LEFT JOIN analysis.TagAnalysisView tav on r.id = tav.route_id
     JOIN deduped_ticks t ON r.id = t.route_id
     WHERE r.num_votes >= 15
     AND r.avg_stars >= 3.5
     {route_type_filter(route_types)}
     {year_filter(year_range=(year_start, year_end), use_where=False)}
     {add_user_filter(user_id)}
-    GROUP BY r.route_name, r.main_area, r.specific_location, r.yds_rating, r.hueco_rating, 
+    GROUP BY r.route_name, r.main_area, r.specific_location, r.yds_rating, r.hueco_rating,
              r.aid_rating, r.danger_rating, r.commitment_grade, r.avg_stars, r.num_votes,
              r.primary_photo_url, r.route_url
     {tag_filter}
@@ -394,7 +406,9 @@ def get_classic_climbs(conn, tag_selections=None, route_types=None, year_start=N
     """
     return conn.query(query)
 
-def get_bigwall_routes(conn, user_id=None, route_types=None, pitch_preference=None):
+
+def get_bigwall_routes(conn, user_id=None, route_types=None,
+                       pitch_preference=None):
     """Get all bigwall routes"""
     query = f'''
     {estimated_lengths_cte}
@@ -409,37 +423,37 @@ def get_bigwall_routes(conn, user_id=None, route_types=None, pitch_preference=No
         r.route_url,
         r.primary_photo_url,
         r.route_type,
-        STRING_AGG(DISTINCT NULLIF(CASE 
-            WHEN tav.mapped_type = 'style' AND tav.mapped_tag IS NOT NULL 
-            THEN tav.mapped_tag 
+        STRING_AGG(DISTINCT NULLIF(CASE
+            WHEN tav.mapped_type = 'style' AND tav.mapped_tag IS NOT NULL
+            THEN tav.mapped_tag
         END, ''), ', ') as styles,
-        STRING_AGG(DISTINCT NULLIF(CASE 
-            WHEN tav.mapped_type = 'feature' AND tav.mapped_tag IS NOT NULL 
-            THEN tav.mapped_tag 
+        STRING_AGG(DISTINCT NULLIF(CASE
+            WHEN tav.mapped_type = 'feature' AND tav.mapped_tag IS NOT NULL
+            THEN tav.mapped_tag
         END, ''), ', ') as features,
-        STRING_AGG(DISTINCT NULLIF(CASE 
-            WHEN tav.mapped_type = 'descriptor' AND tav.mapped_tag IS NOT NULL 
-            THEN tav.mapped_tag 
+        STRING_AGG(DISTINCT NULLIF(CASE
+            WHEN tav.mapped_type = 'descriptor' AND tav.mapped_tag IS NOT NULL
+            THEN tav.mapped_tag
         END, ''), ', ') as descriptors,
-        STRING_AGG(DISTINCT NULLIF(CASE 
-            WHEN tav.mapped_type = 'rock_type' AND tav.mapped_tag IS NOT NULL 
-            THEN tav.mapped_tag 
+        STRING_AGG(DISTINCT NULLIF(CASE
+            WHEN tav.mapped_type = 'rock_type' AND tav.mapped_tag IS NOT NULL
+            THEN tav.mapped_tag
         END, ''), ', ') as rock_type
-    FROM routes.Ticks t 
-    JOIN routes.Routes r on r.id = t.route_id 
-    LEFT JOIN estimated_lengths el on el.id = t.route_id 
+    FROM routes.Ticks t
+    JOIN routes.Routes r on r.id = t.route_id
+    LEFT JOIN estimated_lengths el on el.id = t.route_id
     LEFT JOIN analysis.fa fa on fa.route_id = r.id
-    LEFT JOIN analysis.taganalysisview tav on tav.route_id = r.id 
+    LEFT JOIN analysis.taganalysisview tav on tav.route_id = r.id
     {year_filter(year_range=(1999, 2025), use_where=True)}
     {add_user_filter(user_id)}
     {route_type_filter(route_types)}
     AND (
-        r.length_ft >= 1000 
-        OR el.estimated_length >= 1000 
+        r.length_ft >= 1000
+        OR el.estimated_length >= 1000
         OR r.commitment_grade IN ('IV', 'V', 'VI', 'VII')
     )
     AND r.commitment_grade NOT IN ('I', 'II', 'III')
-    GROUP BY 
+    GROUP BY
     t.date,
     r.route_name,
     r.yds_rating,
@@ -460,11 +474,13 @@ def get_bigwall_routes(conn, user_id=None, route_types=None, pitch_preference=No
     '''
     return conn.query(query)
 
-def get_length_climbed(conn, area_type="main_area", user_id=None, year_start=None, year_end=None, pitch_preference=None):
+
+def get_length_climbed(conn, area_type="main_area", user_id=None,
+                       year_start=None, year_end=None, pitch_preference=None):
 
     query = f"""
     {estimated_lengths_cte}
-    SELECT 
+    SELECT
         EXTRACT(YEAR FROM t.date) as year,
         r.{area_type} location,
         sum({get_pitch_preference_lengths(pitch_preference)}) as length_climbed
@@ -479,7 +495,9 @@ def get_length_climbed(conn, area_type="main_area", user_id=None, year_start=Non
     """
     return conn.query(query).itertuples(index=False)
 
-def total_routes(conn, user_id=None, year_start=None, year_end=None, route_types=None):
+
+def total_routes(conn, user_id=None, year_start=None,
+                 year_end=None, route_types=None):
     query = f"""
     SELECT
         date,
@@ -494,30 +512,31 @@ def total_routes(conn, user_id=None, year_start=None, year_end=None, route_types
     print(query)
     return conn.query(query)
 
+
 def most_climbed_route(conn, user_id=None, year_start=None, year_end=None):
     query = f"""
         {estimated_lengths_cte},
         route_tags AS (
-            SELECT 
+            SELECT
                 route_id,
-                STRING_AGG(DISTINCT NULLIF(CASE 
-                    WHEN mapped_type = 'style' THEN mapped_tag 
+                STRING_AGG(DISTINCT NULLIF(CASE
+                    WHEN mapped_type = 'style' THEN mapped_tag
                     END, ''), ', ') as styles,
-                STRING_AGG(DISTINCT NULLIF(CASE 
-                    WHEN mapped_type = 'feature' THEN mapped_tag 
+                STRING_AGG(DISTINCT NULLIF(CASE
+                    WHEN mapped_type = 'feature' THEN mapped_tag
                     END, ''), ', ') as features,
-                STRING_AGG(DISTINCT NULLIF(CASE 
-                    WHEN mapped_type = 'descriptor' THEN mapped_tag 
+                STRING_AGG(DISTINCT NULLIF(CASE
+                    WHEN mapped_type = 'descriptor' THEN mapped_tag
                 END, ''), ', ') as descriptors,
-                STRING_AGG(DISTINCT NULLIF(CASE 
-                    WHEN mapped_type = 'rock_type' THEN mapped_tag 
+                STRING_AGG(DISTINCT NULLIF(CASE
+                    WHEN mapped_type = 'rock_type' THEN mapped_tag
                 END, ''), ', ') as rock_type
         FROM analysis.taganalysisview
         GROUP BY route_id
     ),
     route_counts AS (
     SELECT
-        DISTINCT 
+        DISTINCT
         r.route_name,
         r.specific_location,
         TRIM(NULLIF(CONCAT_WS(' ', r.yds_rating, r.hueco_rating, r.aid_rating, r.danger_rating, r.commitment_grade), '')) grade,
@@ -536,10 +555,10 @@ def most_climbed_route(conn, user_id=None, year_start=None, year_end=None):
     FROM routes.Ticks t
     JOIN routes.Routes r ON t.route_id = r.id
     LEFT JOIN estimated_lengths el on el.id = t.route_id
-    LEFT JOIN route_tags rt on rt.route_id = r.id	
+    LEFT JOIN route_tags rt on rt.route_id = r.id
     {year_filter(year_range=(year_start, year_end), use_where=True)}
     {add_user_filter(user_id)}
-    GROUP BY r.route_name, r.specific_location, r.yds_rating, r.hueco_rating, 
+    GROUP BY r.route_name, r.specific_location, r.yds_rating, r.hueco_rating,
             r.aid_rating, r.danger_rating, r.commitment_grade, el.estimated_length, r.length_ft,
             r.primary_photo_url, r.route_url, rt.styles, rt.features, rt.descriptors, rt.rock_type
     ),
@@ -555,6 +574,7 @@ def most_climbed_route(conn, user_id=None, year_start=None, year_end=None):
     print(query)
     return conn.query(query)
 
+
 def days_climbed(conn, user_id=None):
     query = f"""
         SELECT COUNT(DISTINCT date)
@@ -562,18 +582,20 @@ def days_climbed(conn, user_id=None):
         WHERE date::text ILIKE '%2024%'
         {add_user_filter(user_id)}
     """
-    return conn.query(query).iloc[0,0]
+    return conn.query(query).iloc[0, 0]
 
-def biggest_climbing_day(conn, user_id=None, year_start=None, year_end=None, pitch_preference=None):
+
+def biggest_climbing_day(conn, user_id=None, year_start=None,
+                         year_end=None, pitch_preference=None):
 
     query = f"""
         {estimated_lengths_cte}
         SELECT  t.date,
                 STRING_AGG(
-                    concat(r.route_name, ' ~ ', 
-                          TRIM(SUBSTRING(r.specific_location FROM POSITION('>' IN r.specific_location) + 1)), 
-                          ' - ', 
-                          TRIM(NULLIF(CONCAT_WS(' ', r.yds_rating, r.hueco_rating, r.aid_rating, r.danger_rating, r.commitment_grade), '')), 
+                    concat(r.route_name, ' ~ ',
+                          TRIM(SUBSTRING(r.specific_location FROM POSITION('>' IN r.specific_location) + 1)),
+                          ' - ',
+                          TRIM(NULLIF(CONCAT_WS(' ', r.yds_rating, r.hueco_rating, r.aid_rating, r.danger_rating, r.commitment_grade), '')),
                           ' - ',
                           CAST(coalesce(r.length_ft,el.estimated_length) AS INT),' ft'
                     ), ' | '
@@ -583,9 +605,9 @@ def biggest_climbing_day(conn, user_id=None, year_start=None, year_end=None, pit
                 STRING_AGG(DISTINCT CONCAT(r.main_area, ', ', r.region), ' & ') areas,
                 STRING_AGG(r.route_url, ' | ') route_urls,
                 STRING_AGG(r.primary_photo_url, ' | ') photo_urls
-        FROM routes.Ticks t 
-        JOIN routes.Routes r on r.id = t.route_id 
-        LEFT JOIN estimated_lengths el on el.id = t.route_id 
+        FROM routes.Ticks t
+        JOIN routes.Routes r on r.id = t.route_id
+        LEFT JOIN estimated_lengths el on el.id = t.route_id
         {year_filter(year_range=(year_start, year_end), use_where=True)}
         {add_user_filter(user_id)}
         GROUP BY t.date
@@ -594,7 +616,7 @@ def biggest_climbing_day(conn, user_id=None, year_start=None, year_end=None, pit
     """
 
     result = conn.query(query)
-    
+
     if result.empty:
         return None
 
@@ -611,20 +633,21 @@ def biggest_climbing_day(conn, user_id=None, year_start=None, year_end=None, pit
         for _, row in result.iterrows()
     ]
 
+
 def top_grade(conn, level, user_id=None):
     query = f"""
     WITH grade_counts AS (
         SELECT
         	CASE
-	        	WHEN r.route_type ILIKE '%Boulder%' THEN r.hueco_rating 
-	        	WHEN r.route_type ILIKE '%Aid%' THEN r.aid_rating 
+	        	WHEN r.route_type ILIKE '%Boulder%' THEN r.hueco_rating
+	        	WHEN r.route_type ILIKE '%Aid%' THEN r.aid_rating
 	        	ELSE r.yds_rating END AS grade,
 	        	count(*)
         FROM routes.Routes r
         join routes.Ticks t on t.route_id = r.id
         WHERE date::text ILIKE '%2024%'
         {add_user_filter(user_id)}
-        GROUP BY grade 
+        GROUP BY grade
         ORDER BY count(*) desc
         )
     SELECT *
@@ -644,8 +667,9 @@ def top_grade(conn, level, user_id=None):
             grouped_grades[grouped_grade] += count
         else:
             grouped_grades[grouped_grade] = count
-    
-    return max(grouped_grades.items(), key=itemgetter(1))[0]  
+
+    return max(grouped_grades.items(), key=itemgetter(1))[0]
+
 
 def states_climbed(conn, user_id=None, year_start=None, year_end=None):
     query = f"""
@@ -658,8 +682,9 @@ def states_climbed(conn, user_id=None, year_start=None, year_end=None):
         ORDER BY days_out desc;
     """
     result = conn.query(query)
-    
+
     return result.values.tolist()
+
 
 def sub_areas_climbed(conn, user_id=None, year_start=None, year_end=None):
     query = f"""
@@ -668,13 +693,14 @@ def sub_areas_climbed(conn, user_id=None, year_start=None, year_end=None):
         JOIN routes.Ticks t on t.route_id = r.id
         {year_filter(year_range=(year_start, year_end), use_where=True)}
         {add_user_filter(user_id)}
-        GROUP BY sub_area 
+        GROUP BY sub_area
         ORDER BY days_out desc
         Limit 10;
     """
     result = conn.query(query)
-    
+
     return result.values.tolist()
+
 
 def regions_climbed(conn, user_id=None, year_start=None, year_end=None):
     query = f"""
@@ -685,7 +711,8 @@ def regions_climbed(conn, user_id=None, year_start=None, year_end=None):
         {add_user_filter(user_id)}
         Limit 10
     """
-    return conn.query(query).iloc[0,0]
+    return conn.query(query).iloc[0, 0]
+
 
 def regions_sub_areas(conn, user_id=None, year_start=None, year_end=None):
     query = f"""
@@ -695,14 +722,16 @@ def regions_sub_areas(conn, user_id=None, year_start=None, year_end=None):
         {year_filter(year_range=(year_start, year_end), use_where=True)}
         {add_user_filter(user_id)}
     """
-    return conn.query(query).iloc[0,0]
+    return conn.query(query).iloc[0, 0]
 
-def top_tags(conn, tag_type, user_id=None, year_start=None, year_end=None, route_types=None):
-    
+
+def top_tags(conn, tag_type, user_id=None, year_start=None,
+             year_end=None, route_types=None):
+
     query = f"""
         {get_deduped_ticks_cte(user_id=user_id, year_start=year_start, year_end=year_end)}
         SELECT tav.mapped_type, tav.mapped_tag tag_value, count(*) as count
-        FROM analysis.TagAnalysisView tav 
+        FROM analysis.TagAnalysisView tav
         JOIN deduped_ticks dt on dt.route_id = tav.route_id
         JOIN routes.routes r on r.id = dt.route_id
         WHERE 1=1
@@ -711,7 +740,8 @@ def top_tags(conn, tag_type, user_id=None, year_start=None, year_end=None, route
         ORDER BY count DESC;
     """
     all_results = conn.query(query)
-    filtered = all_results[all_results['mapped_type'].str.lower() == tag_type.lower()]
+    filtered = all_results[all_results['mapped_type'].str.lower()
+                           == tag_type.lower()]
 
     filtered = filtered.rename(columns={
         'mapped_type': 'Type',
@@ -721,10 +751,11 @@ def top_tags(conn, tag_type, user_id=None, year_start=None, year_end=None, route
 
     return filtered
 
+
 def get_user_year_range(conn, user_id):
     """Get min and max years from user's tick data"""
     query = f"""
-    SELECT 
+    SELECT
         EXTRACT(YEAR FROM MIN(date))::integer as min_year,
         EXTRACT(YEAR FROM MAX(date))::integer as max_year
     FROM routes.Ticks
@@ -733,7 +764,9 @@ def get_user_year_range(conn, user_id):
     result = conn.query(query)
     return result.iloc[0]['min_year'], result.iloc[0]['max_year']
 
-def get_classics_count(conn, user_id=None, year_start=None, year_end=None, route_types=None, tag_type=None, tag_selections=None):
+
+def get_classics_count(conn, user_id=None, year_start=None, year_end=None,
+                       route_types=None, tag_type=None, tag_selections=None):
     tag_conditions = []
     if tag_selections:
         for tag_type, selected_tags in tag_selections.items():
@@ -743,13 +776,14 @@ def get_classics_count(conn, user_id=None, year_start=None, year_end=None, route
                     for tag in selected_tags
                 ]
                 tag_conditions.append(f"({' AND '.join(conditions)})")
-    
-    tag_filter = f"HAVING {' AND '.join(tag_conditions)}" if tag_conditions else ""
+
+    tag_filter = f"HAVING {
+        ' AND '.join(tag_conditions)}" if tag_conditions else ""
     query = f"""
         SELECT DISTINCT r.id
         FROM routes.Ticks t
         JOIN routes.Routes r ON t.route_id = r.id
-        LEFT JOIN analysis.TagAnalysisView tav on r.id = tav.route_id 
+        LEFT JOIN analysis.TagAnalysisView tav on r.id = tav.route_id
         {year_filter(year_range=(year_start, year_end), use_where=True)}
         {add_user_filter(user_id)}
         {route_type_filter(route_types)}
@@ -760,12 +794,13 @@ def get_classics_count(conn, user_id=None, year_start=None, year_end=None, route
     """
     return len(conn.query(query))
 
+
 def get_available_grades(conn, route_types=None):
-    
+
     grade_column = """
-    CASE 
-        WHEN route_type ILIKE '%Boulder%' THEN hueco_rating 
-        WHEN route_type ILIKE '%Aid%' THEN aid_rating 
+    CASE
+        WHEN route_type ILIKE '%Boulder%' THEN hueco_rating
+        WHEN route_type ILIKE '%Aid%' THEN aid_rating
     ELSE yds_rating END"""
 
     route_type_filter = ""
@@ -785,7 +820,9 @@ def get_available_grades(conn, route_types=None):
     results = conn.query(query)
     return results.to_dict('records')
 
-def get_routes_for_route_finder(conn, offset=0, routes_per_page=None, route_types=None, tag_selections=None, user_id=None, climbed_filter='All Routes', fa_selection='All FAs', grade_system=None, grade_range=None, fa_year_start=None, fa_year_end=None):
+
+def get_routes_for_route_finder(conn, offset=0, routes_per_page=None, route_types=None, tag_selections=None, user_id=None,
+                                climbed_filter='All Routes', fa_selection='All FAs', grade_system=None, grade_range=None, fa_year_start=None, fa_year_end=None):
     try:
         tag_conditions = []
         if tag_selections:
@@ -796,8 +833,9 @@ def get_routes_for_route_finder(conn, offset=0, routes_per_page=None, route_type
                         for tag in selected_tags
                     ]
                     tag_conditions.append(f"({' AND '.join(conditions)})")
-        
-        tag_filter = f"HAVING {' AND '.join(tag_conditions)}" if tag_conditions else ""
+
+        tag_filter = f"HAVING {
+            ' AND '.join(tag_conditions)}" if tag_conditions else ""
 
         route_type_where_clause = generate_route_type_where_clause(route_types)
 
@@ -805,16 +843,16 @@ def get_routes_for_route_finder(conn, offset=0, routes_per_page=None, route_type
         if climbed_filter == 'Unclimbed':
             climbed_condition = f"""
             AND NOT EXISTS (
-                SELECT 1 FROM routes.Ticks t 
-                WHERE t.route_id = r.id 
+                SELECT 1 FROM routes.Ticks t
+                WHERE t.route_id = r.id
                 AND t.user_id = '{user_id}'
             )
             """
         elif climbed_filter == 'Climbed':
             climbed_condition = f"""
             AND EXISTS (
-                SELECT 1 FROM routes.Ticks t 
-                WHERE t.route_id = r.id 
+                SELECT 1 FROM routes.Ticks t
+                WHERE t.route_id = r.id
                 AND t.user_id = '{user_id}'
             )
             """
@@ -823,8 +861,8 @@ def get_routes_for_route_finder(conn, offset=0, routes_per_page=None, route_type
         if fa_selection != 'All FAs':
             fa_condition = f"""
             AND EXISTS (
-                SELECT 1 FROM analysis.fa 
-                WHERE fa.route_id = r.id 
+                SELECT 1 FROM analysis.fa
+                WHERE fa.route_id = r.id
                 AND fa.fa_name = '{fa_selection}'
             )
             """
@@ -838,25 +876,25 @@ def get_routes_for_route_finder(conn, offset=0, routes_per_page=None, route_type
                 'Boulder': 'r.hueco_rating',
                 'Aid': 'r.aid_rating'
             }[grade_system]
-            
+
             grade_join = f"""
-            LEFT JOIN routes.grade_sort gs ON 
-                gs.grade_system = '{grade_system}' AND 
+            LEFT JOIN routes.grade_sort gs ON
+                gs.grade_system = '{grade_system}' AND
                 gs.grade = {rating_col}
             """
 
             min_sort = conn.query(f"""
-                SELECT sort_order FROM routes.grade_sort 
+                SELECT sort_order FROM routes.grade_sort
                 WHERE grade_system = '{grade_system}' AND grade = '{min_grade}'
             """).iloc[0]['sort_order']
-            
+
             max_sort = conn.query(f"""
-                SELECT sort_order FROM routes.grade_sort 
+                SELECT sort_order FROM routes.grade_sort
                 WHERE grade_system = '{grade_system}' AND grade = '{max_grade}'
             """).iloc[0]['sort_order']
-            
+
             grade_where = f"""
-            AND gs.sort_order IS NOT NULL 
+            AND gs.sort_order IS NOT NULL
             AND gs.sort_order BETWEEN {min_sort} AND {max_sort}
             """
 
@@ -881,45 +919,45 @@ def get_routes_for_route_finder(conn, offset=0, routes_per_page=None, route_type
             ),
         estimated_pitches AS (
             SELECT id,
-                CASE 
+                CASE
                     WHEN pitches IS NOT NULL THEN pitches
-                    WHEN route_type NOT ILIKE '%trad%' 
-                        AND route_type NOT ILIKE '%sport%' 
-                        AND route_type NOT ILIKE '%aid%' 
+                    WHEN route_type NOT ILIKE '%trad%'
+                        AND route_type NOT ILIKE '%sport%'
+                        AND route_type NOT ILIKE '%aid%'
                         AND route_type NOT ILIKE '%alpine%' THEN NULL
                     WHEN length_ft <= 230 THEN 1
                     WHEN length_ft IS NOT NULL and length_ft < 1000 THEN
-                        CASE 
-                            WHEN route_type ILIKE '%trad%' THEN 
+                        CASE
+                            WHEN route_type ILIKE '%trad%' THEN
                                 CEIL(length_ft / (
-                                    SELECT avg(length_ft / pitches) 
-                                    FROM routes.Routes 
-                                    WHERE route_type ILIKE '%trad%' 
-                                    AND length_ft IS NOT NULL 
+                                    SELECT avg(length_ft / pitches)
+                                    FROM routes.Routes
+                                    WHERE route_type ILIKE '%trad%'
+                                    AND length_ft IS NOT NULL
                                     AND pitches > 2
                                 ))
-                            WHEN route_type ILIKE '%sport%' THEN 
+                            WHEN route_type ILIKE '%sport%' THEN
                                 CEIL(length_ft / (
-                                    SELECT avg(length_ft / pitches) 
-                                    FROM routes.Routes 
-                                    WHERE route_type ILIKE '%sport%' 
-                                    AND length_ft IS NOT NULL 
+                                    SELECT avg(length_ft / pitches)
+                                    FROM routes.Routes
+                                    WHERE route_type ILIKE '%sport%'
+                                    AND length_ft IS NOT NULL
                                     AND pitches > 2
                                 ))
-                            WHEN route_type ILIKE '%aid%' THEN 
+                            WHEN route_type ILIKE '%aid%' THEN
                                 CEIL(length_ft / (
-                                    SELECT avg(length_ft / pitches) 
-                                    FROM routes.Routes 
-                                    WHERE route_type ILIKE '%aid%' 
-                                    AND length_ft IS NOT NULL 
+                                    SELECT avg(length_ft / pitches)
+                                    FROM routes.Routes
+                                    WHERE route_type ILIKE '%aid%'
+                                    AND length_ft IS NOT NULL
                                     AND pitches > 2
                                 ))
-                            WHEN route_type ILIKE '%alpine%' THEN 
+                            WHEN route_type ILIKE '%alpine%' THEN
                                 CEIL(length_ft / (
-                                    SELECT avg(length_ft / pitches) 
-                                    FROM routes.Routes 
-                                    WHERE route_type ILIKE '%alpine%' 
-                                    AND length_ft IS NOT NULL 
+                                    SELECT avg(length_ft / pitches)
+                                    FROM routes.Routes
+                                    WHERE route_type ILIKE '%alpine%'
+                                    AND length_ft IS NOT NULL
                                     AND pitches > 2
                                 ))
                             ELSE NULL
@@ -930,14 +968,14 @@ def get_routes_for_route_finder(conn, offset=0, routes_per_page=None, route_type
         )
         select
         r.id,
-        r.route_name, 
+        r.route_name,
         r.yds_rating,
         r.hueco_rating,
         r.aid_rating,
         TRIM(NULLIF(CONCAT_WS(' ', r.yds_rating, r.hueco_rating, r.aid_rating, r.danger_rating, r.commitment_grade), '')) grade,
         r.avg_stars,
         least(4.0,round((
-            (r.avg_stars * r.num_votes + 
+            (r.avg_stars * r.num_votes +
             CASE  -- Prior mean (m) - same within grade tiers
                 -- Grade VI tiers
             WHEN r.commitment_grade = 'VI' AND r.num_votes >= 600 THEN 4.5
@@ -972,7 +1010,7 @@ def get_routes_for_route_finder(conn, offset=0, routes_per_page=None, route_type
             WHEN r.num_votes >= 100 THEN 3.5
             WHEN r.num_votes >= 50 THEN 3
             ELSE 2
-        END * 
+        END *
             CASE  -- Confidence number (C)
                 -- Grade VI tiers
                 WHEN r.commitment_grade = 'VI' AND r.num_votes >= 600 THEN GREATEST(15, ROUND(r.num_votes * 0.2))
@@ -1004,7 +1042,7 @@ def get_routes_for_route_finder(conn, offset=0, routes_per_page=None, route_type
                 WHEN r.num_votes >= 100 THEN GREATEST(30, ROUND(r.num_votes * 0.005))
                 ELSE GREATEST(30, ROUND(r.num_votes * 0.0001))
             END)::NUMERIC / (
-            r.num_votes + 
+            r.num_votes +
             CASE  -- Same confidence numbers as above
                 WHEN r.commitment_grade = 'VI' AND r.num_votes >= 600 THEN GREATEST(15, ROUND(r.num_votes * 0.2))
                 WHEN r.commitment_grade = 'VI' AND r.num_votes >= 500 THEN GREATEST(15, ROUND(r.num_votes * 0.19))
@@ -1045,31 +1083,31 @@ def get_routes_for_route_finder(conn, offset=0, routes_per_page=None, route_type
         coalesce(r.length_ft, el.estimated_length) length_ft,
         coalesce(r.pitches,ep.estimated_pitches) pitches,
         r.fa,
-        STRING_AGG(DISTINCT NULLIF(CASE 
-            WHEN tav.mapped_type = 'style' AND tav.mapped_tag IS NOT NULL 
-            THEN tav.mapped_tag 
+        STRING_AGG(DISTINCT NULLIF(CASE
+            WHEN tav.mapped_type = 'style' AND tav.mapped_tag IS NOT NULL
+            THEN tav.mapped_tag
         END, ''), ', ') as styles,
-        STRING_AGG(DISTINCT NULLIF(CASE 
-            WHEN tav.mapped_type = 'feature' AND tav.mapped_tag IS NOT NULL 
-            THEN tav.mapped_tag 
+        STRING_AGG(DISTINCT NULLIF(CASE
+            WHEN tav.mapped_type = 'feature' AND tav.mapped_tag IS NOT NULL
+            THEN tav.mapped_tag
         END, ''), ', ') as features,
-        STRING_AGG(DISTINCT NULLIF(CASE 
-            WHEN tav.mapped_type = 'descriptor' AND tav.mapped_tag IS NOT NULL 
-            THEN tav.mapped_tag 
+        STRING_AGG(DISTINCT NULLIF(CASE
+            WHEN tav.mapped_type = 'descriptor' AND tav.mapped_tag IS NOT NULL
+            THEN tav.mapped_tag
         END, ''), ', ') as descriptors,
-        STRING_AGG(DISTINCT NULLIF(CASE 
-            WHEN tav.mapped_type = 'rock_type' AND tav.mapped_tag IS NOT NULL 
-            THEN tav.mapped_tag 
+        STRING_AGG(DISTINCT NULLIF(CASE
+            WHEN tav.mapped_type = 'rock_type' AND tav.mapped_tag IS NOT NULL
+            THEN tav.mapped_tag
         END, ''), ', ') as rock_type,
         EXISTS (
-            SELECT 1 FROM routes.Ticks t 
-            WHERE t.route_id = r.id 
+            SELECT 1 FROM routes.Ticks t
+            WHERE t.route_id = r.id
             AND t.user_id = '{user_id}'
         ) as climbed
         from routes.routes r
         LEFT JOIN estimated_lengths el on el.id = r.id
         left join estimated_pitches ep on ep.id = r.id
-        LEFT JOIN analysis.taganalysisview tav on tav.route_id = r.id 
+        LEFT JOIN analysis.taganalysisview tav on tav.route_id = r.id
         LEFT JOIN analysis.fa fa ON fa.route_id = r.id
         {grade_join}
         {route_type_where_clause}
@@ -1078,7 +1116,7 @@ def get_routes_for_route_finder(conn, offset=0, routes_per_page=None, route_type
         {fa_year_filter(fa_year_start, fa_year_end)}
         {grade_where}
         group by r.id,
-        r.route_name, 
+        r.route_name,
         yds_rating,
         hueco_rating,
         aid_rating,
@@ -1104,22 +1142,23 @@ def get_routes_for_route_finder(conn, offset=0, routes_per_page=None, route_type
         print("Executing main query...")
         results = conn.query(query)
         print(f"Query returned {len(results)} routes")
-        
+
         return results if not results.empty else pd.DataFrame()
-        
+
     except Exception as e:
         print(f"Error in get_routes_for_route_finder: {str(e)}")
         print(f"Query was: {query}")
         return pd.DataFrame()
 
+
 def get_fifty_classics_details(conn, user_id=None):
     """
     Get detailed information about the Fifty Classic Climbs.
-    
+
     Args:
         conn: Database connection
         user_id: User ID to check for ticks
-        
+
     Returns:
         DataFrame with detailed information about the Fifty Classic Climbs
     """
@@ -1127,21 +1166,21 @@ def get_fifty_classics_details(conn, user_id=None):
  WITH latest_ticks AS (
     SELECT *,
         ROW_NUMBER() OVER (
-            PARTITION BY route_id 
-            ORDER BY 
-                CASE 
+            PARTITION BY route_id
+            ORDER BY
+                CASE
                     WHEN pitches_climbed IS NULL THEN 1  -- Nulls first
                     ELSE 0
                 END DESC,
                 pitches_climbed DESC,
-                date DESC       
+                date DESC
         ) as rn
-    FROM routes.ticks t 
+    FROM routes.ticks t
     WHERE 1=1
     {add_user_filter(user_id)}
 ),
 classic_ticks AS (
-    SELECT 
+    SELECT
         route_id,
         COUNT(*) as ascent_count,
         (SELECT date FROM latest_ticks WHERE rn = 1 AND route_id = t.route_id) as date,
@@ -1153,10 +1192,10 @@ classic_ticks AS (
     {add_user_filter(user_id)}
     GROUP BY route_id
 )
-    SELECT 
+    SELECT
         r.id,
         r.route_name,
-        TRIM(NULLIF(CONCAT_WS(' ', 
+        TRIM(NULLIF(CONCAT_WS(' ',
             r.yds_rating,
             r.hueco_rating,
             r.aid_rating,
@@ -1168,36 +1207,36 @@ classic_ticks AS (
         r.route_type,
         r.main_area,
         r.specific_location,
-        STRING_AGG(DISTINCT NULLIF(CASE 
-            WHEN tav.mapped_type = 'style' AND tav.mapped_tag IS NOT NULL 
-            THEN tav.mapped_tag 
+        STRING_AGG(DISTINCT NULLIF(CASE
+            WHEN tav.mapped_type = 'style' AND tav.mapped_tag IS NOT NULL
+            THEN tav.mapped_tag
         END, ''), ', ') as styles,
-        STRING_AGG(DISTINCT NULLIF(CASE 
-            WHEN tav.mapped_type = 'feature' AND tav.mapped_tag IS NOT NULL 
-            THEN tav.mapped_tag 
+        STRING_AGG(DISTINCT NULLIF(CASE
+            WHEN tav.mapped_type = 'feature' AND tav.mapped_tag IS NOT NULL
+            THEN tav.mapped_tag
         END, ''), ', ') as features,
-        STRING_AGG(DISTINCT NULLIF(CASE 
-            WHEN tav.mapped_type = 'descriptor' AND tav.mapped_tag IS NOT NULL 
-            THEN tav.mapped_tag 
+        STRING_AGG(DISTINCT NULLIF(CASE
+            WHEN tav.mapped_type = 'descriptor' AND tav.mapped_tag IS NOT NULL
+            THEN tav.mapped_tag
         END, ''), ', ') as descriptors,
-        STRING_AGG(DISTINCT NULLIF(CASE 
-            WHEN tav.mapped_type = 'rock_type' AND tav.mapped_tag IS NOT NULL 
-            THEN tav.mapped_tag 
+        STRING_AGG(DISTINCT NULLIF(CASE
+            WHEN tav.mapped_type = 'rock_type' AND tav.mapped_tag IS NOT NULL
+            THEN tav.mapped_tag
         END, ''), ', ') as rock_type,
         r.primary_photo_url,
         r.route_url,
         t.date as tick_date,
         t.style as tick_style,
         t.note as tick_notes,
-        CASE 
-            WHEN t.route_id IS NOT NULL THEN true 
-            ELSE false 
+        CASE
+            WHEN t.route_id IS NOT NULL THEN true
+            ELSE false
         END as climbed
     FROM routes.fifty_classics fc
-    JOIN routes.routes r ON r.id = fc.route_id 
-    LEFT JOIN classic_ticks t ON t.route_id = r.id 
+    JOIN routes.routes r ON r.id = fc.route_id
+    LEFT JOIN classic_ticks t ON t.route_id = r.id
     LEFT JOIN analysis.taganalysisview tav on tav.route_id = r.id
-    GROUP BY 
+    GROUP BY
         r.id,
         r.route_name,
         r.yds_rating,
@@ -1219,7 +1258,9 @@ classic_ticks AS (
     """
     return conn.query(query)
 
-def tag_relationships(conn, primary_type, secondary_type,  route_types=None, year_start=None, year_end=None, user_id=None):
+
+def tag_relationships(conn, primary_type, secondary_type,
+                      route_types=None, year_start=None, year_end=None, user_id=None):
     query = f"""
         WITH filtered_routes AS (
             SELECT DISTINCT r.id as route_id
@@ -1231,7 +1272,7 @@ def tag_relationships(conn, primary_type, secondary_type,  route_types=None, yea
             {add_user_filter(user_id, table_alias='t')}
         ),
         primary_counts AS (
-            SELECT 
+            SELECT
                 mapped_tag as primary_tag,
                 COUNT(DISTINCT tav.route_id) as count
             FROM analysis.TagAnalysisView tav
@@ -1241,15 +1282,15 @@ def tag_relationships(conn, primary_type, secondary_type,  route_types=None, yea
             HAVING COUNT(DISTINCT tav.route_id) >= 3
         ),
         related_counts AS (
-            SELECT 
+            SELECT
                 p.mapped_tag as primary_tag,
                 r.mapped_tag as related_tag,
                 COUNT(DISTINCT r.route_id) as count,
-                COUNT(DISTINCT r.route_id)::float / 
-                    (SELECT pc.count 
-                     FROM primary_counts pc 
+                COUNT(DISTINCT r.route_id)::float /
+                    (SELECT pc.count
+                     FROM primary_counts pc
                      WHERE pc.primary_tag = p.mapped_tag) as percentage,  -- Fixed this line
-                ROW_NUMBER() OVER (PARTITION BY p.mapped_tag 
+                ROW_NUMBER() OVER (PARTITION BY p.mapped_tag
                     ORDER BY COUNT(DISTINCT r.route_id) DESC) as rank
             FROM analysis.TagAnalysisView p
             JOIN analysis.TagAnalysisView r ON r.route_id = p.route_id
@@ -1260,21 +1301,21 @@ def tag_relationships(conn, primary_type, secondary_type,  route_types=None, yea
             GROUP BY p.mapped_tag, r.mapped_tag
             HAVING COUNT(DISTINCT r.route_id) >= 3
         )
-        SELECT 
+        SELECT
             primary_tag || '_' || related_tag as id,
             related_tag || '<br>' || ROUND(percentage * 100) || '%' as label,
             primary_tag as parent,
             count
         FROM related_counts
         UNION ALL
-        SELECT 
+        SELECT
             primary_tag as id,
             primary_tag || '<br>' || count || ' routes' as label,
             'Root' as parent,
             count
         FROM primary_counts
         UNION ALL
-        SELECT 
+        SELECT
             'Root' as id,
             '{primary_type.title()}s' as label,
             '' as parent,
@@ -1283,51 +1324,53 @@ def tag_relationships(conn, primary_type, secondary_type,  route_types=None, yea
     print(query)
     return conn.query(query)
 
-def get_period_stats(conn, user_id, period_type='all', period_value=None, year_start=None, year_end=None):
+
+def get_period_stats(conn, user_id, period_type='all',
+                     period_value=None, year_start=None, year_end=None):
     period_type_sql = f"'{period_type}'"
     query = f"""
     {estimated_lengths_cte},
     estimated_pitches AS (
             SELECT id,
-                CASE 
+                CASE
                     WHEN pitches IS NOT NULL THEN pitches
-                    WHEN route_type NOT ILIKE '%trad%' 
-                        AND route_type NOT ILIKE '%sport%' 
-                        AND route_type NOT ILIKE '%aid%' 
+                    WHEN route_type NOT ILIKE '%trad%'
+                        AND route_type NOT ILIKE '%sport%'
+                        AND route_type NOT ILIKE '%aid%'
                         AND route_type NOT ILIKE '%alpine%' THEN NULL
                     WHEN length_ft <= 230 THEN 1
                     WHEN length_ft IS NOT NULL and length_ft < 1000 THEN
-                        CASE 
-                            WHEN route_type ILIKE '%trad%' THEN 
+                        CASE
+                            WHEN route_type ILIKE '%trad%' THEN
                                 CEIL(length_ft / (
-                                    SELECT avg(length_ft / pitches) 
-                                    FROM routes.Routes 
-                                    WHERE route_type ILIKE '%trad%' 
-                                    AND length_ft IS NOT NULL 
+                                    SELECT avg(length_ft / pitches)
+                                    FROM routes.Routes
+                                    WHERE route_type ILIKE '%trad%'
+                                    AND length_ft IS NOT NULL
                                     AND pitches > 2
                                 ))
-                            WHEN route_type ILIKE '%sport%' THEN 
+                            WHEN route_type ILIKE '%sport%' THEN
                                 CEIL(length_ft / (
-                                    SELECT avg(length_ft / pitches) 
-                                    FROM routes.Routes 
-                                    WHERE route_type ILIKE '%sport%' 
-                                    AND length_ft IS NOT NULL 
+                                    SELECT avg(length_ft / pitches)
+                                    FROM routes.Routes
+                                    WHERE route_type ILIKE '%sport%'
+                                    AND length_ft IS NOT NULL
                                     AND pitches > 2
                                 ))
-                            WHEN route_type ILIKE '%aid%' THEN 
+                            WHEN route_type ILIKE '%aid%' THEN
                                 CEIL(length_ft / (
-                                    SELECT avg(length_ft / pitches) 
-                                    FROM routes.Routes 
-                                    WHERE route_type ILIKE '%aid%' 
-                                    AND length_ft IS NOT NULL 
+                                    SELECT avg(length_ft / pitches)
+                                    FROM routes.Routes
+                                    WHERE route_type ILIKE '%aid%'
+                                    AND length_ft IS NOT NULL
                                     AND pitches > 2
                                 ))
-                            WHEN route_type ILIKE '%alpine%' THEN 
+                            WHEN route_type ILIKE '%alpine%' THEN
                                 CEIL(length_ft / (
-                                    SELECT avg(length_ft / pitches) 
-                                    FROM routes.Routes 
-                                    WHERE route_type ILIKE '%alpine%' 
-                                    AND length_ft IS NOT NULL 
+                                    SELECT avg(length_ft / pitches)
+                                    FROM routes.Routes
+                                    WHERE route_type ILIKE '%alpine%'
+                                    AND length_ft IS NOT NULL
                                     AND pitches > 2
                                 ))
                             ELSE NULL
@@ -1337,125 +1380,129 @@ def get_period_stats(conn, user_id, period_type='all', period_value=None, year_s
             FROM routes.Routes r
         ),
     daily_stats AS (
-        SELECT 
+        SELECT
             t.date,
-            EXTRACT(YEAR FROM t.date) as year,         
-            EXTRACT(MONTH FROM t.date) as month,       
-            CASE 
+            EXTRACT(YEAR FROM t.date) as year,
+            EXTRACT(MONTH FROM t.date) as month,
+            CASE
                 WHEN EXTRACT(MONTH FROM t.date) IN (12, 1, 2) THEN 'Winter'
                 WHEN EXTRACT(MONTH FROM t.date) IN (3, 4, 5) THEN 'Spring'
                 WHEN EXTRACT(MONTH FROM t.date) IN (6, 7, 8) THEN 'Summer'
                 WHEN EXTRACT(MONTH FROM t.date) IN (9, 10, 11) THEN 'Fall'
-            END as season,     
+            END as season,
             SUM(coalesce(t.pitches_climbed,r.pitches,ep.estimated_pitches)) pitches,
             SUM(COALESCE(r.length_ft, el.estimated_length)) as distance_ft,
             COUNT(*) as routes_climbed,
+            COUNT(CASE WHEN r.route_type NOT ILIKE '%boulder%' THEN 1 END) as non_boulder_routes,
+            SUM(CASE
+                WHEN r.route_type NOT ILIKE '%boulder%'
+                THEN COALESCE(r.length_ft, el.estimated_length, 0)
+            END) as non_boulder_distance,
 	        MAX(CASE
             WHEN t.type IN (
                 'Lead / Pinkpoint',
                 'Lead / Onsight',
                 'Lead / Redpoint',
                 'Lead / Flash'
-            ) 
+            )
             AND r.route_type ILIKE '%trad%'
-            THEN gs_yds.sort_order 
+            THEN gs_yds.sort_order
 	        END) as trad_grade_sort,
-	        MAX(CASE 
+	        MAX(CASE
             WHEN t.type IN (
                 'Lead / Pinkpoint',
                 'Lead / Onsight',
                 'Lead / Redpoint',
                 'Lead / Flash'
-            ) 
+            )
             AND r.route_type ILIKE '%sport%'
-            THEN gs_yds.sort_order 
+            THEN gs_yds.sort_order
 	        END) as sport_grade_sort,
-	        MAX(CASE 
-            WHEN t.type != 'Attempt' 
-            THEN gs_boulder.sort_order 
+	        MAX(CASE
+            WHEN t.type != 'Attempt'
+            THEN gs_boulder.sort_order
 	        END) as boulder_grade_sort,
-	        MAX(gs_aid.sort_order) as aid_grade_sort
+	        MAX(gs_aid.sort_order) as aid_grade_sort,
+            CASE WHEN COUNT(CASE WHEN r.route_type NOT ILIKE '%boulder%' THEN 1 END) > 0
+            THEN 1 ELSE 0
+            END as is_rope_day
         FROM routes.ticks t
         JOIN routes.routes r ON t.route_id = r.id
         left join estimated_pitches ep on ep.id = r.id
         left join estimated_lengths el on el.id = r.id
-        LEFT JOIN routes.grade_sort gs_yds ON 
-	        gs_yds.grade_system = 'YDS' AND 
+        LEFT JOIN routes.grade_sort gs_yds ON
+	        gs_yds.grade_system = 'YDS' AND
 	        gs_yds.grade = r.yds_rating
-	    LEFT JOIN routes.grade_sort gs_boulder ON 
-	        gs_boulder.grade_system = 'Boulder' AND 
+	    LEFT JOIN routes.grade_sort gs_boulder ON
+	        gs_boulder.grade_system = 'Boulder' AND
 	        gs_boulder.grade = r.hueco_rating
-	    LEFT JOIN routes.grade_sort gs_aid ON 
-	        gs_aid.grade_system = 'Aid' AND 
+	    LEFT JOIN routes.grade_sort gs_aid ON
+	        gs_aid.grade_system = 'Aid' AND
 	        gs_aid.grade = r.aid_rating
         {year_filter(year_range=(year_start, year_end), use_where=True)}
         {add_user_filter(user_id)}
         GROUP BY t.date
         ),
     period_stats AS (
-    SELECT 
+    SELECT
         'Full Year'::text as period,
         COUNT(DISTINCT date) as days_logged,
         max(trad_grade_sort) as trad_grade_sort,
         MAX(sport_grade_sort) as sport_grade_sort,
         MAX(boulder_grade_sort) as boulder_grade_sort,
         MAX(aid_grade_sort) as aid_grade_sort,
-        ROUND(AVG(distance_ft), 2) as avg_distance_per_day,
-        ROUND(AVG(pitches), 2) as avg_pitches_per_day,
         ROUND(SUM(distance_ft), 2) as total_distance,
         ROUND(SUM(pitches), 2) as total_pitches,
-        ROUND(AVG(routes_climbed), 2) as avg_routes_per_day
+        SUM(non_boulder_distance) as non_boulder_distance,
+        SUM(non_boulder_routes) as non_boulder_routes,
+        SUM(is_rope_day) as roped_days
     FROM daily_stats
     WHERE {period_type_sql} = 'all'
     UNION ALL
-    SELECT 
+    SELECT
         season || ' ' || year::text as period,
-        COUNT(DISTINCT date),
+        COUNT(DISTINCT date) as days_logged,
         max(trad_grade_sort),
         MAX(sport_grade_sort),
         MAX(boulder_grade_sort),
         MAX(aid_grade_sort),
-        ROUND(AVG(distance_ft), 2),
-        ROUND(AVG(pitches), 2),
         ROUND(SUM(distance_ft), 2),
         ROUND(SUM(pitches), 2),
-        ROUND(AVG(routes_climbed), 2)
+        SUM(non_boulder_distance) as non_boulder_distance,
+        SUM(non_boulder_routes) as non_boulder_routes,
+        SUM(is_rope_day) as roped_days
     FROM daily_stats
     WHERE {period_type_sql} = 'season'
     GROUP BY season, year
     UNION ALL
-    SELECT 
+    SELECT
         TO_CHAR(date_trunc('month', date), 'Mon YYYY') as period,
-        COUNT(DISTINCT date),
+        COUNT(DISTINCT date) as days_logged,
         max(trad_grade_sort),
         MAX(sport_grade_sort),
         MAX(boulder_grade_sort),
         MAX(aid_grade_sort),
-        ROUND(AVG(distance_ft), 2),
-        ROUND(AVG(pitches), 2),
         ROUND(SUM(distance_ft), 2),
         ROUND(SUM(pitches), 2),
-        ROUND(AVG(routes_climbed), 2)
+        SUM(non_boulder_distance) as non_boulder_distance,
+        SUM(non_boulder_routes) as non_boulder_routes,
+        SUM(is_rope_day) as roped_days
     FROM daily_stats
     WHERE {period_type_sql} = 'month'
     GROUP BY date_trunc('month', date)
 ),
 route_counts AS (
-    SELECT 
+    SELECT
         'Full Year' as period,
         COUNT(DISTINCT r.id) as total_unique_routes,
-        COUNT(*) as total_ascents,
-        ROUND(AVG(CASE 
-            WHEN r.route_type NOT ILIKE '%boulder%' 
-            THEN COALESCE(r.length_ft, 0) 
-        END), 2) as avg_route_length
+        COUNT(*) as total_ascents
     FROM routes.ticks t
     JOIN routes.routes r ON t.route_id = r.id
     {add_user_filter(user_id)}
     {year_filter(year_range=(year_start, year_end), use_where=False)}
-    WHERE {period_type_sql} = 'all'
+    AND {period_type_sql} = 'all'
     UNION ALL
-    SELECT 
+    SELECT
         CASE
             WHEN EXTRACT(MONTH FROM t.date) IN (12, 1, 2) THEN 'Winter'
             WHEN EXTRACT(MONTH FROM t.date) IN (3, 4, 5) THEN 'Spring'
@@ -1463,17 +1510,13 @@ route_counts AS (
             WHEN EXTRACT(MONTH FROM t.date) IN (9, 10, 11) THEN 'Fall'
         END || ' ' || EXTRACT(YEAR FROM t.date)::text as period,
         COUNT(DISTINCT r.id),
-        COUNT(*),
-        ROUND(AVG(CASE 
-            WHEN r.route_type NOT ILIKE '%boulder%' 
-            THEN COALESCE(r.length_ft, 0) 
-        END), 2)
+        COUNT(*) as total_ascents
     FROM routes.ticks t
     JOIN routes.routes r ON t.route_id = r.id
     {add_user_filter(user_id)}
     {year_filter(year_range=(year_start, year_end), use_where=False)}
-    WHERE {period_type_sql} = 'season'
-    GROUP BY 
+    AND {period_type_sql} = 'season'
+    GROUP BY
         CASE
             WHEN EXTRACT(MONTH FROM t.date) IN (12, 1, 2) THEN 'Winter'
             WHEN EXTRACT(MONTH FROM t.date) IN (3, 4, 5) THEN 'Spring'
@@ -1482,33 +1525,29 @@ route_counts AS (
         END,
         EXTRACT(YEAR FROM t.date)
     UNION ALL
-    SELECT 
+    SELECT
         TO_CHAR(date_trunc('month', t.date), 'Mon YYYY') as period,
         COUNT(DISTINCT r.id),
-        COUNT(*),
-        ROUND(AVG(CASE 
-            WHEN r.route_type NOT ILIKE '%boulder%' 
-            THEN COALESCE(r.length_ft, 0) 
-        END), 2)
+        COUNT(*)
     FROM routes.ticks t
     JOIN routes.routes r ON t.route_id = r.id
     {add_user_filter(user_id)}
     {year_filter(year_range=(year_start, year_end), use_where=False)}
-    WHERE {period_type_sql} = 'month'
+    AND {period_type_sql} = 'month'
     GROUP BY date_trunc('month', t.date)
 )
     SELECT DISTINCT ON (
         CASE {period_type_sql}
-            WHEN 'all' THEN 
+            WHEN 'all' THEN
                 CASE WHEN ps.period = 'Full Year' THEN '0' ELSE '1' END
-            WHEN 'season' THEN 
+            WHEN 'season' THEN
                 CASE SPLIT_PART(ps.period, ' ', 1)
                     WHEN 'Winter' THEN '1'
                     WHEN 'Spring' THEN '2'
                     WHEN 'Summer' THEN '3'
                     WHEN 'Fall' THEN '4'
                 END || SPLIT_PART(ps.period, ' ', 2)
-            WHEN 'month' THEN 
+            WHEN 'month' THEN
                 CASE WHEN ps.period = 'Full Year' THEN '0'
                      ELSE TO_CHAR(TO_DATE(ps.period, 'Mon YYYY'), 'YYYY-MM')
                 END
@@ -1520,41 +1559,40 @@ route_counts AS (
         sport.grade as highest_sport_grade,
         boulder.grade as highest_boulder,
         aid.grade as highest_aid,
-        ps.avg_distance_per_day,
-        ps.avg_pitches_per_day,
         ps.total_distance,
         ps.total_pitches,
         rc.total_ascents as total_routes_climbed,
         rc.total_unique_routes,
-        ps.avg_routes_per_day,
-        rc.avg_route_length
+        ps.non_boulder_distance,
+        ps.non_boulder_routes,
+        ps.roped_days
         FROM period_stats ps
-        LEFT JOIN route_counts rc ON ps.period = rc.period 
-        LEFT JOIN routes.grade_sort trad ON 
-            trad.grade_system = 'YDS' AND 
+        LEFT JOIN route_counts rc ON ps.period = rc.period
+        LEFT JOIN routes.grade_sort trad ON
+            trad.grade_system = 'YDS' AND
             trad.sort_order = ps.trad_grade_sort
-        LEFT JOIN routes.grade_sort sport ON 
-            sport.grade_system = 'YDS' AND 
+        LEFT JOIN routes.grade_sort sport ON
+            sport.grade_system = 'YDS' AND
             sport.sort_order = ps.sport_grade_sort
-        LEFT JOIN routes.grade_sort boulder ON 
-            boulder.grade_system = 'Boulder' AND 
+        LEFT JOIN routes.grade_sort boulder ON
+            boulder.grade_system = 'Boulder' AND
             boulder.sort_order = ps.boulder_grade_sort
-        LEFT JOIN routes.grade_sort aid ON 
-            aid.grade_system = 'Aid' AND 
+        LEFT JOIN routes.grade_sort aid ON
+            aid.grade_system = 'Aid' AND
             aid.sort_order = ps.aid_grade_sort
         WHERE ({period_type_sql} = 'all' OR ps.period != 'Full Year')
-    ORDER BY 
+    ORDER BY
         CASE {period_type_sql}
-            WHEN 'all' THEN 
+            WHEN 'all' THEN
                 CASE WHEN ps.period = 'Full Year' THEN '0' ELSE '1' END
-            WHEN 'season' THEN 
+            WHEN 'season' THEN
                 CASE SPLIT_PART(ps.period, ' ', 1)
                     WHEN 'Winter' THEN '1'
                     WHEN 'Spring' THEN '2'
                     WHEN 'Summer' THEN '3'
                     WHEN 'Fall' THEN '4'
                 END || SPLIT_PART(ps.period, ' ', 2)
-            WHEN 'month' THEN 
+            WHEN 'month' THEN
                 CASE WHEN ps.period = 'Full Year' THEN '0'
                      ELSE TO_CHAR(TO_DATE(ps.period, 'Mon YYYY'), 'YYYY-MM')
                 END

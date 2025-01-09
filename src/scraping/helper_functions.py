@@ -1,31 +1,33 @@
+from src.analysis.fa_parsing import parse_fa_data
+from playwright.sync_api import sync_playwright
+from datetime import datetime, timezone
+from bs4 import BeautifulSoup
+from src.database import queries
+import re
+import requests
+import json
 import os
 import sys
 
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(project_root)
 
-import json
-import requests
-import re
-from src.analysis.ai_analysis_helper_functions import process_route, process_route_response, save_analysis_results
 from src.database.utils import create_connection, add_new_tags_to_mapping
-from src.database import queries
-from bs4 import BeautifulSoup
-from datetime import datetime, timezone
-from playwright.sync_api import sync_playwright
-from src.analysis.fa_parsing import parse_fa_data
+from src.analysis.ai_analysis_helper_functions import process_route, process_route_response, save_analysis_results
 
 mp_home_url = "https://www.mountainproject.com"
+
 
 def get_proxy_url():
     """Get IPRoyal proxy URL - returns a string"""
     username = os.getenv('IPROYAL_USERNAME')
     password = os.getenv('IPROYAL_PASSWORD')
-    
+
     proxy_url = f'http://{username}:{password}@geo.iproyal.com:12321'
     print(f"Generated proxy URL: http://{username}:****@geo.iproyal.com:12321")
-    
+
     return proxy_url
+
 
 def login_and_save_session(playwright):
     browser = None
@@ -52,7 +54,7 @@ def login_and_save_session(playwright):
         context = browser.new_context()
         page = context.new_page()
         print("Context created successfully")
-    
+
         page.set_default_navigation_timeout(90000)
         page.set_default_timeout(90000)
         page.goto(mp_home_url)
@@ -77,52 +79,62 @@ def login_and_save_session(playwright):
 
         print("Login successful, session saved!")
         return browser, context
-    
+
     except Exception as e:
         print(f"Browser/login failed: {str(e)}")
         if browser:
             browser.close()
         raise
 
-def fetch_dynamic_page_content(page, route_link, max_retries=3):
-        for attempt in range(max_retries):
-            try:
-                page.goto(route_link, timeout=90000)
-                last_height = None
 
-                # loads comments
-                while True:
-                    page.evaluate("window.scrollTo(0, document.body.scrollHeight)")  # Scroll down
-                    page.wait_for_timeout(1000)
-                    new_height = page.evaluate("document.body.scrollHeight")
-                    if new_height == last_height:
-                        break
-                    last_height = new_height
-                    
-                html_content = page.content()
-                return html_content
-            except Exception as e:
-                print(f"Error fetching {route_link} (Attempt {attempt + 1}): {str(e)}")
-                if "context or browser has been closed" in str(e):
-                    return "BROWSER_CLOSED"
-                
-                if attempt < max_retries - 1:
-                    continue
-                else:
-                    print(f"Failed to fetch {route_link} after {max_retries} attempts")
-                    raise
+def fetch_dynamic_page_content(page, route_link, max_retries=3):
+    for attempt in range(max_retries):
+        try:
+            page.goto(route_link, timeout=90000)
+            last_height = None
+
+            # loads comments
+            while True:
+                # Scroll down
+                page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                page.wait_for_timeout(1000)
+                new_height = page.evaluate("document.body.scrollHeight")
+                if new_height == last_height:
+                    break
+                last_height = new_height
+
+            html_content = page.content()
+            return html_content
+        except Exception as e:
+            print(
+                f"Error fetching {route_link} (Attempt {
+                    attempt +
+                    1}): {
+                    str(e)}")
+            if "context or browser has been closed" in str(e):
+                return "BROWSER_CLOSED"
+
+            if attempt < max_retries - 1:
+                continue
+            else:
+                print(
+                    f"Failed to fetch {route_link} after {max_retries} attempts")
+                raise
+
 
 def get_total_pages(ticks_url):
     pagination_response = requests.get(ticks_url)
     if pagination_response.status_code != 200:
         print(f"Failed to retrieve data: {pagination_response.status_code}")
-        raise Exception(f"Failed to get total pages: {pagination_response.status_code}")
+        raise Exception(
+            f"Failed to get total pages: {
+                pagination_response.status_code}")
 
     pagination_soup = BeautifulSoup(pagination_response.text, 'html.parser')
     pagination_div = pagination_soup.find('div', class_='pagination')
     if not pagination_div:
         return 1  # Return 1 if no pagination found
-        
+
     no_click_links = pagination_div.find_all('a', class_='no-click')
 
     # Loop through the links to find the one containing text (pagination data)
@@ -132,27 +144,32 @@ def get_total_pages(ticks_url):
     total_pages = int(pagination_text.split()[-1])
     return total_pages
 
+
 def get_comments(route_soup):
-        comments = []
+    comments = []
 
-        comment_elements = route_soup.find_all('div', class_='comment-body')
+    comment_elements = route_soup.find_all('div', class_='comment-body')
 
-        for comment in comment_elements:
-            # Extract the full comment text from the <span> with id containing '-full'
-            comment_text = comment.find('span', id=re.compile(r'.*-full')).get_text(strip=True)
-            comments.append(comment_text)
-        return comments
+    for comment in comment_elements:
+        # Extract the full comment text from the <span> with id containing
+        # '-full'
+        comment_text = comment.find(
+            'span', id=re.compile(r'.*-full')).get_text(strip=True)
+        comments.append(comment_text)
+    return comments
+
 
 def get_route_details(route_soup):
-    description_details_tbl = route_soup.find('table', class_='description-details')
+    description_details_tbl = route_soup.find(
+        'table', class_='description-details')
     route_details = {
-    'route_type': None,
-    'length_ft': None,
-    'pitches': None,
-    'commitment_grade': None,
-    'fa': None
-}
-    desc_rows = description_details_tbl.find_all('tr') 
+        'route_type': None,
+        'length_ft': None,
+        'pitches': None,
+        'commitment_grade': None,
+        'fa': None
+    }
+    desc_rows = description_details_tbl.find_all('tr')
     for row in desc_rows:
         cells = row.find_all('td')
 
@@ -166,8 +183,10 @@ def get_route_details(route_soup):
             route_details['fa'] = value
     return route_details
 
+
 def get_route_sections(route_soup):
-    # sections we want to extract text for. Can add as more relevant sections are found
+    # sections we want to extract text for. Can add as more relevant sections
+    # are found
     sections = ['description', 'protection']
     route_sections = {}
 
@@ -178,10 +197,12 @@ def get_route_sections(route_soup):
         for section in sections:
             if section.lower() in header_text:
                 section_div = header.find_next_sibling('div', class_='fr-view')
-                route_sections[section.lower()] = ' '.join(section_div.get_text(separator=' ').split())
+                route_sections[section.lower()] = ' '.join(
+                    section_div.get_text(separator=' ').split())
                 # break out of loop if match already found and processed
                 break
     return route_sections
+
 
 def get_grade(route_soup):
     grade_types = {
@@ -190,7 +211,7 @@ def get_grade(route_soup):
         'aid_rating': None,     # e.g., "A2"
         'danger_rating': None   # e.g., "R"
     }
-    danger_list = ['PG', 'PG13', 'R', 'X'] 
+    danger_list = ['PG', 'PG13', 'R', 'X']
 
     rating_h2 = route_soup.find('h2', class_='inline-block mr-2')
     if rating_h2:
@@ -202,15 +223,18 @@ def get_grade(route_soup):
                 grade_types['yds_rating'] = rating
             elif rating.startswith('V'):
                 grade_types['hueco_rating'] = rating
-        
+
         danger_text = rating_h2.get_text().strip()
         for word in danger_text.split():
-            if (word.startswith('A') or word.startswith('C')) and len(word) > 1 and word[1].isdigit():
+            if (word.startswith('A') or word.startswith('C')
+                    ) and len(word) > 1 and word[1].isdigit():
                 grade_types['aid_rating'] = word
             elif word in danger_list:
                 grade_types['danger_rating'] = word
-        
+
     return grade_types
+
+
 def get_route_attributes(route_soup):
 
     route_attributes = {}
@@ -219,17 +243,29 @@ def get_route_attributes(route_soup):
     route_attributes['hueco_rating'] = grade_types['hueco_rating']
     route_attributes['aid_rating'] = grade_types['aid_rating']
     route_attributes['danger_rating'] = grade_types['danger_rating']
-    stars_avg_text_element = route_soup.find('span', id=re.compile('^starsWithAvgText-'))
+    stars_avg_text_element = route_soup.find(
+        'span', id=re.compile('^starsWithAvgText-'))
     avg_rating_text = stars_avg_text_element.text.strip().replace('\n', ' ')
     avg_rating_parts = avg_rating_text.split('from')
-    route_attributes['avg_stars'] = avg_rating_parts[0].replace('Avg:', '').strip()
-    route_attributes['num_ratings'] = int(avg_rating_parts[1].replace('votes', '').replace('vote', '').replace(',', '').strip() )
-    route_attributes['formatted_location'] = ' > '.join(link.text.strip() for link in route_soup.select('.mb-half.small.text-warm a'))
+    route_attributes['avg_stars'] = avg_rating_parts[0].replace(
+        'Avg:', '').strip()
+    route_attributes['num_ratings'] = int(
+        avg_rating_parts[1].replace(
+            'votes',
+            '').replace(
+            'vote',
+            '').replace(
+                ',',
+            '').strip())
+    route_attributes['formatted_location'] = ' > '.join(
+        link.text.strip() for link in route_soup.select('.mb-half.small.text-warm a'))
     photo_link = route_soup.find('div', class_='carousel-item')
     route_attributes['primary_photo_url'] = (
-        photo_link['style'].split('url("')[1].split('")')[0] if photo_link and 'style' in photo_link.attrs else None
+        photo_link['style'].split('url("')[1].split('")')[
+            0] if photo_link and 'style' in photo_link.attrs else None
     )
     return route_attributes
+
 
 def parse_route_type(route_details_string):
     """
@@ -256,12 +292,23 @@ def parse_route_type(route_details_string):
 
     # Split the string by commas
     parts = [p.strip() for p in route_details_string.split(',')]
-    valid_types = ['Trad', 'Sport', 'Aid', 'Boulder', 'Alpine', 'Mixed', 'Ice', 'Snow', 'TR']
+    valid_types = [
+        'Trad',
+        'Sport',
+        'Aid',
+        'Boulder',
+        'Alpine',
+        'Mixed',
+        'Ice',
+        'Snow',
+        'TR']
     found_types = []
 
-    # Process parts until we hit a length, pitch, or grade indicator to get type(s)
+    # Process parts until we hit a length, pitch, or grade indicator to get
+    # type(s)
     for part in parts:
-        if not any(indicator in part.lower() for indicator in ['ft', 'pitch', 'grade']):
+        if not any(indicator in part.lower()
+                   for indicator in ['ft', 'pitch', 'grade']):
             for valid_type in valid_types:
                 if valid_type in part:
                     found_types.append(valid_type)
@@ -270,7 +317,8 @@ def parse_route_type(route_details_string):
         # Match route length (e.g., "500 ft (152 m)")
         length_match = re.search(r'(\d+)\s*ft', part)
         if length_match:
-            parsed_details['length_ft'] = int(length_match.group(1))  # Store in feet
+            parsed_details['length_ft'] = int(
+                length_match.group(1))  # Store in feet
             continue
 
         # Match pitches (e.g., "6 pitches" or "6 pitch")
@@ -284,10 +332,12 @@ def parse_route_type(route_details_string):
         if grade_match:
             parsed_details['commitment_grade'] = grade_match.group(1)
             continue
-    
-    parsed_details['route_type'] = ', '.join(found_types) if found_types else None
+
+    parsed_details['route_type'] = ', '.join(
+        found_types) if found_types else None
 
     return parsed_details
+
 
 def parse_location(location_string):
     """
@@ -334,18 +384,20 @@ def parse_location(location_string):
         location_data['specific_location'] = ' > '.join(parts[3:])
 
     return location_data
-    
+
+
 def check_routes_exist(cursor, route_ids):
     """Check multiple routes at once"""
     if not route_ids:
         return set()
-        
+
     placeholders = ','.join(['%s'] * len(route_ids))
     cursor.execute(
         f"SELECT id FROM routes.Routes WHERE id IN ({placeholders})",
         tuple(route_ids)
     )
     return {row[0] for row in cursor.fetchall()}
+
 
 def parse_route_data(route_soup, route_id, route_name, route_link):
     route_attributes = get_route_attributes(route_soup)
@@ -357,7 +409,7 @@ def parse_route_data(route_soup, route_id, route_name, route_link):
         'route_id': route_id,
         'route_name': route_name,
         'route_url': route_link,
-        'yds_rating': route_attributes.get('yds_rating'),  
+        'yds_rating': route_attributes.get('yds_rating'),
         'hueco_rating': route_attributes.get('hueco_rating'),
         'aid_rating': route_attributes.get('aid_rating'),
         'danger_rating': route_attributes.get('danger_rating'),
@@ -376,13 +428,16 @@ def parse_route_data(route_soup, route_id, route_name, route_link):
         'protection': route_sections.get('protection'),
         'primary_photo_url': route_attributes.get('primary_photo_url'),
         'insert_date': datetime.now(timezone.utc).isoformat()
-        }
+    }
     return current_route_data
+
 
 def parse_route_comments_data(route_soup, route_id):
     comments = get_comments(route_soup)
-    comments_dict = [{'route_id': route_id, 'comment': comment, 'insert_date': datetime.now(timezone.utc).isoformat()} for comment in comments]
+    comments_dict = [{'route_id': route_id, 'comment': comment, 'insert_date': datetime.now(
+        timezone.utc).isoformat()} for comment in comments]
     return comments_dict
+
 
 def parse_tick_details(tick_details, current_route_data, user_id):
 
@@ -404,12 +459,12 @@ def parse_tick_details(tick_details, current_route_data, user_id):
     ]
 
     if ' · ' in tick_details_text:
-        post_date_text = tick_details_text.split(' · ')[1]  # Get everything after the bullet, following date
+        # Get everything after the bullet, following date
+        post_date_text = tick_details_text.split(' · ')[1]
         pitch_pattern = r'(\d+)\s*pitches?'
         pitch_match = re.search(pitch_pattern, post_date_text)
         if pitch_match:
             pitch_count = int(pitch_match.group(1))
-
 
         if '.' in post_date_text:
             parts = post_date_text.split('.', 1)
@@ -418,7 +473,8 @@ def parse_tick_details(tick_details, current_route_data, user_id):
                 potential_type = next_parts[0].strip()
                 if potential_type in valid_tick_types:
                     tick_type = potential_type
-                    tick_note = next_parts[1].strip() if len(next_parts) > 1 else None
+                    tick_note = next_parts[1].strip() if len(
+                        next_parts) > 1 else None
                 else:
                     tick_note = parts[1].strip()
             else:
@@ -430,7 +486,7 @@ def parse_tick_details(tick_details, current_route_data, user_id):
                     tick_note = parts[1].strip()
         else:
             tick_note = post_date_text.strip()
-            
+
     tick_data = {
         'user_id': user_id,
         'route_id': current_route_data['route_id'],
@@ -441,6 +497,7 @@ def parse_tick_details(tick_details, current_route_data, user_id):
         'insert_date': datetime.now(timezone.utc).isoformat()
     }
     return tick_data
+
 
 def process_page(page_number, ticks_url, user_id, retry_count=0):
     """Process a single page"""
@@ -463,26 +520,33 @@ def process_page(page_number, ticks_url, user_id, retry_count=0):
                 browser, context = login_and_save_session(playwright)
                 page = context.new_page()
 
-                print(f'Processing page: {page_number} for user {user_id}. (Retry #{retry_count})')
-                
+                print(
+                    f'Processing page: {page_number} for user {user_id}. (Retry #{retry_count})')
+
                 current_page_url = f"{ticks_url}{page_number}"
                 page.goto(current_page_url, timeout=90000)
                 tick_html = page.content()
                 tick_soup = BeautifulSoup(tick_html, 'html.parser')
-                tick_table = tick_soup.find('table', class_='table route-table hidden-xs-down')
+                tick_table = tick_soup.find(
+                    'table', class_='table route-table hidden-xs-down')
                 tick_rows = tick_table.find_all('tr', class_='route-row')
                 print(f"Found {len(tick_rows) / 2} routes to process")
-                
-                for i in range(0, len(tick_rows), 2):  # Step by 2 since routes and ticks alternate
+
+                for i in range(0, len(tick_rows),
+                               2):  # Step by 2 since routes and ticks alternate
                     try:
                         route_row = tick_rows[i]
-                        tick_row = tick_rows[i + 1] if i + 1 < len(tick_rows) else None
+                        tick_row = tick_rows[i + 1] if i + \
+                            1 < len(tick_rows) else None
                         cells = route_row.find_all('td')
-                        route_name = ' '.join(cells[0].text.strip().replace('●', '').split())
+                        route_name = ' '.join(
+                            cells[0].text.strip().replace(
+                                '●', '').split())
                         route_link = route_row.find('a', href=True)['href']
                         route_id = route_link.split('/route/')[1].split('/')[0]
 
-                        tick_details = tick_row.find('td', class_='text-warm small pt-0') if tick_row else None
+                        tick_details = tick_row.find(
+                            'td', class_='text-warm small pt-0') if tick_row else None
 
                         if route_id not in tick_details_map:
                             tick_details_map[route_id] = []
@@ -501,9 +565,11 @@ def process_page(page_number, ticks_url, user_id, retry_count=0):
 
                 with create_connection() as conn:
                     cursor = conn.cursor()
-                    existing_routes = queries.check_routes_exists(cursor, route_ids_to_check.keys())
+                    existing_routes = queries.check_routes_exists(
+                        cursor, route_ids_to_check.keys())
 
-                    for route_id, (route_name, route_link) in route_ids_to_check.items():
+                    for route_id, (route_name,
+                                   route_link) in route_ids_to_check.items():
                         print(f'Retrieving data for {route_name}')
 
                         current_route_data = {
@@ -511,37 +577,46 @@ def process_page(page_number, ticks_url, user_id, retry_count=0):
                             'route_name': route_name
                         }
                         if int(route_id) in existing_routes:
-                            print(f"Route {route_name} with id {route_id} already exists in the database.")
-                            
+                            print(
+                                f"Route {route_name} with id {route_id} already exists in the database.")
+
                         if int(route_id) not in existing_routes:
-                            route_html_content = fetch_dynamic_page_content(page, route_link)
+                            route_html_content = fetch_dynamic_page_content(
+                                page, route_link)
 
                             if route_html_content == "BROWSER_CLOSED":
                                 print("Browser closed, recreating session...")
                                 if context:
                                     try:
                                         context.close()
-                                    except:
+                                    except BaseException:
                                         pass
                                 if browser:
                                     try:
                                         browser.close()
-                                    except:
+                                    except BaseException:
                                         pass
-                                browser, context = login_and_save_session(playwright)
+                                browser, context = login_and_save_session(
+                                    playwright)
                                 page = context.new_page()
-                                print("Session recreated, continuing with next route")
+                                print(
+                                    "Session recreated, continuing with next route")
                                 continue
                             if route_html_content is None:
-                                print(f"Skipping route {route_name} due to fetch errors")
+                                print(
+                                    f"Skipping route {route_name} due to fetch errors")
                                 continue
 
-                            route_soup = BeautifulSoup(route_html_content, 'html.parser')
-                            current_route_data = parse_route_data(route_soup, route_id, route_name, route_link)
-                            current_route_comments_data = parse_route_comments_data(route_soup, route_id)
+                            route_soup = BeautifulSoup(
+                                route_html_content, 'html.parser')
+                            current_route_data = parse_route_data(
+                                route_soup, route_id, route_name, route_link)
+                            current_route_comments_data = parse_route_comments_data(
+                                route_soup, route_id)
 
                             route_data.append(current_route_data)
-                            route_comments_data.extend(current_route_comments_data)
+                            route_comments_data.extend(
+                                current_route_comments_data)
                             parse_fa_data(current_route_data['fa'])
 
                             combined_grade = ' '.join(filter(None, [
@@ -549,16 +624,18 @@ def process_page(page_number, ticks_url, user_id, retry_count=0):
                                 current_route_data.get('hueco_rating') or '',
                                 current_route_data.get('aid_rating') or '',
                                 current_route_data.get('danger_rating') or '',
-                                current_route_data.get('commitment_grade') or ''
+                                current_route_data.get(
+                                    'commitment_grade') or ''
                             ])).strip() or None
 
                             combined_location = ' > '.join(filter(None, [
                                 current_route_data.get('region') or '',
                                 current_route_data.get('main_area') or '',
                                 current_route_data.get('sub_area') or '',
-                                current_route_data.get('specific_location') or ''
+                                current_route_data.get(
+                                    'specific_location') or ''
                             ])).strip() or None
-                        
+
                             route_for_analysis = {
                                 'route_id': current_route_data['route_id'],
                                 'route_name': current_route_data['route_name'],
@@ -571,24 +648,35 @@ def process_page(page_number, ticks_url, user_id, retry_count=0):
                                 'description': current_route_data['description'],
                                 'protection': current_route_data['protection'],
                                 'comments': ' | '.join(c['comment'] for c in current_route_comments_data)
-                        }
+                            }
                             print(f"Running AI analysis")
-                            ai_route_response = process_route(route_for_analysis)
+                            ai_route_response = process_route(
+                                route_for_analysis)
                             if ai_route_response:
-                                ai_route_analysis_data.append(process_route_response(ai_route_response))
-                                
+                                ai_route_analysis_data.append(
+                                    process_route_response(ai_route_response))
+
                         if route_id in tick_details_map:
-                            print(f"\nProcessing ticks for {route_name} ({route_id})")
-                            print(f"Number of ticks: {len(tick_details_map[route_id])}")
+                            print(
+                                f"\nProcessing ticks for {route_name} ({route_id})")
+                            print(
+                                f"Number of ticks: {len(tick_details_map[route_id])}")
                             for tick_detail in tick_details_map[route_id]:
-                                tick_data.append(parse_tick_details(tick_detail, current_route_data, user_id))
+                                tick_data.append(
+                                    parse_tick_details(
+                                        tick_detail,
+                                        current_route_data,
+                                        user_id))
 
                     if route_data:
                         print(f"Attempting to insert {len(route_data)} routes")
                         queries.insert_routes_batch(cursor, route_data)
                     if route_comments_data:
-                        print(f"Attempting to insert {len(route_comments_data)} comments")
-                        queries.insert_comments_batch(cursor, route_comments_data)
+                        print(
+                            f"Attempting to insert {
+                                len(route_comments_data)} comments")
+                        queries.insert_comments_batch(
+                            cursor, route_comments_data)
                     if tick_data:
                         print(f"Attempting to insert {len(tick_data)} ticks")
                         cursor = conn.cursor()
@@ -597,19 +685,17 @@ def process_page(page_number, ticks_url, user_id, retry_count=0):
                         print(f"Attempting to insert AI results")
                         for result in ai_route_analysis_data:
                             save_analysis_results(cursor, result)
-                    
+
                     add_new_tags_to_mapping(cursor)
 
-                    conn.commit() # commit all transactions together
+                    conn.commit()  # commit all transactions together
                     print(f'Successfully processed page {page_number}')
             finally:
                 if context:
                     context.close()
                 if browser:
                     browser.close()
-        
+
     except Exception as e:
         print(f"Error processing page {page_number}: {str(e)}")
         raise
-
-

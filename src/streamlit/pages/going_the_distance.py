@@ -1,3 +1,4 @@
+import plotly.graph_objects as go
 import streamlit as st
 import pandas as pd
 import os
@@ -6,23 +7,23 @@ import sys
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(project_root)
 
-from src.analysis.filters_ctes import available_years
-import src.analysis.mp_racked_metrics as metrics
-from src.streamlit.streamlit_helper_functions import image_to_base64, get_squared_image
-from src.streamlit.styles import get_spotify_style
 from src.streamlit.filters import render_filters
-
-import plotly.graph_objects as go
-
+from src.streamlit.styles import get_spotify_style
+from src.streamlit.streamlit_helper_functions import image_to_base64, get_squared_image
+import src.analysis.mp_racked_metrics as metrics
+from src.analysis.filters_ctes import available_years
 
 def get_day_type(length):
-    # Sort achievements by length requirement
-    sorted_achievements = sorted(day_types.items(), key=lambda x: x[1][0], reverse=True)
-    
+    sorted_achievements = sorted(
+        day_types.items(),
+        key=lambda x: x[1][0],
+        reverse=True)
+
     # Find the highest achievement that's not exceeding the length
     for name, (threshold, emoji) in sorted_achievements:
         if length >= threshold:
             return f"{name} {emoji}"
+
 
 st.markdown(get_spotify_style(), unsafe_allow_html=True)
 
@@ -35,14 +36,14 @@ st.markdown("""
         div[data-testid="stExpander"] {
             margin-top: -30px !important;
         }
-        
+
         div[role="tabpanel"] div[data-testid="stExpander"] {
             margin-top: 0 !important;
             margin-bottom: 10px !important;
         }
-            
+
         .stat-card {
-            background: black !important;  
+            background: black !important;
             border: 1px solid #1ed760 !important;
             border-radius: 10px !important;
             padding: 1rem 0.3rem !important;
@@ -55,19 +56,19 @@ st.markdown("""
             justify-content: center !important;
             gap: 0.2rem
         }
-            
+
         div:has(> .stat-card) {
             margin-top: 1rem !important;
         }
-        
+
         .stat-card h3 {
             color: #F5F5F5 !important;
             font-size: 1.1rem !important;
             margin-bottom: -1rem !important;
             font-weight: normal !important;
-            line-height: 1;        
+            line-height: 1;
         }
-        
+
         .big-number {
             color: #F5F5F5 !important;
             font-size: 1.5rem !important;
@@ -75,14 +76,14 @@ st.markdown("""
             margin: .3rem 0 !important;
             line-height: 1;
         }
-        
+
         .subtitle {
             color: #F5F5F5 !important;
             font-size: 1rem !important;
             margin: 0.2rem !important;
             line-height: 1 !important;
         }
-            
+
         .total-section {
             background: rgba(30, 215, 96, 0.1);
             border-radius: 8px;
@@ -90,32 +91,32 @@ st.markdown("""
             padding: 0.5rem;
             min-width: 200px;
         }
-        
+
         .stat-group {
             display: flex;
             flex-direction: column;
             gap: 0.5rem;
         }
-        
+
         .stat-item {
             text-align: center;
             padding: 0.25rem 0;
         }
-        
+
         .total-label {
             color: #888;
             font-size: 0.8rem;
             margin-bottom: 0.25rem;
             line-height: 1;
         }
-                    
+
         .total-value {
             color: #1ed760;
             font-size: 1.2rem;
             font-weight: bold;
             line-height: 1.2;
         }
-            
+
         .achievement-text {
             color: #1ed760;
             font-size: 0.9rem;
@@ -124,13 +125,13 @@ st.markdown("""
             opacity: 0.9;
             text-align: center;
         }
-        
+
         @media (max-width: 768px) {
             .achievement-text {
                 font-size: 0.8rem;
             }
         }
-        
+
         [data-testid="stTabs"] {
             margin-top: 2rem !important;
         }
@@ -146,16 +147,16 @@ st.markdown("""
         [data-testid="stTabs"] {
             margin-top: -1rem !important;  /* Reduce from 2rem to 1rem */
         }
-        
+
         @media (max-width: 768px) {
             .total-section {
                 min-width: 150px;
             }
-            
+
             .total-value {
                 font-size: 1rem;
             }
-            
+
             .stat-divider {
                 margin: 0 0.5rem;
             }
@@ -163,7 +164,8 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 if 'authenticated' not in st.session_state or not st.session_state['authenticated']:
-    st.warning('⚠️ Please enter your Mountain Project URL or User ID on the home page first.')
+    st.warning(
+        '⚠️ Please enter your Mountain Project URL or User ID on the home page first.')
     st.stop()
 
 user_id = st.session_state.user_id
@@ -173,23 +175,32 @@ try:
     years_df = available_years(conn, user_id)
 
     filters = render_filters(
-    df=years_df,
-    filters_to_include=['date'],
-    filter_title="Choose your year range") 
+        df=years_df,
+        filters_to_include=['date'],
+        filter_title="Choose your year range")
 
     start_year = filters.get('year_start')
     end_year = filters.get('year_end')
-    
+
     col1, col2, col3 = st.columns(3)
-    
+
     with col1:
-        length_data = metrics.get_length_climbed(conn, user_id=user_id, year_start=start_year, year_end=end_year, pitch_preference=st.session_state.pitches_preference)
-        length_df = pd.DataFrame(length_data, columns=['Year', 'Location', 'Length'])
+        length_data = metrics.get_length_climbed(
+            conn,
+            user_id=user_id,
+            year_start=start_year,
+            year_end=end_year,
+            pitch_preference=st.session_state.pitches_preference)
+        length_df = pd.DataFrame(
+            length_data, columns=[
+                'Year', 'Location', 'Length'])
         total_length = length_df['Length'].sum()
         el_caps = total_length / 3000
-        el_caps_str = f"{el_caps:.1f}" if el_caps % 1 != 0 else f"{int(el_caps)}"
+        el_caps_str = f"{
+            el_caps:.1f}" if el_caps % 1 != 0 else f"{
+            int(el_caps)}"
         formatted_length = f"{int(total_length):,}"
-        
+
         st.markdown(
             f"""
             <div class='stat-card'>
@@ -208,7 +219,7 @@ try:
             gap: 100px;
             justify-content: center !important;
         }
-                 
+
         .stTabs {
             padding: 0 12px;
         }
@@ -216,8 +227,8 @@ try:
     """, unsafe_allow_html=True)
 
     tab1, tab2 = st.tabs(
-    ["📍 Areas", "📅 Biggest Day"])
-            
+        ["📍 Areas", "📅 Biggest Day"])
+
     with tab1:
         st.markdown("""
             <div style='
@@ -228,8 +239,10 @@ try:
                 Group Areas By
             </div>
         """, unsafe_allow_html=True)
-        
-        st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
+
+        st.markdown(
+            "<div style='margin-top: 5px;'></div>",
+            unsafe_allow_html=True)
 
         container = st.container()
         with container:
@@ -247,7 +260,9 @@ try:
                 }
             </style>
         """, unsafe_allow_html=True)
-            st.markdown('<span id="area-filter-radio-after"></span>', unsafe_allow_html=True)
+            st.markdown(
+                '<span id="area-filter-radio-after"></span>',
+                unsafe_allow_html=True)
             area_type = st.radio(
                 "",
                 options=[
@@ -257,20 +272,24 @@ try:
                 format_func=lambda x: x[1],
                 key='area_filter_type',
                 horizontal=True,
-                label_visibility='collapsed'      
+                label_visibility='collapsed'
             )
 
         st.markdown("</div>", unsafe_allow_html=True)
 
         if area_type[0] == 'region':
-            areas_data = metrics.states_climbed(conn, user_id=user_id, year_start=start_year, year_end=end_year)
-            total_count = metrics.regions_climbed(conn, user_id=user_id, year_start=start_year, year_end=end_year)
+            areas_data = metrics.states_climbed(
+                conn, user_id=user_id, year_start=start_year, year_end=end_year)
+            total_count = metrics.regions_climbed(
+                conn, user_id=user_id, year_start=start_year, year_end=end_year)
             title = "Top States/Regions"
         else:
-            areas_data = metrics.sub_areas_climbed(conn, user_id=user_id, year_start=start_year, year_end=end_year)
-            total_count = metrics.regions_sub_areas(conn, user_id=user_id, year_start=start_year, year_end=end_year)
+            areas_data = metrics.sub_areas_climbed(
+                conn, user_id=user_id, year_start=start_year, year_end=end_year)
+            total_count = metrics.regions_sub_areas(
+                conn, user_id=user_id, year_start=start_year, year_end=end_year)
             title = "Top Areas"
-            
+
         st.markdown("""
             <style>
                 .area-section {
@@ -279,14 +298,14 @@ try:
                     padding: 1rem;
                     margin-bottom: 2rem;
                 }
-                
+
                 .section-title {
                     color: #F5F5F5;
                     font-size: 1.3rem;
                     margin-bottom: 1rem;
                     text-align: center;
                 }
-                
+
                 .list-item {
                     display: flex;
                     justify-content: space-between;
@@ -298,27 +317,27 @@ try:
                     margin-left: auto;
                     margin-right: auto;
                 }
-                
+
                 .list-item:hover {
                     background: rgba(255, 255, 255, 0.1);
                 }
-                
+
                 .rank {
                     color: #1ed760;
                     margin-right: 0.5rem;
                 }
-                
+
                 .name {
                     color: #F5F5F5;
                     flex-grow: 1;
                 }
-                
+
                 .stats {
                     color: #F5F5F5;
                     font-size: 0.8rem;
                     text-align: right;
                 }
-                
+
                 .total-count {
                     text-align: center;
                     color: #1ed760;
@@ -353,15 +372,19 @@ try:
         )
 
         length_data = metrics.get_length_climbed(
-            conn, 
+            conn,
             area_type=area_type[0],
             year_start=filters['year_start'],
             year_end=filters['year_end'],
             user_id=user_id
         )
-        length_df = pd.DataFrame(length_data, columns=['Year', 'Location', 'Length'])
-        
-        st.markdown("<div style='margin-top: 40px;'></div>", unsafe_allow_html=True)
+        length_df = pd.DataFrame(
+            length_data, columns=[
+                'Year', 'Location', 'Length'])
+
+        st.markdown(
+            "<div style='margin-top: 40px;'></div>",
+            unsafe_allow_html=True)
 
         fig = go.Figure(data=[
             go.Bar(
@@ -371,7 +394,7 @@ try:
                 marker_color='#1ed760',
             )
         ])
-        
+
         fig.update_layout(
             paper_bgcolor='black',
             plot_bgcolor='black',
@@ -405,13 +428,13 @@ try:
             )
         )
         st.plotly_chart(fig, use_container_width=True)
-    
-    with tab2: 
+
+    with tab2:
         try:
             if 'previous_filter_state' not in st.session_state:
                 st.session_state.previous_filter_state = (None, None)
 
-            current_filter_state = (start_year, end_year)   
+            current_filter_state = (start_year, end_year)
 
             if current_filter_state != st.session_state.previous_filter_state:
                 st.session_state.current_day_index = 0
@@ -420,40 +443,40 @@ try:
                 st.session_state.previous_filter_state = current_filter_state
 
             day_types = {
-                "Cragging Day": (0, "🧗‍♂️"),        
-                "Castleton Day": (400, "🏰"),       
-                "Devil's Tower Day": (700, "😈"),   
-                "Diamond Day": (1000, "💎"),            
-                "Washington Column": (1200, "🏔️"),  
-                "Lost Arrow Day": (1400, "🎯"),     
-                "Sentinel Day": (1600, "⚔️"),       
-                "Half Dome Day": (2000, "🌓"),      
-                "Mt Watkins Day": (2200, "🌲"),    
-                "Grand Teton Day": (2500, "🗻"),    
-                "NIAD Day": (3000, "⚡"),           
-                "SIAD Day": (3500, "⭐"),        
-                "Cerro Torre Day": (4000, "🗡️"),    
-                "Great Trango Day": (4400, "🌎"),   
-                "Emperor Face Day": (4900, "👑"),   #
+                "Cragging Day": (0, "🧗‍♂️"),
+                "Castleton Day": (400, "🏰"),
+                "Devil's Tower Day": (700, "😈"),
+                "Diamond Day": (1000, "💎"),
+                "Washington Column": (1200, "🏔️"),
+                "Lost Arrow Day": (1400, "🎯"),
+                "Sentinel Day": (1600, "⚔️"),
+                "Half Dome Day": (2000, "🌓"),
+                "Mt Watkins Day": (2200, "🌲"),
+                "Grand Teton Day": (2500, "🗻"),
+                "NIAD Day": (3000, "⚡"),
+                "SIAD Day": (3500, "⭐"),
+                "Cerro Torre Day": (4000, "🗡️"),
+                "Great Trango Day": (4400, "🌎"),
+                "Emperor Face Day": (4900, "👑"),  
 
-                "Yosemite Double Day": (5000, "⚡🌓"),     # El Cap + Half Dome
-                "El Cap Double Day": (6000, "⚡⚡"),        # Two El Cap routes
-                "Yosemite Triple Day": (7200, "👑⚡🌓"),    # El Cap + Half Dome + Mt Watkins
+                "Yosemite Double Day": (5000, "⚡🌓"), 
+                "El Cap Double Day": (6000, "⚡⚡"),    
+                "Yosemite Triple Day": (7200, "👑⚡🌓"),
             }
-       
+
             if 'current_day_index' not in st.session_state:
                 st.session_state.current_day_index = 0
             if 'needs_verification' not in st.session_state:
                 st.session_state.needs_verification = True
 
             biggest_days = metrics.biggest_climbing_day(
-                conn, 
+                conn,
                 user_id=user_id,
                 year_start=start_year,
                 year_end=end_year,
                 pitch_preference=st.session_state.pitches_preference
             )
-                
+
             if st.session_state.current_day_index < len(biggest_days):
                 current_day = biggest_days[st.session_state.current_day_index]
 
@@ -468,18 +491,23 @@ try:
                 num_routes = len(route_list)
 
                 route_details_list = []
-                for route, url, photo in zip(route_list, route_urls, photo_urls):
+                for route, url, photo in zip(
+                        route_list, route_urls, photo_urls):
                     route_parts = route.split(" ~ ")
                     route_name = route_parts[0]
-                    route_details = route_parts[1] if len(route_parts) > 1 else ""
-                    route_details_list.append((route_name, route_details, url, photo))
+                    route_details = route_parts[1] if len(
+                        route_parts) > 1 else ""
+                    route_details_list.append(
+                        (route_name, route_details, url, photo))
 
-                major_routes_exist = any(grade.strip() in ["V", "VI", "VII"] for grade in commitment_grades)
-          
+                major_routes_exist = any(
+                    grade.strip() in [
+                        "V", "VI", "VII"] for grade in commitment_grades)
+
                 if st.session_state.needs_verification and major_routes_exist:
-                    major_route = next((route for route, grade in zip(route_list, commitment_grades) 
+                    major_route = next((route for route, grade in zip(route_list, commitment_grades)
                                         if grade.strip() in ["V", "VI", "VII"]), None)
-                    
+
                     if major_route:
                         route_name = major_route.split(" ~ ")[0]
 
@@ -503,7 +531,7 @@ try:
                                 transition: all 0.3s ease !important;
                             }
                             </style>
-                            
+
                         """, unsafe_allow_html=True)
 
                         st.markdown(f"""
@@ -535,36 +563,42 @@ try:
                             </div>
                         """, unsafe_allow_html=True)
 
-                        st.markdown('<span id="verify-radio-after"></span>', unsafe_allow_html=True)
+                        st.markdown(
+                            '<span id="verify-radio-after"></span>',
+                            unsafe_allow_html=True)
                         response = st.radio(
                             "",
                             options=["Yes", "No"],
                             key=f"verify_{date.strftime('%Y%m%d')}"
                         )
 
-                        st.markdown('<span id="verify-button-after"></span>', unsafe_allow_html=True)
+                        st.markdown(
+                            '<span id="verify-button-after"></span>',
+                            unsafe_allow_html=True)
                         if st.button("Confirm"):
                             if response == "Select an option":
                                 st.warning("Please select Yes or No.")
                             elif response == "No":
                                 st.session_state.current_day_index += 1
                                 st.rerun()
-                            else: 
+                            else:
                                 st.session_state.needs_verification = False
                                 st.session_state.shown_big_day_prompts = True
                                 st.rerun()
 
-                    else: # response == "Yes"
-                        st.session_state.shown_big_day_prompts = True   
+                    else:  # response == "Yes"
+                        st.session_state.shown_big_day_prompts = True
 
-                if st.session_state.get('shown_big_day_prompts', False) or not major_routes_exist:
+                if st.session_state.get(
+                        'shown_big_day_prompts', False) or not major_routes_exist:
                     if start_year == end_year:
                         day = date.day
-                        suffix = 'th' if 11 <= day <= 13 else {1: 'st', 2: 'nd', 3: 'rd'}.get(day % 10, 'th')
+                        suffix = 'th' if 11 <= day <= 13 else {
+                            1: 'st', 2: 'nd', 3: 'rd'}.get(day % 10, 'th')
                         formatted_date = date.strftime(f'%b %d{suffix}')
                     else:
                         formatted_date = date.strftime('%b %d, %Y')
-                        
+
                     with st.container():
                         st.markdown(f"""
                             <div style="
@@ -601,8 +635,9 @@ try:
                                     {get_day_type(total_length)}
                                 </div>
                         """, unsafe_allow_html=True)
-                    
-                    for i, (route_name, route_details, url, photo) in enumerate(route_details_list, 1):    
+
+                    for i, (route_name, route_details, url,
+                            photo) in enumerate(route_details_list, 1):
                         with st.expander(f"{i}. {route_name}"):
                             st.markdown(
                                 f"""
@@ -617,17 +652,17 @@ try:
                                 """,
                                 unsafe_allow_html=True
                             )
-                            
+
                             if photo:
                                 img = get_squared_image(photo)
                                 if img:
                                     st.markdown(
                                         f"""
                                         <div style="width: 100%;">
-                                            <img src="{image_to_base64(img)}" 
-                                                style="width: 100%; 
-                                                        object-fit: cover; 
-                                                        margin: 0; 
+                                            <img src="{image_to_base64(img)}"
+                                                style="width: 100%;
+                                                        object-fit: cover;
+                                                        margin: 0;
                                                         padding: 0;
                                                         border-radius: 4px;"
                                                 alt="{route_name}">
@@ -637,6 +672,6 @@ try:
                                     )
         except Exception as e:
             st.error(f"Error: {str(e)}")
-                
+
 except Exception as e:
     st.error(f"Error: {str(e)}")

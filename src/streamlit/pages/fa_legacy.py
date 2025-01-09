@@ -1,3 +1,4 @@
+import src.analysis.fa_queries as fa_queries
 import streamlit as st
 import pandas as pd
 import os
@@ -6,9 +7,8 @@ import sys
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(project_root)
 
-import src.analysis.fa_queries as fa_queries
-from src.streamlit.chart_utils import create_bar_chart
 from src.streamlit.styles import get_spotify_style
+from src.streamlit.chart_utils import create_bar_chart
 
 user_id = st.session_state.user_id
 conn = st.connection('postgresql', type='sql')
@@ -18,8 +18,10 @@ if 'fa_view_type' not in st.session_state:
 if 'selected_fa' not in st.session_state:
     st.session_state.selected_fa = None
 
-top_fas = fa_queries.get_top_first_ascensionists(conn, user_id=user_id, year_start=1900, year_end=2100)
-partnerships = fa_queries.get_collaborative_ascensionists(conn, "All FAs", user_id, year_start=1900, year_end=2100)
+top_fas = fa_queries.get_top_first_ascensionists(
+    conn, user_id=user_id, year_start=1900, year_end=2100)
+partnerships = fa_queries.get_collaborative_ascensionists(
+    conn, "All FAs", user_id, year_start=1900, year_end=2100)
 
 st.markdown(get_spotify_style(), unsafe_allow_html=True)
 st.markdown("""
@@ -33,11 +35,11 @@ st.markdown("""
             padding: -2rem!important;
             margin-top: -2rem !important;
         }
-        
+
         .stDataFrame {
-            margin-bottom: 10rem !important; 
+            margin-bottom: 10rem !important;
         }
-        
+
         .spotify-header {
             font-size: 1.5rem;
             text-align: center;
@@ -45,22 +47,22 @@ st.markdown("""
             padding: 0;
             line-height: 1.2;
         }
-        
+
         div.stRadio > div {
             flex-direction: column;
             gap: 0.2rem;
             padding: 0rem;
             margin: 1rem;
-            position: relative;  
+            position: relative;
         }
-        
+
         div.stSelectbox {
-            position: absolute !important;  
-            left: 150px !important;        
-            top: -110px !important;          
-            width: 200px !important;       
+            position: absolute !important;
+            left: 150px !important;
+            top: -110px !important;
+            width: 200px !important;
         }
-        
+
         div.stSelectbox label {
             display: none;
         }
@@ -68,33 +70,33 @@ st.markdown("""
         .element-container:has(.js-plotly-plot) {
             margin-bottom: 2rem !important;  /* Increased space between charts */
         }
-        
+
         .element-container:has(.js-plotly-plot):last-of-type {
             margin-bottom: -2 !important;
         }
-        
+
         .js-plotly-plot .plotly .gtitle {
             margin-top: 0rem !important;
-        }   
-            
+        }
+
         .list-item {
             padding: 0.5rem 0;
             display: flex;
-            justify-content: space-between; 
+            justify-content: space-between;
             align-items: center;
-            max-width: 65%; 
-            margin: 0 auto; 
-            gap: 1rem; 
+            max-width: 65%;
+            margin: 0 auto;
+            gap: 1rem;
             position: relative;
             cursor: pointer;
         }
-        
+
         .route-list {
             display: none;
             position: absolute;
-            left: 105%; 
+            left: 105%;
             top: 0;
-            background-color: rgba(26, 26, 26, 0.98); 
+            background-color: rgba(26, 26, 26, 0.98);
             backdrop-filter: blur(8px);
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 8px;
@@ -105,16 +107,16 @@ st.markdown("""
             overflow-y: auto;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
         }
-            
+
         .list-item:hover .route-list {
             display: block;
             animation: fadeIn 0.2s ease-in-out;
-        }   
+        }
         @keyframes fadeIn {
             from { opacity: 0; transform: translateX(-10px); }
             to { opacity: 1; transform: translateX(0); }
         }
-        
+
         .list-item:hover .route-list {
             display: block;
         }
@@ -122,12 +124,12 @@ st.markdown("""
             padding: 0.5rem 0;
             color: rgba(255, 255, 255, 0.9);
             font-size: 0.95em;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);  
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
         .item-name {
             color: #F5F5F5;
         }
-    
+
         .item-details {
             color: #F5F5F5;
             margin-right: 2rem;
@@ -161,7 +163,7 @@ st.markdown("""
             color: #aaa;
             font-size: 0.95em;
         }
-            
+
         .dataframe {
             font-size: 0.9em;
             margin: 0 auto;
@@ -214,78 +216,92 @@ with right:
 
     current_selection = st.session_state.selected_fa or "All FAs"
 
-decades = fa_queries.get_first_ascensionist_by_decade(conn, current_selection, user_id, year_start=1900, year_end=2100)
-areas = fa_queries.get_first_ascensionist_areas(conn, current_selection, user_id, year_start=1900, year_end=2100)
-grades = fa_queries.get_first_ascensionist_grades(conn, current_selection, user_id, year_start=1900, year_end=2100)
+decades = fa_queries.get_first_ascensionist_by_decade(
+    conn, current_selection, user_id, year_start=1900, year_end=2100)
+areas = fa_queries.get_first_ascensionist_areas(
+    conn, current_selection, user_id, year_start=1900, year_end=2100)
+grades = fa_queries.get_first_ascensionist_grades(
+    conn, current_selection, user_id, year_start=1900, year_end=2100)
 
 if view_type == "Individual FA":
-    partners = fa_queries.get_collaborative_ascensionists(conn, current_selection, user_id)
-    
+    partners = fa_queries.get_collaborative_ascensionists(
+        conn, current_selection, user_id)
+
 if view_type == "All FAs":
     create_bar_chart(
-        title="FAs by Decade", 
-        x_data=[decade[0] for decade in decades], 
+        title="FAs by Decade",
+        x_data=[decade[0] for decade in decades],
         y_data=[decade[1] for decade in decades],
         orientation='v',
     )
 
-    st.markdown("<h3 style='text-align: center;'>Most Prolific FAs</h3>", unsafe_allow_html=True)
+    st.markdown(
+        "<h3 style='text-align: center;'>Most Prolific FAs</h3>",
+        unsafe_allow_html=True)
     st.markdown("<div class='list-container'>", unsafe_allow_html=True)
-    for fa, count in top_fas:          
+    for fa, count in top_fas:
         with st.expander(f"{fa} - {count} routes"):
-            routes = fa_queries.get_fa_routes(conn, fa, user_id, year_start=1900, year_end=2100)
+            routes = fa_queries.get_fa_routes(
+                conn, fa, user_id, year_start=1900, year_end=2100)
             for route in routes:
                 st.markdown(
-                    f"<div class='route-item'>{route[0]}</div>", 
+                    f"<div class='route-item'>{route[0]}</div>",
                     unsafe_allow_html=True
                 )
     st.markdown("</div>", unsafe_allow_html=True)
 else:
-    
+
     create_bar_chart(
-        title="FAs by Decade", 
-        x_data=[decade[0] for decade in decades], 
+        title="FAs by Decade",
+        x_data=[decade[0] for decade in decades],
         y_data=[decade[1] for decade in decades],
         orientation='v',
     )
-    
+
     create_bar_chart(
-        title="Areas Developed by FA", 
-        x_data=[area[0] for area in areas], 
+        title="Areas Developed by FA",
+        x_data=[area[0] for area in areas],
         y_data=[area[1] for area in areas],
         orientation='h',
     )
-    
+
     create_bar_chart(
-        title="FAs by Grade", 
-        x_data=[grade[0] for grade in grades], 
+        title="FAs by Grade",
+        x_data=[grade[0] for grade in grades],
         y_data=[grade[1] for grade in grades],
         orientation='v',
     )
-    
+
     if view_type == "Individual FA":
-        st.markdown("<h3 style='text-align: center;'>Frequent Partners</h3>", unsafe_allow_html=True)
+        st.markdown(
+            "<h3 style='text-align: center;'>Frequent Partners</h3>",
+            unsafe_allow_html=True)
         st.markdown("<div class='list-container'>", unsafe_allow_html=True)
-        partners = fa_queries.get_collaborative_ascensionists(conn, current_selection, user_id, year_start=1900, year_end=2100)
+        partners = fa_queries.get_collaborative_ascensionists(
+            conn, current_selection, user_id, year_start=1900, year_end=2100)
         for partner, count in partners:
             with st.expander(f"{partner} - {count} routes"):
-                routes = fa_queries.get_partnership_routes(conn, current_selection, partner, user_id, year_start=1900, year_end=2100)
+                routes = fa_queries.get_partnership_routes(
+                    conn, current_selection, partner, user_id, year_start=1900, year_end=2100)
                 for route in routes:
                     st.markdown(
-                        f"<div class='route-item'>{route[0]}</div>", 
+                        f"<div class='route-item'>{route[0]}</div>",
                         unsafe_allow_html=True
                     )
         st.markdown("</div>", unsafe_allow_html=True)
-    
+
     if view_type == "FA Team":
-        st.markdown("<h3 style='text-align: center;'>Routes Done Together</h3>", unsafe_allow_html=True)
-        
+        st.markdown(
+            "<h3 style='text-align: center;'>Routes Done Together</h3>",
+            unsafe_allow_html=True)
+
         # Split the partnership into individual names
         climber1, climber2 = current_selection.split(" & ")
-        partnership_routes = fa_queries.get_partnership_routes(conn, climber1.strip(), climber2.strip(), user_id, year_start=1900, year_end=2100)
+        partnership_routes = fa_queries.get_partnership_routes(
+            conn, climber1.strip(), climber2.strip(), user_id, year_start=1900, year_end=2100)
         if partnership_routes:
             df = pd.DataFrame(partnership_routes, columns=['Route'])
-            
+
             st.dataframe(
                 df,
                 hide_index=True,
