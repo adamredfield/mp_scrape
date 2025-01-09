@@ -583,10 +583,8 @@ with tab1:
             stats_df['total_pitches'].iloc[0],
             stats_df['non_boulder_routes'].iloc[0],
             stats_df['non_boulder_distance'].iloc[0],
-            stats_df['total_routes_climbed'].iloc[0] -
-            stats_df['non_boulder_routes'].iloc[0],
-            stats_df['total_distance'].iloc[0] -
-            stats_df['non_boulder_distance'].iloc[0]),
+            stats_df['total_routes_climbed'].iloc[0] - stats_df['non_boulder_routes'].iloc[0],
+            stats_df['boulder_distance'].iloc[0]),
         unsafe_allow_html=True)
 
     st.markdown("""
