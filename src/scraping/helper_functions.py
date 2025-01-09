@@ -124,8 +124,7 @@ def get_total_pages(ticks_url):
     if pagination_response.status_code != 200:
         print(f"Failed to retrieve data: {pagination_response.status_code}")
         raise Exception(
-            f"Failed to get total pages: {
-                pagination_response.status_code}")
+            f"Failed to get total pages: {pagination_response.status_code}")
 
     pagination_soup = BeautifulSoup(pagination_response.text, 'html.parser')
     pagination_div = pagination_soup.find('div', class_='pagination')
@@ -182,8 +181,6 @@ def get_route_details(route_soup):
 
 
 def get_route_sections(route_soup):
-    # sections we want to extract text for. Can add as more relevant sections
-    # are found
     sections = ['description', 'protection']
     route_sections = {}
 
@@ -670,8 +667,7 @@ def process_page(page_number, ticks_url, user_id, retry_count=0):
                         queries.insert_routes_batch(cursor, route_data)
                     if route_comments_data:
                         print(
-                            f"Attempting to insert {
-                                len(route_comments_data)} comments")
+                            f"Attempting to insert {len(route_comments_data)} comments")
                         queries.insert_comments_batch(
                             cursor, route_comments_data)
                     if tick_data:
