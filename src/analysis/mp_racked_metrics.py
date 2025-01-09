@@ -1404,6 +1404,7 @@ def get_period_stats(conn, user_id, period_type='all', period_value=None, year_s
         ) as distance_ft,
             COUNT(*) as routes_climbed,
             COUNT(CASE WHEN r.route_type NOT ILIKE '%boulder%' THEN 1 END) as non_boulder_routes,
+            COUNT(CASE WHEN r.route_type ILIKE '%boulder%' THEN 1 END) as boulder_routes,
             SUM(CASE
                 WHEN r.route_type NOT ILIKE '%boulder%'
                 THEN {get_pitch_preference_lengths(pitch_preference)}
@@ -1411,6 +1412,7 @@ def get_period_stats(conn, user_id, period_type='all', period_value=None, year_s
             SUM(CASE
                 WHEN r.route_type ILIKE '%boulder%'
                 THEN COALESCE(r.length_ft, el.estimated_length, 0)
+                ELSE 0
             END) as boulder_distance,
 	        MAX(CASE
             WHEN t.type IN (
@@ -1468,8 +1470,9 @@ def get_period_stats(conn, user_id, period_type='all', period_value=None, year_s
         ROUND(SUM(distance_ft), 2) as total_distance,
         ROUND(SUM(pitches), 2) as total_pitches,
         SUM(non_boulder_distance) as non_boulder_distance,
-        SUM(boulder_distance) as boulder_distance,
+        COALESCE(SUM(boulder_distance), 0) as boulder_distance,
         SUM(non_boulder_routes) as non_boulder_routes,
+        SUM(boulder_routes) as boulder_routes,
         SUM(is_rope_day) as roped_days
     FROM daily_stats
     WHERE {period_type_sql} = 'all'
@@ -1484,8 +1487,9 @@ def get_period_stats(conn, user_id, period_type='all', period_value=None, year_s
         ROUND(SUM(distance_ft), 2),
         ROUND(SUM(pitches), 2),
         SUM(non_boulder_distance) as non_boulder_distance,
-        SUM(boulder_distance) as boulder_distance,
+        COALESCE(SUM(boulder_distance), 0) as boulder_distance,
         SUM(non_boulder_routes) as non_boulder_routes,
+        SUM(boulder_routes) as boulder_routes,
         SUM(is_rope_day) as roped_days
     FROM daily_stats
     WHERE {period_type_sql} = 'season'
@@ -1501,8 +1505,9 @@ def get_period_stats(conn, user_id, period_type='all', period_value=None, year_s
         ROUND(SUM(distance_ft), 2),
         ROUND(SUM(pitches), 2),
         SUM(non_boulder_distance) as non_boulder_distance,
-        SUM(boulder_distance) as boulder_distance,
+        COALESCE(SUM(boulder_distance), 0) as boulder_distance,
         SUM(non_boulder_routes) as non_boulder_routes,
+        SUM(boulder_routes) as boulder_routes,
         SUM(is_rope_day) as roped_days
     FROM daily_stats
     WHERE {period_type_sql} = 'month'
@@ -1582,6 +1587,7 @@ route_counts AS (
         rc.total_unique_routes,
         ps.non_boulder_distance,
         ps.non_boulder_routes,
+        ps.boulder_routes,
         ps.boulder_distance,
         ps.roped_days
         FROM period_stats ps
