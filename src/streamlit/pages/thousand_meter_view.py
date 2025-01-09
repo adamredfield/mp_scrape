@@ -402,6 +402,8 @@ with tab1:
             'total_unique_routes': None,
             'non_boulder_distance': seasonal_data['non_boulder_distance'].sum() or 0,
             'non_boulder_routes': seasonal_data['non_boulder_routes'].sum() or 0,
+            'boulder_distance': seasonal_data['boulder_distance'].sum() or 0,
+            'boulder_routes': seasonal_data['boulder_routes'].sum() or 0, 
             'roped_days': seasonal_data['roped_days'].sum() or 0
         }])
         stats_df['avg_distance_per_day'] = (
@@ -457,6 +459,8 @@ with tab1:
             'total_unique_routes': None,  # Set to None for multiple years,
             'non_boulder_distance': monthly_data['non_boulder_distance'].sum() or 0,
             'non_boulder_routes': monthly_data['non_boulder_routes'].sum() or 0,
+            'boulder_distance': monthly_data['boulder_distance'].sum() or 0,
+            'boulder_routes': monthly_data['boulder_routes'].sum() or 0,
             'roped_days': monthly_data['roped_days'].sum() or 0
         }])
         stats_df['avg_distance_per_day'] = (
@@ -538,6 +542,15 @@ with tab1:
     </style>
     """, unsafe_allow_html=True)
 
+
+    print(f"Days logged: {stats_df['days_logged'].iloc[0]}")
+    print(f"Total pitches: {stats_df['total_pitches'].iloc[0]}")
+    print(f"Non boulder routes: {stats_df['non_boulder_routes'].iloc[0]}")
+    print(f"Non boulder distance: {stats_df['non_boulder_distance'].iloc[0]}")
+    print(f"Total routes climbed: {stats_df['total_routes_climbed'].iloc[0]}")
+    print(f"Boulder routes: {stats_df['total_routes_climbed'].iloc[0] - stats_df['non_boulder_routes'].iloc[0]}")
+    print(f"Boulder distance: {stats_df['boulder_distance'].iloc[0]}")
+
     st.markdown(
         """
         <div class="stat-card">
@@ -583,8 +596,8 @@ with tab1:
             stats_df['total_pitches'].iloc[0],
             stats_df['non_boulder_routes'].iloc[0],
             stats_df['non_boulder_distance'].iloc[0],
-            stats_df['total_routes_climbed'].iloc[0] - stats_df['non_boulder_routes'].iloc[0],
-            stats_df['boulder_distance'].iloc[0]),
+            stats_df['boulder_routes'].iloc[0],
+            stats_df['boulder_distance'].fillna(0).iloc[0]),
         unsafe_allow_html=True)
 
     st.markdown("""
