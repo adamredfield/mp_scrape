@@ -200,9 +200,7 @@ def process_route(route: dict, max_retries=2) -> dict:
                 continue
             return None
 
-    print(
-        f"Failed to process {
-            route['route_name']} after {max_retries} attempts")
+    print(f"Failed to process {route['route_name']} after {max_retries} attempts")
     return None
 
 
