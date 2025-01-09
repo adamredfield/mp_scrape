@@ -1,17 +1,16 @@
+from typing import Optional
+from openai import OpenAI
+import time
+from pathlib import Path
+import json
 import os
 import sys
 
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(project_root)
 
-from src.analysis.ai_analysis_helper_functions import construct_prompt, process_route_response, save_analysis_results
 from src.database.utils import create_connection
-import json
-from pathlib import Path
-import os
-import time
-from openai import OpenAI
-from typing import Optional
+from src.analysis.ai_analysis_helper_functions import construct_prompt, process_route_response, save_analysis_results
 
 def get_system_prompt():
     return (
@@ -21,7 +20,7 @@ def get_system_prompt():
         "Note: Focus on overarching physical style(s) that are most representative of the route's character. (e.g., crack, chimney, face, overhang, slab, scramble, ridge)\n"
         "Note: This should NOT include climb types like trad/sport - only the physical style.\n"
         "- Rank styles by their prominence in the route (1 being most dominant)\n"
-        "- Maximum of 3 styles, ranked by importance\n" 
+        "- Maximum of 3 styles, ranked by importance\n"
         "2. features: Rank specific route features that are essential to the route's identity (e.g., hand-crack, finger-crack). \n"
         "Note: ideally these should act as sub-tags of the style. (e.g. style: crack, features: hand-crack, finger-crack, wide-crack, offwidth, corner). \n"
         "- Keep features specific but standardized (use 'hand-crack' not 'perfect hand crack')\n"
@@ -42,15 +41,16 @@ def get_system_prompt():
         "- Rank 1 is always the most important/dominant characteristic\n"
         "- Include ONLY features explicitly mentioned or clearly implied in the route's data\n"
         "- Do not add any extra text or formatting\n"
-        "- Use hyphens for compound terms (e.g., 'hand-crack' not 'hand crack')\n" 
+        "- Use hyphens for compound terms (e.g., 'hand-crack' not 'hand crack')\n"
         "- Ensure all JSON strings are properly escaped\n"
         "- Do not use line breaks within reasoning strings"
     )
 
+
 def get_routes_batch(cursor, limit=3000):
     """Get a batch of routes that haven't been analyzed yet"""
     query = '''
-    SELECT 
+    SELECT
         r.id as route_id,
         r.route_name,
         r.yds_rating,
@@ -79,11 +79,11 @@ def get_routes_batch(cursor, limit=3000):
     cursor.execute(query, (limit,))
     columns = [description[0] for description in cursor.description]
     results = cursor.fetchall()
-    
+
     routes = []
     for result in results:
         current_route_data = dict(zip(columns, result))
-        
+
         combined_grade = ' '.join(filter(None, [
             current_route_data.get('yds_rating') or '',
             current_route_data.get('hueco_rating') or '',
@@ -113,8 +113,9 @@ def get_routes_batch(cursor, limit=3000):
             'comments': current_route_data['comments']
         }
         routes.append(route_for_analysis)
-    
+
     return routes
+
 
 def upload_batch_file(file_path: str) -> Optional[str]:
     """Upload the JSONL file to OpenAI and return the file ID"""
@@ -123,13 +124,16 @@ def upload_batch_file(file_path: str) -> Optional[str]:
         with open(file_path, "rb") as file:
             batch_input_file = client.files.create(
                 file=file,
-                purpose="batch" 
+                purpose="batch"
             )
-            print(f"File uploaded successfully. File ID: {batch_input_file.id}")
-            return batch_input_file 
+            print(
+                f"File uploaded successfully. File ID: {
+                    batch_input_file.id}")
+            return batch_input_file
     except Exception as e:
         print(f"Error uploading file: {e}")
         return None
+
 
 def create_batch_job(batch_input_file: object) -> Optional[str]:
     """Create a batch processing job and return the batch ID"""
@@ -150,6 +154,7 @@ def create_batch_job(batch_input_file: object) -> Optional[str]:
         print(f"Error creating batch job: {e}")
         return None
 
+
 def monitor_batch_job(batch_id: str, check_interval: int = 60):
     """Monitor the batch job status"""
     try:
@@ -159,20 +164,23 @@ def monitor_batch_job(batch_id: str, check_interval: int = 60):
         while True:
             batch = client.batches.retrieve(batch_id)
             print(f"Status: {batch.status}")
-            
+
             if batch.status in ["completed", "failed", "cancelled"]:
                 if batch.output_file_id:
                     # Download and process results
                     file_response = client.files.content(batch.output_file_id)
-                    results_file = output_dir / f"batch_results_{batch_id}.jsonl"
+                    results_file = output_dir / \
+                        f"batch_results_{batch_id}.jsonl"
                     with open(results_file, 'w') as f:
                         f.write(file_response.text)
                     print(f"Results saved to: {results_file}")
-                    
+
                     # Check for errors
                     if batch.error_file_id:
-                        error_results = client.files.content(batch.error_file_id)
-                        error_file = output_dir / f"batch_errors_{batch_id}.jsonl"
+                        error_results = client.files.content(
+                            batch.error_file_id)
+                        error_file = output_dir / \
+                            f"batch_errors_{batch_id}.jsonl"
                         with open(error_file, 'w') as f:
                             f.write(error_results.text)
                         print(f"Errors saved to: {error_file}")
@@ -181,70 +189,76 @@ def monitor_batch_job(batch_id: str, check_interval: int = 60):
     except Exception as e:
         print(f"Error monitoring batch job: {e}")
         return "error"
-    
+
+
 def process_batch_results(batch_id: str):
     """Process the batch results and save to database using existing pipeline format"""
     try:
-        results_file = Path("batch_results") / f"batch_results_{batch_id}.jsonl"
+        results_file = Path("batch_results") / \
+            f"batch_results_{batch_id}.jsonl"
 
         if not results_file.exists():
             print(f"Error: Results file not found at {results_file}")
             return
-        
+
         print(f"Processing results from: {results_file}")
         processed_count = 0
         failed_count = 0
 
         with create_connection() as conn:
             cursor = conn.cursor()
-            
+
             with open(results_file, 'r') as f:
                 for line in f:
                     try:
                         batch_result = json.loads(line)
-                        
+
                         # Create the format expected by process_route_response
                         ai_response = {
                             'route_id': batch_result['custom_id'],
                             'tags': batch_result['response']['body']['choices'][0]['message']['content']
                         }
-                        
+
                         # Process using existing pipeline function
                         processed_result = process_route_response(ai_response)
-                        
+
                         if processed_result:
                             # Save to database using existing function
                             save_analysis_results(cursor, processed_result)
                             conn.commit()
                             processed_count += 1
-                            print(f"Processed and saved analysis for route {processed_result['route_id']}")
+                            print(
+                                f"Processed and saved analysis for route {
+                                    processed_result['route_id']}")
                     except Exception as e:
                         failed_count += 1
                         print(f"Error processing route: {e}")
                         conn.rollback()
                         continue
-            
-            print(f"\nProcessing complete. Processed: {processed_count}, Failed: {failed_count}")
-            
+
+            print(
+                f"\nProcessing complete. Processed: {processed_count}, Failed: {failed_count}")
+
     except Exception as e:
         print(f"Error processing batch results: {e}")
         if 'conn' in locals():
             conn.rollback()
 
+
 def main():
     print("Starting batch processing...")
-    
+
     with create_connection() as conn:
         cursor = conn.cursor()
         print("Connected to database...")
         routes = get_routes_batch(cursor, limit=3000)
         print(f"Retrieved {len(routes)} routes from database")
-        
+
         timestamp = time.strftime("%Y%m%d_%H%M%S")
         output_dir = Path("batch_files")
         output_dir.mkdir(exist_ok=True)
         filename = output_dir / f"routes_batch_{timestamp}.jsonl"
-        
+
         with open(filename, 'w') as f:
             for route in routes:
                 entry = {
@@ -255,22 +269,23 @@ def main():
                         "model": "gpt-4o",
                         "messages": [
                             {"role": "system", "content": get_system_prompt()},
-                            {"role": "user", "content": construct_prompt(route)}
+                            {"role": "user",
+                             "content": construct_prompt(route)}
                         ],
                         "max_tokens": 1000,
                         "temperature": 0.2
                     }
                 }
                 f.write(json.dumps(entry) + '\n')
-        
+
         print(f"Created batch file with {len(routes)} routes")
         print(f"Output file: {filename}")
 
         batch_input_file = upload_batch_file(str(filename))
         if not batch_input_file:
-                print("Failed to upload batch file. Exiting.")
-                return
-        
+            print("Failed to upload batch file. Exiting.")
+            return
+
         batch_id = create_batch_job(batch_input_file)
         if batch_id:
             print("Starting batch job monitoring...")
@@ -282,7 +297,7 @@ def main():
                 process_batch_results(batch_id)
             else:
                 print(f"Batch job failed with status: {final_status}")
-            
+
 
 if __name__ == "__main__":
     main()
