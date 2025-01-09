@@ -514,7 +514,7 @@ def total_routes(conn, user_id=None, year_start=None,
     return conn.query(query)
 
 
-def most_climbed_route(conn, user_id=None, year_start=None, year_end=None):
+def most_climbed_route(conn, user_id=None, year_start=None, year_end=None, pitch_preference=None):
     query = f"""
         {estimated_lengths_cte},
         route_tags AS (
@@ -541,7 +541,7 @@ def most_climbed_route(conn, user_id=None, year_start=None, year_end=None):
         r.route_name,
         r.specific_location,
         TRIM(NULLIF(CONCAT_WS(' ', r.yds_rating, r.hueco_rating, r.aid_rating, r.danger_rating, r.commitment_grade), '')) grade,
-        CAST(COALESCE(r.length_ft, el.estimated_length) AS INTEGER) as length,
+        max({get_pitch_preference_lengths(pitch_preference)}) as length,
         array_agg(t.date ORDER BY t.date) as dates,
         array_agg(t.type ORDER BY t.date) as types,
         array_agg(t.note ORDER BY t.date) as notes,
@@ -560,7 +560,7 @@ def most_climbed_route(conn, user_id=None, year_start=None, year_end=None):
     {year_filter(year_range=(year_start, year_end), use_where=True)}
     {add_user_filter(user_id)}
     GROUP BY r.route_name, r.specific_location, r.yds_rating, r.hueco_rating,
-            r.aid_rating, r.danger_rating, r.commitment_grade, el.estimated_length, r.length_ft,
+            r.aid_rating, r.danger_rating, r.commitment_grade,
             r.primary_photo_url, r.route_url, rt.styles, rt.features, rt.descriptors, rt.rock_type
     ),
     max_count AS (
@@ -1327,7 +1327,7 @@ def tag_relationships(conn, primary_type, secondary_type,
 
 
 def get_period_stats(conn, user_id, period_type='all',
-                     period_value=None, year_start=None, year_end=None):
+                     period_value=None, year_start=None, year_end=None, pitch_preference=None):
     period_type_sql = f"'{period_type}'"
     query = f"""
     {estimated_lengths_cte},
@@ -1392,7 +1392,17 @@ def get_period_stats(conn, user_id, period_type='all',
                 WHEN EXTRACT(MONTH FROM t.date) IN (9, 10, 11) THEN 'Fall'
             END as season,
             SUM(coalesce(t.pitches_climbed,r.pitches,ep.estimated_pitches)) pitches,
-            SUM(COALESCE(r.length_ft, el.estimated_length)) as distance_ft,
+            SUM(
+            coalesce(r.length_ft, el.estimated_length) *
+            CASE
+                WHEN t.pitches_climbed IS NOT NULL
+                    AND r.pitches IS NOT NULL
+                    AND t.pitches_climbed <= r.pitches THEN
+                    (t.pitches_climbed::numeric / r.pitches)
+                ELSE
+                    1
+            END
+        ) as distance_ft,
             COUNT(*) as routes_climbed,
             COUNT(CASE WHEN r.route_type NOT ILIKE '%boulder%' THEN 1 END) as non_boulder_routes,
             SUM(CASE
@@ -1601,3 +1611,5 @@ route_counts AS (
         """
     print(query)
     return conn.query(query)
+
+

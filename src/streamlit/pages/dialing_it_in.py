@@ -31,7 +31,8 @@ if filters['year_start'] is not None and filters['year_end'] is not None:
         conn,
         user_id=user_id,
         year_start=filters['year_start'],
-        year_end=filters['year_end'])
+        year_end=filters['year_end'],
+        pitch_preference=st.session_state.pitches_preference)
 
 st.markdown(get_spotify_style(), unsafe_allow_html=True)
 

@@ -333,7 +333,8 @@ if year_start is not None and year_end is not None:
         period_type=period_type,
         period_value=period_value,
         year_start=year_start,
-        year_end=year_end
+        year_end=year_end,
+        pitch_preference=st.session_state.pitches_preference
     )
 
 tab1, tab2 = st.tabs(["Stats", "Visualizations"])
