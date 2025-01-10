@@ -34,7 +34,7 @@ def with_retry(max_retries=3, delay=1):
                                 print(f"Failed to reset connection/cursor: {conn_err}")
                                 continue
                         
-                        time.sleep(delay)
+                        time.sleep(delay) 
                         continue
                     raise
                 except Exception as e:
