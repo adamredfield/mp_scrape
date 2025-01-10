@@ -8,6 +8,7 @@ import requests
 import json
 import os
 import sys
+import unicodedata
 
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(project_root)
@@ -16,7 +17,6 @@ from src.database.utils import create_connection, add_new_tags_to_mapping
 from src.analysis.ai_analysis_helper_functions import process_route, process_route_response, save_analysis_results
 
 mp_home_url = "https://www.mountainproject.com"
-
 
 def get_proxy_url():
     """Get IPRoyal proxy URL - returns a string"""
@@ -401,7 +401,7 @@ def parse_route_data(route_soup, route_id, route_name, route_link):
 
     current_route_data = {
         'route_id': route_id,
-        'route_name': route_name,
+        'route_name': sanitize_text(route_name),
         'route_url': route_link,
         'yds_rating': route_attributes.get('yds_rating'),
         'hueco_rating': route_attributes.get('hueco_rating'),
@@ -692,3 +692,50 @@ def process_page(page_number, ticks_url, user_id, retry_count=0):
     except Exception as e:
         print(f"Error processing page {page_number}: {str(e)}")
         raise
+
+import unicodedata
+
+def sanitize_text(text):
+    if not text:
+        return text
+        
+    # Replace problematic characters
+    replacements = {
+        '…': '...',
+        '\u2019': "'",  # Replace curly single quote with straight single quote
+        '"': '"',
+        '"': '"',
+        '–': '-',
+        '—': '-',
+        '\u2028': ' ',  # Line separator
+        '\u2029': ' '   # Paragraph separator
+    }
+    
+    for old, new in replacements.items():
+        text = text.replace(old, new)
+        
+    # Normalize Unicode characters
+    text = unicodedata.normalize('NFKD', text).encode('ascii', 'ignore').decode('ascii')
+    
+    return text.strip()
+
+def sanitize_route_data(route_data):
+    """Sanitize all text fields in route data"""
+    text_fields = [
+        'route_name',
+        'description',
+        'protection',
+        'fa',
+        'region',
+        'main_area',
+        'sub_area',
+        'specific_location',
+        'route_type',
+        'commitment_grade'
+    ]
+    
+    for field in text_fields:
+        if field in route_data and route_data[field]:
+            route_data[field] = sanitize_text(route_data[field])
+    
+    return route_data
