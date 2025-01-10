@@ -251,7 +251,7 @@ if not route_data.empty and len(
                 color: #F5F5F5;
                 font-size: 1rem;
             ">
-                ≈ {times_climbed} Laps on {formatted_date}{suffix}
+                ≈ {times_climbed} Laps starting on {formatted_date}{suffix}
             </div>
         </div>
     """, unsafe_allow_html=True)
