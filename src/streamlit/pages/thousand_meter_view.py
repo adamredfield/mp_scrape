@@ -297,8 +297,8 @@ def get_highest_grade(grades, grade_sort_df):
         return None
 
     grade_orders = pd.merge(
-        pd.DataFrame({'grade': valid_grades}),
-        grade_sort_df[['grade', 'sort_order']],
+        pd.DataFrame({'grade': valid_grades.astype(str)}),
+        grade_sort_df[['grade', 'sort_order']].astype({'grade': str}),
         on='grade',
         how='left'
     )
