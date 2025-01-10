@@ -4,6 +4,7 @@ import plotly.graph_objects as go
 import pandas as pd
 import os
 import sys
+from src.analysis.mp_racked_metrics import grade_sort_key
 
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(project_root)
@@ -95,8 +96,8 @@ def create_figure(sends_df, falls_df, ordered_grades):
             width=0.8,
             marker=dict(
                 color=sends_colors.get(route_type, '#1ed760'),
-                opacity=0.8,  # Slight transparency
-                line=dict(  # Add border to make small sections more visible
+                opacity=0.8,
+                line=dict( 
                     width=1,
                     color='rgba(255,255,255,0.3)'
                 )
@@ -294,8 +295,12 @@ sends_df, falls_df = get_chart_data(
 if sends_df.empty:
     st.stop()
 
-ordered_grades = sends_df['grade'].tolist()
+all_grades = set(sends_df['grade'].tolist())
+if not falls_df.empty:
+    all_grades.update(falls_df['grade'].tolist())
 
+ordered_grades = sorted(list(all_grades), 
+                       key=lambda x: grade_sort_key(x)) 
 
 fig = create_figure(sends_df, falls_df, ordered_grades)
 
