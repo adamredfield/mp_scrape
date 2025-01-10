@@ -20,9 +20,10 @@ try:
         conn,
         user_id=user_id,
         pitch_preference=st.session_state.pitches_preference)
-
-    if df.empty:
-        st.error("No big wall routes found for 2024")
+    
+    if df.empty: 
+        st.info("No big wall routes found in your tick history. Big wall routes are defined as routes that are either 1000+ feet or have a commitment grade of IV or higher.")
+        st.stop()
 
     st.markdown(get_spotify_style(), unsafe_allow_html=True)
     st.markdown("""
@@ -109,6 +110,10 @@ try:
     """, unsafe_allow_html=True)
 
     with st.expander("Filters"):
+
+        if df.empty:
+            st.stop()
+            
         available_grades = sorted(
             [g for g in df['commitment_grade'].unique() if pd.notna(g)])
         selected_grades = st.multiselect(
@@ -124,7 +129,11 @@ try:
         )
 
         min_length = 500
-        max_length = int(df['length'].max())
+        if not df.empty and 'length' in df.columns:
+            length_series = df['length'].dropna()
+            max_length = int(length_series.max()) if not length_series.empty else 5000
+        else:
+            max_length = 10000
         length_filter = st.slider(
             'Minimum Route Length (ft):',
             min_value=min_length,
@@ -134,7 +143,11 @@ try:
             key='length_filter'
         )
 
-        available_years = sorted(df['date'].dt.year.unique())
+        if not df.empty and 'date' in df.columns:
+            df['date'] = pd.to_datetime(df['date'])
+            available_years = sorted(df['date'].dt.year.unique(), reverse=True)
+        else:
+            available_years = list(range(2024, 1999, -1))  # Default year range
 
         date_filter_type = st.radio(
             "Date Range",
