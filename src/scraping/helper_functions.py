@@ -559,6 +559,11 @@ def process_page(page_number, ticks_url, user_id, retry_count=0):
 
                 with create_connection() as conn:
                     cursor = conn.cursor()
+
+                    def get_new_connection():
+                        new_conn = create_connection()
+                        return new_conn.__enter__() 
+                    
                     existing_routes = queries.check_routes_exists(
                         cursor, route_ids_to_check.keys())
 
@@ -664,13 +669,13 @@ def process_page(page_number, ticks_url, user_id, retry_count=0):
 
                     if route_data:
                         print(f"Attempting to insert {len(route_data)} routes")
-                        queries.insert_routes_batch(cursor, route_data, create_connection=create_connection)
+                        queries.insert_routes_batch(cursor, route_data, create_connection=get_new_connection)
                     if route_comments_data:
                         print(f"Attempting to insert {len(route_comments_data)} comments")
-                        queries.insert_comments_batch(cursor, route_comments_data, create_connection=create_connection)
+                        queries.insert_comments_batch(cursor, route_comments_data, create_connection=get_new_connection)
                     if tick_data:
                         print(f"Attempting to insert {len(tick_data)} ticks")
-                        queries.insert_ticks_batch(cursor, tick_data, create_connection=create_connection)
+                        queries.insert_ticks_batch(cursor, tick_data, create_connection=get_new_connection)
                     if ai_route_analysis_data:
                         print(f"Attempting to insert AI results")
                         for result in ai_route_analysis_data:
