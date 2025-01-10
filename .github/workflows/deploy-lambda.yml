@@ -1,8 +1,6 @@
 name: Deploy Lambda Functions
 
 on:
-  push:
-    branches: [ main, user-input ]
   pull_request:
     branches: [ main ]
 
@@ -144,7 +142,7 @@ jobs:
               "OPENAI_API_KEY": "${{ secrets.OPENAI_API_KEY }}"
           }}' \
           --timeout 900 \
-          --memory-size 900 \
+          --memory-size 2048 \
           --image-config '{"Command": ["src.lambdas.worker.lambda_handler"]}'
 
     - name: Set worker concurrency
@@ -175,7 +173,7 @@ jobs:
             }
           }' \
           --timeout 900 \
-          --memory-size 900 \
+          --memory-size 2048 \
           --image-config '{"Command": ["src.lambdas.retry_worker.lambda_handler"]}'
         
     - name: Set retry worker concurrency
@@ -198,7 +196,7 @@ jobs:
               "IPROYAL_PASSWORD": "${{ secrets.IPROYAL_PASSWORD }}"
           }}' \
           --timeout 900 \
-          --memory-size 900 \
+          --memory-size 2048 \
           --image-config '{"Command": ["src.lambdas.orchestrator.lambda_handler"]}'
 
     - name: Update Lambda IAM Role
