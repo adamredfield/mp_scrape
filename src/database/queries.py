@@ -38,7 +38,6 @@ def with_retry(max_retries=3, delay=1):
                         continue
                     raise
                 except Exception as e:
-                    # Don't retry other types of exceptions
                     raise
             raise last_exception
         return wrapper
@@ -56,7 +55,7 @@ def check_routes_exists(cursor, route_ids):
     return results
 
 @with_retry()
-def insert_comments_batch(cursor, comments):  
+def insert_comments_batch(cursor, comments, **kwargs):  
     failed_comments = []
     try:
         print(f"Received {len(comments)} comments to insert")
@@ -126,7 +125,7 @@ def insert_comments_batch(cursor, comments):
         return successful_count, failed_comments
 
 @with_retry()
-def insert_ticks_batch(cursor, tick_data):
+def insert_ticks_batch(cursor, tick_data, **kwargs):
     failed_ticks = []
 
     for tick in tick_data:
@@ -198,7 +197,7 @@ def insert_ticks_batch(cursor, tick_data):
         return successful_count, failed_ticks
 
 @with_retry()
-def insert_routes_batch(cursor, routes_data):
+def insert_routes_batch(cursor, routes_data, **kwargs):
     failed_routes = []
     try:
         args_str = ','.join(
