@@ -1,7 +1,6 @@
 import time
 import psycopg2
 from functools import wraps
-from src.scraping.helper_functions import sanitize_route_data
 
 def with_retry(max_retries=3, delay=1):
     def decorator(func):
