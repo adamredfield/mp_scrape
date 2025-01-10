@@ -12,22 +12,27 @@ def with_retry(max_retries=3, delay=1):
                     return func(*args, **kwargs)
                 except (psycopg2.OperationalError, psycopg2.InterfaceError) as e:
                     last_exception = e
-                    if (("SSL connection has been closed" in str(e) or 
-                         "cursor already closed" in str(e)) and 
-                        attempt < max_retries - 1):
+                    if attempt < max_retries - 1:
                         print(f"Database connection failed on attempt {attempt + 1}, retrying in {delay} seconds...")
-                        
-                        # Get new cursor if needed
-                        if "cursor already closed" in str(e):
-                            cursor = args[0]
-                            if hasattr(cursor, 'connection'):
-                                try:
+                        cursor = args[0]
+                        if hasattr(cursor, 'connection'):
+                            try:
+                                if cursor.connection.closed:  # 🔵 Check if connection is closed
+                                    print("Connection closed, attempting to reconnect...")
+                                    new_conn = kwargs.get('create_connection', None)
+                                    if new_conn:
+                                        conn = new_conn()
+                                        args = list(args)
+                                        args[0] = conn.cursor()
+                                        args = tuple(args)
+                                else:
+                                    print("Getting new cursor...")
                                     args = list(args)
                                     args[0] = cursor.connection.cursor()
                                     args = tuple(args)
-                                except Exception as conn_err:
-                                    print(f"Failed to get new cursor: {conn_err}")
-                                    raise
+                            except Exception as conn_err:
+                                print(f"Failed to reset connection/cursor: {conn_err}")
+                                continue
                         
                         time.sleep(delay)
                         continue
