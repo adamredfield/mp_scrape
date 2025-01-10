@@ -664,16 +664,13 @@ def process_page(page_number, ticks_url, user_id, retry_count=0):
 
                     if route_data:
                         print(f"Attempting to insert {len(route_data)} routes")
-                        queries.insert_routes_batch(cursor, route_data)
+                        queries.insert_routes_batch(cursor, route_data, create_connection=create_connection)
                     if route_comments_data:
-                        print(
-                            f"Attempting to insert {len(route_comments_data)} comments")
-                        queries.insert_comments_batch(
-                            cursor, route_comments_data)
+                        print(f"Attempting to insert {len(route_comments_data)} comments")
+                        queries.insert_comments_batch(cursor, route_comments_data, create_connection=create_connection)
                     if tick_data:
                         print(f"Attempting to insert {len(tick_data)} ticks")
-                        cursor = conn.cursor()
-                        queries.insert_ticks_batch(cursor, tick_data)
+                        queries.insert_ticks_batch(cursor, tick_data, create_connection=create_connection)
                     if ai_route_analysis_data:
                         print(f"Attempting to insert AI results")
                         for result in ai_route_analysis_data:
@@ -719,23 +716,3 @@ def sanitize_text(text):
     
     return text.strip()
 
-def sanitize_route_data(route_data):
-    """Sanitize all text fields in route data"""
-    text_fields = [
-        'route_name',
-        'description',
-        'protection',
-        'fa',
-        'region',
-        'main_area',
-        'sub_area',
-        'specific_location',
-        'route_type',
-        'commitment_grade'
-    ]
-    
-    for field in text_fields:
-        if field in route_data and route_data[field]:
-            route_data[field] = sanitize_text(route_data[field])
-    
-    return route_data
