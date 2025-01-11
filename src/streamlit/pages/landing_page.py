@@ -54,14 +54,14 @@ st.markdown(f"""
             <div style="font-size: 2.2rem; opacity: 0.95;">
                 Welcome to your
             </div>
-            <div style="font-size: 2.2rem;">
+            <div style="font-size: 2rem;">
                 Mountain Project Racked
             </div>
         </h1>
     </div>
     <div style="
         color: rgba(255, 255, 255, 0.85);
-        font-size: 1rem;
+        font-size: .9rem;
         line-height: 2;
         margin: 0 0 1.5rem 0;
     ">
