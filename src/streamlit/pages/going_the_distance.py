@@ -518,6 +518,18 @@ try:
                                 flex-direction: column;
                                 margin-left: 20px;
                                 margin-top: -120px;
+                                position: relative;
+                                z-index: 9999;
+                            }
+                            .st-emotion-cache-1cvow4s {
+                                position: relative;
+                                z-index: 0;
+                        }
+                                    
+                            /* Add z-index to individual radio options */
+                            div[role="radio"] {
+                                position: relative;  /* Add this */
+                                z-index: 1001;      /* Add this */
                             }
                             .element-container:has(#verify-button-after) + div button {
                                 display: flex;
@@ -529,6 +541,7 @@ try:
                                 background: rgba(30, 215, 96, 0.1)
                                 color: #F5F5F5 !important;
                                 transition: all 0.3s ease !important;
+                                z-index: 1000;
                             }
                             </style>
 
