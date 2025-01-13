@@ -14,7 +14,15 @@ from src.analysis.filters_ctes import available_years
 from src.streamlit.filters import render_filters
 import src.analysis.mp_racked_metrics as metrics
 from src.streamlit.streamlit_helper_functions import get_squared_image, image_to_base64
+from streamlit_cookies_controller import CookieController
 
+cookie_controller = CookieController()
+
+current_page = st.query_params.get("page", "Classics Chaser")
+cookie_controller.set('current_page', current_page)
+
+if not st.session_state.get('authenticated'):
+    st.switch_page("mp_racked.py")
 st.markdown("""
     <style>
         /* Add bottom padding to tab panels to prevent cutoff */

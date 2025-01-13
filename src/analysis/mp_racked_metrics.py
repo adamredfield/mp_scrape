@@ -472,7 +472,6 @@ def get_bigwall_routes(conn, user_id=None, route_types=None,
     r.pitches
     ORDER BY commitment_grade DESC, length DESC;
     '''
-    print(query)
     return conn.query(query)
 
 
@@ -510,7 +509,6 @@ def total_routes(conn, user_id=None, year_start=None,
     {route_type_filter(route_types)}
     GROUP BY date
     """
-    print(query)
     return conn.query(query)
 
 
@@ -572,7 +570,6 @@ def most_climbed_route(conn, user_id=None, year_start=None, year_end=None, pitch
     WHERE times_climbed = (SELECT max_times FROM max_count)
     ORDER BY times_climbed DESC, route_name;
     """
-    print(query)
     return conn.query(query)
 
 
@@ -1322,7 +1319,6 @@ def tag_relationships(conn, primary_type, secondary_type,
             '' as parent,
             (SELECT SUM(count) FROM primary_counts)
     """
-    print(query)
     return conn.query(query)
 
 
@@ -1622,7 +1618,6 @@ route_counts AS (
                 END
         END;
         """
-    print(query)
     return conn.query(query)
 
 
