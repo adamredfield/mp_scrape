@@ -12,7 +12,15 @@ sys.path.append(project_root)
 from src.analysis.filters_ctes import available_years
 from src.streamlit.filters import render_filters
 from src.streamlit.styles import get_spotify_style
+from streamlit_cookies_controller import CookieController
 
+cookie_controller = CookieController()
+
+current_page = st.query_params.get("page", "Grade Pyramid")
+cookie_controller.set('current_page', current_page)
+
+if not st.session_state.get('authenticated'):
+    st.switch_page("mp_racked.py")
 
 user_id = st.session_state.user_id
 conn = st.connection('postgresql', type='sql')

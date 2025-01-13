@@ -16,7 +16,15 @@ from src.analysis.filters_ctes import available_years, get_pitch_preference_leng
 from src.streamlit.filters import render_filters
 from src.streamlit.styles import get_spotify_style
 from src.analysis.filters_ctes import add_user_filter
+from streamlit_cookies_controller import CookieController
 
+cookie_controller = CookieController()
+
+current_page = st.query_params.get("page", "Thousand Meter View")
+cookie_controller.set('current_page', current_page)
+
+if not st.session_state.get('authenticated'):
+    st.switch_page("mp_racked.py")
 
 st.markdown(get_spotify_style(), unsafe_allow_html=True)
 

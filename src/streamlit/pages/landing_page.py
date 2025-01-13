@@ -1,4 +1,10 @@
+from streamlit_cookies_controller import CookieController
 import streamlit as st
+
+cookie_controller = CookieController()
+
+if not st.session_state.get('authenticated'):
+    st.switch_page("mp_racked.py")
 
 user_id = st.session_state.user_id
 conn = st.connection('postgresql', type='sql')

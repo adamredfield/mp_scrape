@@ -9,7 +9,15 @@ sys.path.append(project_root)
 
 from src.streamlit.styles import get_spotify_style
 from src.streamlit.chart_utils import create_bar_chart
+from streamlit_cookies_controller import CookieController
 
+cookie_controller = CookieController()
+
+current_page = st.query_params.get("page", "FA Legacy")
+cookie_controller.set('current_page', current_page)
+
+if not st.session_state.get('authenticated'):
+    st.switch_page("mp_racked.py")
 user_id = st.session_state.user_id
 conn = st.connection('postgresql', type='sql')
 
