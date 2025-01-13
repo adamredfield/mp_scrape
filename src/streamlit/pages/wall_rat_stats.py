@@ -37,6 +37,7 @@ try:
     st.markdown("""
         <style>
             .block-container {
+                margin-top: -3rem !important;
                 padding-bottom: 5rem;
                 max-width: 100%;
             }
@@ -114,6 +115,7 @@ try:
             .js-plotly-plot {
                 margin-bottom: 10rem !important;
             }
+            
         </style>
     """, unsafe_allow_html=True)
 

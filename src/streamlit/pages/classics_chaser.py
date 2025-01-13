@@ -341,7 +341,7 @@ with tab2:
             /* Ensure no extra padding at top of container */
             .block-container {
                 padding-top: 0 !important;
-                margin-top: -2rem !important;
+                margin-top: -4.5rem !important;
             }
         </style>
     """, unsafe_allow_html=True)
