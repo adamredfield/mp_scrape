@@ -36,31 +36,6 @@ The application is built using a serverless architecture on AWS:
   - PostgreSQL
   - Playwright and BeautifulSoup for web scraping
 
-## Local Development
-
-1. Clone the repository
-2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-3. Set up environment variables:
-   ```bash
-   # AWS Configuration
-   AWS_REGION=us-east-1
-   AWS_ACCESS_KEY_ID=your_access_key
-   AWS_SECRET_ACCESS_KEY=your_secret_key
-
-   # Database Configuration
-   DB_HOST=your_db_host
-   DB_NAME=your_db_name
-   DB_USER=your_db_user
-   DB_PASSWORD=your_db_password
-   ```
-4. Run the Streamlit app:
-   ```bash
-   streamlit run src/streamlit/mp_racked.py
-   ```
-
 ## Deployment
 
 The project uses GitHub Actions for CI/CD. The workflow:
@@ -68,7 +43,6 @@ The project uses GitHub Actions for CI/CD. The workflow:
 2. Creates/updates SQS queues
 3. Deploys Lambda functions
 4. Configures DLQ for error handling
-
 
 ## Data Model
 
