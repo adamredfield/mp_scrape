@@ -43,6 +43,7 @@ route_types = filters.get('route_type')
 st.markdown("""
     <style>
         .block-container {
+            margin-top: -3rem !important;
             padding-top: 0rem !important;
             padding-bottom: 10rem !important;
         }

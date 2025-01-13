@@ -257,7 +257,7 @@ st.markdown("""
         margin-top: 1rem !important;
     }
     .stExpander {
-        margin-top: -1rem !important;
+        margin-top: -3.5rem !important;
         margin-bottom: -3rem !important;
     }
 

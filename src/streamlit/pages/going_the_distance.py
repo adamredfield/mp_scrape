@@ -38,6 +38,7 @@ st.markdown(get_spotify_style(), unsafe_allow_html=True)
 st.markdown("""
     <style>
         .block-container {
+            margin-top: -3rem !important;
             padding-bottom: 10rem !important;
             max-width: 100%;
         }

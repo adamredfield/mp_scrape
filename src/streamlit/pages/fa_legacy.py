@@ -41,7 +41,7 @@ st.markdown("""
             padding-bottom: 0rem;
             max-width: 100%;
             padding: -2rem!important;
-            margin-top: -2rem !important;
+            margin-top: -4.5rem !important;
         }
 
         .stDataFrame {
