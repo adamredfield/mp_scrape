@@ -5,7 +5,7 @@ import time
 st.set_page_config(
     page_title="Your 2024 Climbing Racked",
     page_icon="🧗‍♂️",
-    layout="centered",
+    layout="wide",
     initial_sidebar_state="collapsed",
 )
 

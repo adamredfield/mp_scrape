@@ -79,13 +79,10 @@ st.markdown(f"""
 
 
 def render_feature_card(emoji, title, description, page_name):
-    # Create unique key for the card
     card_key = f"card_{title.lower().replace(' ', '_')}"
     
-    # Use columns to create proper layout
     col1, col2, col3 = st.columns([0.1, 0.8, 0.1])
     with col2:
-        # Create the card content
         st.markdown(f"""
             <div class="card-wrapper">
                 <div class="feature-card">
@@ -98,17 +95,15 @@ def render_feature_card(emoji, title, description, page_name):
             </div>
         """, unsafe_allow_html=True)
         
-        # Add the button in the same column
         if st.button("", key=card_key, use_container_width=True):
             cookie_controller.set('current_page', title)
             st.switch_page(f"pages/{page_name.lower().replace(' ', '_')}.py")
 
-# Add CSS to style everything properly
 st.markdown("""
     <style>
     .card-wrapper {
         position: relative;
-        margin-bottom: -150px;  /* Adjust based on button height */
+        margin-bottom: -150px;
     }
     
     .feature-card {
@@ -150,13 +145,9 @@ st.markdown("""
         border: none !important;
         height: 150px !important;
         transition: all 0.2s;
-        margin-top: -20px !important;  /* Increased negative margin to move button up */
+        margin-top: -20px !important;  
         position: relative !important;
-        z-index: 1 !important;  /* Ensure button stays on top */
-    }
-    
-    .stButton button:hover {
-        background-color: rgba(30, 215, 96, 0.1) !important;
+        z-index: 1 !important;  
     }
     
     .stButton button:active {
@@ -175,7 +166,7 @@ with st.expander("📈 Overview", expanded=False):
     render_feature_card("🐀", "Wall Rat Stats", 
                         "Go BIG or go home.<br>"
                         "Multipitch & Bigwall Tracker", "wall_rat_stats")   
-# Personal Analytics Section
+
 with st.expander("📊 Personal Analytics", expanded=False):
     render_feature_card("🏃", "Going the Distance", 
                        "See how far you've climbed", "going_the_distance")
@@ -186,7 +177,6 @@ with st.expander("📊 Personal Analytics", expanded=False):
                        "Break down your climbing preferences<br>"
                        "Top Styles, Features, Descriptors & Rock Type<br>", "style_for_miles")
 
-# Route Explorer Section
 with st.expander("🔍 Route Explorer", expanded=False):
     render_feature_card("⭐", "Classics Collector", 
                        "View your ultra classics<br>"

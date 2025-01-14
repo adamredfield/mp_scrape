@@ -1621,3 +1621,104 @@ route_counts AS (
     return conn.query(query)
 
 
+def get_leaderboard_routes_info(conn, user_id, year_start, year_end, period_stats_df, period_type='all', period_value=None):
+    
+    highest_grades = {
+        'trad': period_stats_df['highest_trad_grade'].iloc[0],
+        'sport': period_stats_df['highest_sport_grade'].iloc[0],
+        'boulder': period_stats_df['highest_boulder'].iloc[0],
+        'aid': period_stats_df['highest_aid'].iloc[0]
+    }
+    
+    period_filter = ""
+    if period_type == 'season':
+        if period_value == 'Winter':
+            period_filter = "AND EXTRACT(MONTH FROM t.date) IN (1, 2, 3)"
+        elif period_value == 'Spring':
+            period_filter = "AND EXTRACT(MONTH FROM t.date) IN (4, 5, 6)"
+        elif period_value == 'Summer':
+            period_filter = "AND EXTRACT(MONTH FROM t.date) IN (7, 8, 9)"
+        elif period_value == 'Fall':
+            period_filter = "AND EXTRACT(MONTH FROM t.date) IN (10, 11, 12)"
+    elif period_type == 'month':
+        period_filter = f"AND EXTRACT(MONTH FROM t.date) = {period_value}"
+
+    query = f"""
+    WITH filtered_routes AS (
+        SELECT 
+            'trad' as route_type,
+            r.route_name,
+            r.main_area,
+            t.type as tick_type,
+            t.note as tick_note,
+            t.date as date,
+            r.yds_rating as grade,
+            t.user_id
+        FROM routes.ticks t
+        JOIN routes.routes r ON t.route_id = r.id
+        WHERE r.route_type ILIKE '%trad%'
+        AND r.yds_rating = '{highest_grades['trad']}'
+        AND t.type IN ('Lead / Pinkpoint', 'Lead / Onsight', 'Lead / Redpoint', 'Lead / Flash')
+        AND t.note NOT ILIKE '%aid%'
+        AND r.aid_rating IS NULL 
+        UNION ALL
+        SELECT 
+            'sport' as route_type,
+            r.route_name,
+            r.main_area,
+            t.type as tick_type,
+            t.note as tick_note,
+            t.date as date,
+            r.yds_rating as grade,
+            t.user_id
+        FROM routes.ticks t
+        JOIN routes.routes r ON t.route_id = r.id
+        WHERE r.route_type ILIKE '%sport%'
+        AND r.yds_rating = '{highest_grades['sport']}'
+        AND t.type IN ('Lead / Pinkpoint', 'Lead / Onsight', 'Lead / Redpoint', 'Lead / Flash')
+        UNION ALL
+        SELECT 
+            'boulder' as route_type,
+            r.route_name,
+            r.main_area,
+            t.type as tick_type,
+            t.note as tick_note,
+            t.date as date,
+            r.hueco_rating as grade,
+            t.user_id
+        FROM routes.ticks t
+        JOIN routes.routes r ON t.route_id = r.id
+        WHERE r.route_type ILIKE '%boulder%'
+        AND r.hueco_rating = '{highest_grades['boulder']}'
+        AND t.type != 'Attempt'
+        UNION ALL
+        SELECT 
+            'aid' as route_type,
+            r.route_name,
+            r.main_area,
+            t.type as tick_type,
+            t.note as tick_note,
+            t.date as date,
+            r.aid_rating as grade,
+            t.user_id
+        FROM routes.ticks t
+        JOIN routes.routes r ON t.route_id = r.id
+        WHERE r.aid_rating IS NOT NULL
+        AND r.aid_rating = '{highest_grades['aid']}'
+    )
+    SELECT 
+        route_type,
+        route_name,
+        main_area,
+        tick_type,
+        tick_note,
+        date,
+        grade
+    FROM filtered_routes t
+    {year_filter(year_range=(year_start, year_end), use_where=True, table_alias='t')}
+    {add_user_filter(user_id, table_alias='t')}
+    {period_filter}
+    ORDER BY date DESC;
+    """
+    print(query)
+    return conn.query(query)
