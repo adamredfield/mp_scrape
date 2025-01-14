@@ -18,6 +18,7 @@ from src.streamlit.filters import render_filters
 from src.streamlit.styles import get_spotify_style
 from src.analysis.filters_ctes import add_user_filter
 from streamlit_cookies_controller import CookieController
+from streamlit_extras.stylable_container import stylable_container 
 
 cookie_controller = CookieController()
 
@@ -683,27 +684,39 @@ with tab1:
         
         return tooltips
 
-    route_info = st.empty()
-    tooltips = create_tooltips(leaderboard_routes)
-    button_cols = st.columns([.4, .4, .4, .4])
-    buttons = [
-        ('sport', 'highest_sport_grade'),
-        ('trad', 'highest_trad_grade'),
-        ('boulder', 'highest_boulder'),
-        ('aid', 'highest_aid')
-    ]
+    with stylable_container(
+        key="grade_buttons",
+        css_styles="""
+            [data-testid="stHorizontalBlock"] {
+                flex-wrap: nowrap !important;
+                gap: 34px !important;
+                flex-direction: row !important;
+                justify-content: center !important;
+                margin-top: -60px !important;
+            }
+        """
+    ):
 
-    for col, (key, grade_col) in zip(button_cols, buttons):
-        with col:
-            if st.button(stats_df[grade_col].iloc[0] or '-', key=key):
-                route_info.markdown(f"""
-                <div class="route-info-box">
-                    {tooltips.get(key, 'No sends recorded')}
-                </div>
-                """, unsafe_allow_html=True)
-                time.sleep(2)
-                route_info.empty()
+        route_info = st.empty()
+        tooltips = create_tooltips(leaderboard_routes)
+        button_cols = st.columns([.4, .4, .4, .4])
+        buttons = [
+            ('sport', 'highest_sport_grade'),
+            ('trad', 'highest_trad_grade'),
+            ('boulder', 'highest_boulder'),
+            ('aid', 'highest_aid')
+        ]
 
+        for col, (key, grade_col) in zip(button_cols, buttons):
+            with col:
+                if st.button(stats_df[grade_col].iloc[0] or '-', key=key):
+                    route_info.markdown(f"""
+                    <div class="route-info-box">
+                        {tooltips.get(key, 'No sends recorded')}
+                    </div>
+                    """, unsafe_allow_html=True)
+                    time.sleep(2)
+                    route_info.empty()
 
     st.markdown("""
         <style>
@@ -752,14 +765,7 @@ with tab1:
             text-align: center;
         }
 
-        /* Layout */
-        [data-testid="stHorizontalBlock"] {
-            flex-wrap: nowrap !important;
-            gap: 34px !important;
-            flex-direction: row !important;
-            justify-content: center !important;
-            margin-top: -60px !important;
-        }
+
 
         /* Column sizing */
         [data-testid="column"] {
