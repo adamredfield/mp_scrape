@@ -1381,10 +1381,10 @@ def get_period_stats(conn, user_id, period_type='all', period_value=None, year_s
             EXTRACT(YEAR FROM t.date) as year,
             EXTRACT(MONTH FROM t.date) as month,
             CASE
-                WHEN EXTRACT(MONTH FROM t.date) IN (12, 1, 2) THEN 'Winter'
-                WHEN EXTRACT(MONTH FROM t.date) IN (3, 4, 5) THEN 'Spring'
-                WHEN EXTRACT(MONTH FROM t.date) IN (6, 7, 8) THEN 'Summer'
-                WHEN EXTRACT(MONTH FROM t.date) IN (9, 10, 11) THEN 'Fall'
+                WHEN EXTRACT(MONTH FROM t.date) IN (1, 2, 3) THEN 'Winter'
+                WHEN EXTRACT(MONTH FROM t.date) IN (4, 5, 6) THEN 'Spring'
+                WHEN EXTRACT(MONTH FROM t.date) IN (7, 8, 9) THEN 'Summer'
+                WHEN EXTRACT(MONTH FROM t.date) IN (10, 11, 12) THEN 'Fall'
             END as season,
             SUM(coalesce(t.pitches_climbed,r.pitches,ep.estimated_pitches)) pitches,
             SUM(
@@ -1522,10 +1522,10 @@ route_counts AS (
     UNION ALL
     SELECT
         CASE
-            WHEN EXTRACT(MONTH FROM t.date) IN (12, 1, 2) THEN 'Winter'
-            WHEN EXTRACT(MONTH FROM t.date) IN (3, 4, 5) THEN 'Spring'
-            WHEN EXTRACT(MONTH FROM t.date) IN (6, 7, 8) THEN 'Summer'
-            WHEN EXTRACT(MONTH FROM t.date) IN (9, 10, 11) THEN 'Fall'
+                WHEN EXTRACT(MONTH FROM t.date) IN (1, 2, 3) THEN 'Winter'
+                WHEN EXTRACT(MONTH FROM t.date) IN (4, 5, 6) THEN 'Spring'
+                WHEN EXTRACT(MONTH FROM t.date) IN (7, 8, 9) THEN 'Summer'
+                WHEN EXTRACT(MONTH FROM t.date) IN (10, 11, 12) THEN 'Fall'
         END || ' ' || EXTRACT(YEAR FROM t.date)::text as period,
         COUNT(DISTINCT r.id),
         COUNT(*) as total_ascents
@@ -1536,10 +1536,10 @@ route_counts AS (
     AND {period_type_sql} = 'season'
     GROUP BY
         CASE
-            WHEN EXTRACT(MONTH FROM t.date) IN (12, 1, 2) THEN 'Winter'
-            WHEN EXTRACT(MONTH FROM t.date) IN (3, 4, 5) THEN 'Spring'
-            WHEN EXTRACT(MONTH FROM t.date) IN (6, 7, 8) THEN 'Summer'
-            WHEN EXTRACT(MONTH FROM t.date) IN (9, 10, 11) THEN 'Fall'
+                WHEN EXTRACT(MONTH FROM t.date) IN (1, 2, 3) THEN 'Winter'
+                WHEN EXTRACT(MONTH FROM t.date) IN (4, 5, 6) THEN 'Spring'
+                WHEN EXTRACT(MONTH FROM t.date) IN (7, 8, 9) THEN 'Summer'
+                WHEN EXTRACT(MONTH FROM t.date) IN (10, 11, 12) THEN 'Fall'
         END,
         EXTRACT(YEAR FROM t.date)
     UNION ALL

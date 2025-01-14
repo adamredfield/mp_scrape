@@ -425,6 +425,7 @@ with tab1:
             period_type, 
             period_value
         )
+        print(leaderboard_routes)
         stats_df['avg_distance_per_day'] = (
             stats_df['total_distance'] /
             stats_df['days_logged']).round(0)
@@ -951,10 +952,10 @@ with tab2:
                 SELECT
                     EXTRACT(YEAR FROM t.date)::text || ' ' ||
                     CASE
-                        WHEN EXTRACT(MONTH FROM t.date) IN (12, 1, 2) THEN 'Winter'
-                        WHEN EXTRACT(MONTH FROM t.date) IN (3, 4, 5) THEN 'Spring'
-                        WHEN EXTRACT(MONTH FROM t.date) IN (6, 7, 8) THEN 'Summer'
-                        ELSE 'Fall'
+                        WHEN EXTRACT(MONTH FROM t.date) IN (1, 2, 3) THEN 'Winter'
+                        WHEN EXTRACT(MONTH FROM t.date) IN (4, 5, 6) THEN 'Spring'
+                        WHEN EXTRACT(MONTH FROM t.date) IN (7, 8, 9) THEN 'Summer'
+                        WHEN EXTRACT(MONTH FROM t.date) IN (10, 11, 12) THEN 'Fall'
                     END as period,
                     SUM({get_pitch_preference_lengths(pitch_preference)}) as total_length,
                     COUNT(DISTINCT t.date) as days_climbed,
@@ -968,10 +969,10 @@ with tab2:
                 GROUP BY
                     EXTRACT(YEAR FROM t.date),
                         CASE
-                            WHEN EXTRACT(MONTH FROM t.date) IN (12, 1, 2) THEN 'Winter'
-                            WHEN EXTRACT(MONTH FROM t.date) IN (3, 4, 5) THEN 'Spring'
-                            WHEN EXTRACT(MONTH FROM t.date) IN (6, 7, 8) THEN 'Summer'
-                            ELSE 'Fall'
+                            WHEN EXTRACT(MONTH FROM t.date) IN (1, 2, 3) THEN 'Winter'
+                            WHEN EXTRACT(MONTH FROM t.date) IN (4, 5, 6) THEN 'Spring'
+                            WHEN EXTRACT(MONTH FROM t.date) IN (7, 8, 9) THEN 'Summer'
+                            WHEN EXTRACT(MONTH FROM t.date) IN (10, 11, 12) THEN 'Fall'
                         END
                 )
                 SELECT *
