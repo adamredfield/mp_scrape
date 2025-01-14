@@ -8,6 +8,7 @@ import src.analysis.mp_racked_metrics as metrics
 import streamlit as st
 import os
 import sys
+import time
 
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(project_root)
@@ -274,7 +275,7 @@ def display_year(
             autorange="reversed",
             ticks="",
             showticksuffix="none",
-            fixedrange=True  # Add this line
+            fixedrange=True
         ),
         xaxis=dict(
             showline=False,
@@ -283,7 +284,7 @@ def display_year(
             tickmode='array',
             ticktext=month_names,
             tickvals=month_positions,
-            fixedrange=True  # Add this line
+            fixedrange=True 
         ),
         font={'size': 10, 'color': '#9e9e9e'},
         margin=dict(
@@ -344,13 +345,13 @@ if year_start is not None and year_end is not None:
         year_end=year_end,
         pitch_preference=st.session_state.pitches_preference
     )
-
+    
 tab1, tab2 = st.tabs(["Stats", "Visualizations"])
 
 with tab1:
     if current_state != st.session_state.filter_state:
         st.session_state.filter_state = current_state.copy()
-        # Preserve the active tab through the rerun
+
         stored_tab = st.session_state.active_tab
         st.rerun()
 
@@ -414,6 +415,15 @@ with tab1:
             'boulder_routes': seasonal_data['boulder_routes'].sum() or 0, 
             'roped_days': seasonal_data['roped_days'].sum() or 0
         }])
+        leaderboard_routes = metrics.get_leaderboard_routes_info(
+            conn, 
+            user_id, 
+            year_start, 
+            year_end, 
+            stats_df,
+            period_type, 
+            period_value
+        )
         stats_df['avg_distance_per_day'] = (
             stats_df['total_distance'] /
             stats_df['days_logged']).round(0)
@@ -444,7 +454,7 @@ with tab1:
             monthly_data['highest_sport_grade'], sport_grades)
         highest_trad = get_highest_grade(
             monthly_data['highest_trad_grade'],
-            sport_grades)  # Trad uses YDS
+            sport_grades)  
         highest_boulder = get_highest_grade(
             monthly_data['highest_boulder'], boulder_grades)
         highest_aid = get_highest_grade(
@@ -471,6 +481,15 @@ with tab1:
             'boulder_routes': monthly_data['boulder_routes'].sum() or 0,
             'roped_days': monthly_data['roped_days'].sum() or 0
         }])
+        leaderboard_routes = metrics.get_leaderboard_routes_info(
+            conn, 
+            user_id, 
+            year_start, 
+            year_end, 
+            stats_df,
+            period_type, 
+            period_value
+        )
         stats_df['avg_distance_per_day'] = (
             stats_df['total_distance'] /
             stats_df['days_logged']).round(0)
@@ -485,6 +504,15 @@ with tab1:
             stats_df['non_boulder_routes']).round(0)
     elif period_type == 'all':
         stats_df = stats_df[stats_df['period'] == 'Full Year']
+        leaderboard_routes = metrics.get_leaderboard_routes_info(
+            conn, 
+            user_id, 
+            year_start, 
+            year_end, 
+            stats_df,
+            period_type, 
+            period_value
+        )
 
     st.markdown("""
     <style>
@@ -514,7 +542,6 @@ with tab1:
         margin: 10px 0;
         border: 1px solid rgba(255, 255, 255, 0.1);
         text-align: center;
-
     }
 
     .card-title {
@@ -546,67 +573,66 @@ with tab1:
         font-weight: 600;
         display: inline-block;
         margin: 5px;
+        z-index: 1000;
     }
     </style>
     """, unsafe_allow_html=True)
 
+    practice_card = st.container()
+    tooltip_container = st.container()
+    getting_after_it = st.container()
 
-    print(f"Days logged: {stats_df['days_logged'].iloc[0]}")
-    print(f"Total pitches: {stats_df['total_pitches'].iloc[0]}")
-    print(f"Non boulder routes: {stats_df['non_boulder_routes'].iloc[0]}")
-    print(f"Non boulder distance: {stats_df['non_boulder_distance'].iloc[0]}")
-    print(f"Total routes climbed: {stats_df['total_routes_climbed'].iloc[0]}")
-    print(f"Boulder routes: {stats_df['total_routes_climbed'].iloc[0] - stats_df['non_boulder_routes'].iloc[0]}")
-    print(f"Boulder distance: {stats_df['boulder_distance'].iloc[0]}")
-
-    st.markdown(
-        """
-        <div class="stat-card">
-            <div class="card-title">💪 Practice Makes Perfect</div>
-            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
-                <!-- Column 1: Time Metrics -->
-                <div style="display: flex; flex-direction: column; gap: 20px;">
-                    <div>
-                        <div class="stat-label">Days on Rock</div>
-                        <div class="stat-value">{:,.0f} Days</div>
+    with practice_card:
+        st.markdown(
+            """
+            <div class="stat-card">
+                <div class="card-title">💪 Practice Makes Perfect</div>
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
+                    <!-- Column 1: Time Metrics -->
+                    <div style="display: flex; flex-direction: column; gap: 20px;">
+                        <div>
+                            <div class="stat-label">Days on Rock</div>
+                            <div class="stat-value">{:,.0f} Days</div>
+                        </div>
+                        <div>
+                            <div class="stat-label">Total Pitches</div>
+                            <div class="stat-value">{:,.0f}</div>
+                        </div>
                     </div>
-                    <div>
-                        <div class="stat-label">Total Pitches</div>
-                        <div class="stat-value">{:,.0f}</div>
+                    <!-- Column 2: Roped Metrics -->
+                    <div style="display: flex; flex-direction: column; gap: 20px;">
+                        <div>
+                            <div class="stat-label">Roped Routes</div>
+                            <div class="stat-value">{:,.0f}</div>
+                        </div>
+                        <div>
+                            <div class="stat-label">Rope Distance</div>
+                            <div class="stat-value">{:,.0f} ft</div>
+                        </div>
                     </div>
-                </div>
-                <!-- Column 2: Roped Metrics -->
-                <div style="display: flex; flex-direction: column; gap: 20px;">
-                    <div>
-                        <div class="stat-label">Roped Routes</div>
-                        <div class="stat-value">{:,.0f}</div>
-                    </div>
-                    <div>
-                        <div class="stat-label">Rope Distance</div>
-                        <div class="stat-value">{:,.0f} ft</div>
-                    </div>
-                </div>
-                <!-- Column 3: Boulder Metrics -->
-                <div style="display: flex; flex-direction: column; gap: 20px;">
-                    <div>
-                        <div class="stat-label">Boulders</div>
-                        <div class="stat-value">{:,.0f}</div>
-                    </div>
-                    <div>
-                        <div class="stat-label">Boulder Distance</div>
-                        <div class="stat-value">{:,.0f} ft</div>
+                    <!-- Column 3: Boulder Metrics -->
+                    <div style="display: flex; flex-direction: column; gap: 20px;">
+                        <div>
+                            <div class="stat-label">Boulders</div>
+                            <div class="stat-value">{:,.0f}</div>
+                        </div>
+                        <div>
+                            <div class="stat-label">Boulder Distance</div>
+                            <div class="stat-value">{:,.0f} ft</div>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
-        """.format(
-            stats_df['days_logged'].iloc[0],
-            stats_df['total_pitches'].iloc[0],
-            stats_df['non_boulder_routes'].iloc[0],
-            stats_df['non_boulder_distance'].iloc[0],
-            stats_df['boulder_routes'].iloc[0],
-            stats_df['boulder_distance'].fillna(0).iloc[0]),
-        unsafe_allow_html=True)
+            """.format(
+                stats_df['days_logged'].iloc[0],
+                stats_df['total_pitches'].iloc[0],
+                stats_df['non_boulder_routes'].iloc[0],
+                stats_df['non_boulder_distance'].iloc[0],
+                stats_df['boulder_routes'].iloc[0],
+                stats_df['boulder_distance'].fillna(0).iloc[0]),
+            unsafe_allow_html=True)
+
+    st.markdown("<div style='margin-top: 25px'></div>", unsafe_allow_html=True)
 
     st.markdown("""
     <div class="stat-card">
@@ -638,38 +664,169 @@ with tab1:
         stats_df['highest_aid'].iloc[0] or '-'
     ), unsafe_allow_html=True)
 
+    def create_tooltips(leaderboard_routes):
+        tooltips = {}
+        
+        for route_type in ['sport', 'trad', 'boulder', 'aid']:
+
+            route_info = tooltip_container.empty()
+            route_info = leaderboard_routes[leaderboard_routes['route_type'] == route_type]
+            
+            if not route_info.empty:
+                route = route_info.iloc[0]  
+                tooltips[route_type] = (
+                    f"{route['route_name']} • {route['main_area']}\n"
+                    f"{route['tick_type']} • {route['date'].strftime('%Y-%m-%d')}"
+                )
+            else:
+                tooltips[route_type] = "No sends recorded"
+        
+        return tooltips
+
+    route_info = st.empty()
+    tooltips = create_tooltips(leaderboard_routes)
+    button_cols = st.columns([.4, .4, .4, .4])
+    buttons = [
+        ('sport', 'highest_sport_grade'),
+        ('trad', 'highest_trad_grade'),
+        ('boulder', 'highest_boulder'),
+        ('aid', 'highest_aid')
+    ]
+
+    for col, (key, grade_col) in zip(button_cols, buttons):
+        with col:
+            if st.button(stats_df[grade_col].iloc[0] or '-', key=key):
+                route_info.markdown(f"""
+                <div class="route-info-box">
+                    {tooltips.get(key, 'No sends recorded')}
+                </div>
+                """, unsafe_allow_html=True)
+                time.sleep(2)
+                route_info.empty()
+
+
+    st.markdown("""
+        <style>
+        .route-info-box {
+            position: absolute;
+            background: rgba(13, 17, 23, 0.95);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 12px 16px;
+            color: white;
+            font-size: 0.9em;
+            line-height: 1.4;
+            transition: opacity 0.2s ease;
+            margin-top: 15px;
+            width: 400px;
+            color: #ffffff;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            left: 50%;
+            transform: translateX(-50%);
+            }
+            </style>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("""
+        <style>
+        .stContainer {
+            background-color: rgba(32, 33, 35, 0.7);
+            border-radius: 10px;
+            padding: 15px;
+            margin: 10px 0;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Text styles */
+        .card-title {
+            font-size: 1.1em;
+            font-weight: 600;
+            color: white;
+            text-align: center;
+        }
+
+        .card-subtitle, .stat-label {
+            color: #9e9e9e;
+            font-size: 0.9em;
+            text-align: center;
+        }
+
+        /* Layout */
+        [data-testid="stHorizontalBlock"] {
+            flex-wrap: nowrap !important;
+            gap: 34px !important;
+            flex-direction: row !important;
+            justify-content: center !important;
+            margin-top: -60px !important;
+        }
+
+        /* Column sizing */
+        [data-testid="column"] {
+            width: auto !important;
+            flex: 0 0 60px !important;
+            padding: 0 !important;
+        }
+
+        /* Button styling */
+        .stButton button {
+            opacity: 0 !important;
+            background-color: transparent !important;
+            border: none !important;
+            width: 60px !important;
+            height: 28px !important;
+        }
+
+        /* Specific class override */
+        .st-emotion-cache-1vj2wxa {
+            max-width: 60px !important;
+            width: 60px !important;
+            min-width: 60px !important;
+            flex: 0 0 60px !important;
+        }
+
+        /* Mobile responsiveness */
+        @media (max-width: 640px) {
+            [data-testid="column"] {
+                width: 25% !important;
+                flex: 1 !important;
+            }
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
     st.markdown(
         """
-    <div class="stat-card">
-        <div class="card-title">🚀 Getting After It</div>
-        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;">
-            <div>
-                <div class="stat-label">Daily Distance</div>
-                <div class="stat-value">{:.0f} ft</div>
-            </div>
-            <div>
-                <div class="stat-label">Daily Pitches</div>
-                <div class="stat-value">{:.1f}</div>
-            </div>
-            <div>
-                <div class="stat-label">Routes per Day</div>
-                <div class="stat-value">{:.1f}</div>
-            </div>
-            <div>
-                <div class="stat-label">Avg Route Length</div>
-                <div class="stat-value">{:.0f} ft</div>
+        <div class="stat-card">
+            <div class="card-title">🚀 Getting After It</div>
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;">
+                <div>
+                    <div class="stat-label">Daily Distance</div>
+                    <div class="stat-value">{:.0f} ft</div>
+                </div>
+                <div>
+                    <div class="stat-label">Daily Pitches</div>
+                    <div class="stat-value">{:.1f}</div>
+                </div>
+                <div>
+                    <div class="stat-label">Routes per Day</div>
+                    <div class="stat-value">{:.1f}</div>
+                </div>
+                <div>
+                    <div class="stat-label">Avg Route Length</div>
+                    <div class="stat-value">{:.0f} ft</div>
+                </div>
             </div>
         </div>
-    </div>
-    """.format(
-            stats_df['non_boulder_distance'].iloc[0] /
-            stats_df['roped_days'].iloc[0],
-            stats_df['avg_pitches_per_day'].iloc[0],
-            stats_df['non_boulder_routes'].iloc[0] /
-            stats_df['roped_days'].iloc[0],
-            stats_df['non_boulder_distance'].iloc[0] /
-            stats_df['non_boulder_routes'].iloc[0]),
-        unsafe_allow_html=True)
+        """.format(
+                stats_df['non_boulder_distance'].iloc[0] /
+                stats_df['roped_days'].iloc[0],
+                stats_df['avg_pitches_per_day'].iloc[0],
+                stats_df['non_boulder_routes'].iloc[0] /
+                stats_df['roped_days'].iloc[0],
+                stats_df['non_boulder_distance'].iloc[0] /
+                stats_df['non_boulder_routes'].iloc[0]),
+            unsafe_allow_html=True)
 
 with tab2:
     if year_start is not None and year_end is not None:
@@ -901,7 +1058,7 @@ with tab2:
                 text=metric,
                 font=dict(color='#E6EAF1')
             ),
-            fixedrange=True  # Add this line
+            fixedrange=True 
         ),
         xaxis=dict(
             tickformat='%b',

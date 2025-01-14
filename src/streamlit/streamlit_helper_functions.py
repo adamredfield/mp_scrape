@@ -340,7 +340,7 @@ def check_queue(queue_url, sqs):
     return visible_count, in_flight_count
 
 def check_queue_status(user_id, sqs):
-    # Check overall queue status and look for user's job
+    # Check queue status and look for user's job
     main_queue_url = st.secrets["aws"]["queue_url"]
     dlq_url = st.secrets["aws"]["dlq_url"]
 
