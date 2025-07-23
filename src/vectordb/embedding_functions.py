@@ -8,8 +8,11 @@ import openai
 import os
 import sys
 from datetime import datetime
+from dotenv import load_dotenv
 
+# Load environment variables from .env file
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+load_dotenv(os.path.join(project_root, '.env'))
 sys.path.append(project_root)
 
 def get_routes_for_embedding(cursor, limit=50, user_id=None, force_regenerate=False, offset=0):
@@ -150,92 +153,212 @@ def get_existing_ai_tags(cursor, route_id):
 
 def create_embedding_text(route_data, ai_tags=None):
     """
-    Create natural language text optimized for semantic search embeddings.
-    No instruction text, just clean content that represents how people think about routes.
+    Create search-optimized embedding text that prioritizes AI tags and geographic context.
+    Leverages existing LLM analysis for maximum searchability.
     """
     parts = []
     
-    # Core route identity - most important for search
-    route_identity = f"{route_data['route_name']} is a {combine_grade(route_data)} {route_data['route_type'] or 'climb'}"
+    # 1. GEOGRAPHIC CONTEXT FIRST - Critical for location-based searches
+    geo_context = get_geographic_context(route_data)
+    if geo_context:
+        parts.append(geo_context)
     
-    # Add length and pitch info
+    # 2. AI TAGS - PRIORITIZED - These are your LLM-analyzed characteristics
+    if ai_tags:
+        # Rock type - Important for material-based searches
+        if rock_types := ai_tags.get('rock_type'):
+            rock_type = rock_types[0]['tag'] if isinstance(rock_types, list) else rock_types.get('tag', '')
+            if rock_type:
+                parts.append(f"{rock_type} rock climbing")
+        
+        # Climbing styles - Core search terms
+        if styles := ai_tags.get('style'):
+            style_names = [tag['tag'] for tag in sorted(styles, key=lambda x: x['rank'])[:3]]
+            parts.append(f"{', '.join(style_names)} climbing")
+        
+        # Key features - Specific characteristics climbers search for
+        if features := ai_tags.get('feature'):
+            feature_names = [tag['tag'] for tag in sorted(features, key=lambda x: x['rank'])[:4]]
+            parts.append(f"Features: {', '.join(feature_names)}")
+        
+        # Descriptors - Experience-based terms
+        if descriptors := ai_tags.get('descriptor'):
+            desc_names = [tag['tag'] for tag in sorted(descriptors, key=lambda x: x['rank'])[:3]]
+            parts.append(f"Character: {', '.join(desc_names)}")
+    
+    # 3. FORMATION TYPE - Detect if it's a tower, wall, crack, etc.
+    formation = detect_formation_type(route_data)
+    if formation:
+        parts.append(f"{formation} formation")
+    
+    # 4. CORE ROUTE IDENTITY
+    route_name = route_data.get('route_name', '')
+    grade = combine_grade(route_data)
+    route_type = route_data.get('route_type', 'climb')
+    
+    identity = f"{route_name} is a {grade} {route_type}"
+    
+    # Add dimensions
     if route_data.get('length_ft'):
-        route_identity += f" that's {route_data['length_ft']} feet"
+        identity += f" that's {route_data['length_ft']} feet"
     if route_data.get('pitches') and route_data['pitches'] > 1:
-        route_identity += f" in {route_data['pitches']} pitches"
+        identity += f" in {route_data['pitches']} pitches"
     
-    parts.append(route_identity)
+    parts.append(identity)
     
-    # Route description - PRIORITIZED - contains rich semantic content
-    if route_data.get('description'):
-        desc = clean_text(route_data['description'])
-        if desc:
-            parts.append(f"Route description: {desc}")
-    
-    # Community insights - PRIORITIZED - climber experiences contain nuanced language
-    if route_data.get('comments'):
-        comments = clean_text(route_data['comments'])
-        if comments:
-            # Limit comment length for embeddings
-            comment_sample = comments[:300] + "..." if len(comments) > 300 else comments
-            parts.append(f"Climber feedback: {comment_sample}")
-    
-    # Location - hierarchical for area-based search
+    # 5. LOCATION - Now that context is established
     location = combine_location(route_data)
     if location:
         parts.append(f"Located in {location}")
     
-    # Commitment grade - important for big routes
+    # 6. QUALITY INDICATOR - Important for "classic" searches
+    if route_data.get('avg_stars') and route_data.get('num_votes', 0) >= 10:
+        stars = route_data['avg_stars']
+        votes = route_data['num_votes']
+        if stars >= 3.5:
+            parts.append(f"Classic highly-rated {stars:.1f} star route with {votes} votes")
+        elif stars >= 3.0:
+            parts.append(f"Popular {stars:.1f} star route")
+    
+    # 7. COMMITMENT GRADE - For big route searches
     if route_data.get('commitment_grade'):
         commitment = route_data['commitment_grade']
         if commitment in ['IV', 'V', 'VI', 'VII']:
-            parts.append(f"Commitment grade {commitment} big wall or alpine route")
+            parts.append(f"Grade {commitment} big wall alpine adventure")
     
-    # Quality rating - important for recommendations
-    if route_data.get('avg_stars') and route_data.get('num_votes'):
-        stars = route_data['avg_stars']
-        votes = route_data['num_votes']
-        if votes >= 10:  # Only mention rating if statistically significant
-            parts.append(f"Rated {stars:.1f} stars by {votes} climbers")
+    # 8. KEY CHARACTERISTICS from description - But more selective
+    if route_data.get('description'):
+        desc = clean_text(route_data['description'])
+        if desc:
+            # Extract only the most search-relevant phrases
+            key_phrases = extract_search_keywords(desc)
+            if key_phrases:
+                parts.append(f"Notable features: {key_phrases}")
     
-    # Protection info - important for planning
+    # 9. PROTECTION - Important for style searches
     if route_data.get('protection'):
         protection = clean_text(route_data['protection'])
         if protection:
-            parts.append(f"Protection: {protection}")
-    
-    # AI-generated tags - leverage existing analysis
-    if ai_tags:
-        # Climbing styles
-        styles = ai_tags.get('style', [])
-        if styles:
-            style_names = [tag['tag'] for tag in sorted(styles, key=lambda x: x['rank'])[:3]]
-            parts.append(f"Climbing style: {', '.join(style_names)}")
-        
-        # Key features
-        features = ai_tags.get('feature', [])
-        if features:
-            feature_names = [tag['tag'] for tag in sorted(features, key=lambda x: x['rank'])[:4]]
-            parts.append(f"Key features: {', '.join(feature_names)}")
-        
-        # Descriptors
-        descriptors = ai_tags.get('descriptor', [])
-        if descriptors:
-            desc_names = [tag['tag'] for tag in sorted(descriptors, key=lambda x: x['rank'])[:3]]
-            parts.append(f"Character: {', '.join(desc_names)}")
-        
-        # Rock type
-        rock_types = ai_tags.get('rock_type', [])
-        if rock_types:
-            parts.append(f"Rock type: {rock_types[0]['tag']}")
-    
-    # First ascent - historical context
-    if route_data.get('fa'):
-        fa = clean_text(route_data['fa'])
-        if fa:
-            parts.append(f"First ascent: {fa}")
+            # Simplify protection info to key concepts
+            protection_summary = summarize_protection(protection)
+            if protection_summary:
+                parts.append(f"Protection: {protection_summary}")
     
     return ". ".join(parts) + "."
+
+def get_geographic_context(route_data):
+    """
+    Add explicit geographic context that climbers search for
+    """
+    region = route_data.get('region', '')
+    main_area = route_data.get('main_area', '')
+    sub_area = route_data.get('sub_area', '')
+    
+    # Desert climbing regions
+    if region in ['Utah', 'Arizona', 'Nevada', 'New Mexico']:
+        if any(area in str(main_area).lower() for area in ['moab', 'indian creek', 'castle valley', 'fisher towers']):
+            return "Desert sandstone tower and crack climbing"
+        elif 'zion' in str(main_area).lower():
+            return "Desert sandstone wall climbing"
+        elif 'red rocks' in str(main_area).lower():
+            return "Desert limestone climbing"
+        else:
+            return "Desert climbing"
+    
+    # California granite
+    elif region == 'California':
+        if 'yosemite' in str(main_area).lower():
+            return "Granite crack and big wall climbing"
+        elif 'joshua tree' in str(main_area).lower():
+            return "Desert granite climbing"
+        elif any(area in str(main_area).lower() for area in ['tahoe', 'tuolumne', 'sierra']):
+            return "Sierra granite climbing"
+        elif 'coast' in str(main_area).lower() or 'big sur' in str(main_area).lower():
+            return "Coastal climbing"
+    
+    # Alpine regions
+    elif region in ['Colorado', 'Wyoming', 'Montana', 'Washington']:
+        return "Alpine mountain climbing"
+    
+    # Other regions
+    elif region in ['Kentucky', 'Tennessee', 'West Virginia']:
+        return "Limestone sport climbing"
+    elif region == 'New Hampshire':
+        return "Granite climbing"
+    
+    return None
+
+def detect_formation_type(route_data):
+    """
+    Detect if this is a tower, wall, crack, slab, etc.
+    """
+    route_name = route_data.get('route_name', '').lower()
+    location = route_data.get('specific_location', '').lower()
+    combined = f"{route_name} {location}"
+    
+    # Formation type keywords
+    formations = {
+        'tower': ['tower', 'spire', 'pinnacle', 'needle'],
+        'wall': ['wall', 'face', 'headwall'],
+        'crack': ['crack', 'splitter', 'corner', 'dihedral'],
+        'slab': ['slab', 'friction'],
+        'arete': ['arete', 'ridge', 'buttress'],
+        'chimney': ['chimney', 'squeeze'],
+        'roof': ['roof', 'overhang', 'ceiling']
+    }
+    
+    for formation_type, keywords in formations.items():
+        if any(keyword in combined for keyword in keywords):
+            return formation_type
+    
+    return None
+
+def extract_search_keywords(description):
+    """
+    Extract only the most search-relevant terms from description
+    """
+    # Keywords that climbers commonly search for
+    search_keywords = [
+        'exposed', 'runout', 'pumpy', 'sustained', 'technical', 'steep',
+        'overhang', 'traverse', 'crux', 'delicate', 'powerful', 'classic',
+        'splitter', 'perfect', 'varied', 'interesting', 'spectacular',
+        'committing', 'scary', 'safe', 'beginner', 'moderate', 'advanced'
+    ]
+    
+    desc_lower = description.lower()
+    found_keywords = []
+    
+    for keyword in search_keywords:
+        if keyword in desc_lower:
+            found_keywords.append(keyword)
+            if len(found_keywords) >= 5:  # Limit to most relevant
+                break
+    
+    return ', '.join(found_keywords) if found_keywords else None
+
+def summarize_protection(protection_text):
+    """
+    Simplify protection info to key searchable concepts
+    """
+    protection_lower = protection_text.lower()
+    
+    # Key protection concepts
+    if 'bolt' in protection_lower and 'anchor' in protection_lower:
+        return "bolted route with anchors"
+    elif 'bolt' in protection_lower:
+        return "bolted protection"
+    elif 'runout' in protection_lower or 'sparse' in protection_lower:
+        return "runout sparse protection"
+    elif 'cam' in protection_lower and 'nut' in protection_lower:
+        return "cams and nuts protection"
+    elif 'cam' in protection_lower:
+        return "cam protection"
+    elif any(word in protection_lower for word in ['trad', 'rack', 'gear']):
+        return "traditional gear protection"
+    elif 'piton' in protection_lower:
+        return "piton protection"
+    
+    return None
 
 def combine_grade(route_data):
     """Combine all grade components like existing function"""
@@ -275,10 +398,14 @@ def clean_text(text):
 
 def generate_embedding(text, model="text-embedding-3-small"):
     """Generate embedding using OpenAI API"""
-    openai.api_key = os.getenv('OPENAI_API_KEY')
+    api_key = os.getenv('OPENAI_API_KEY')
+    print(f"Debug: API key loaded: {api_key[:10] if api_key else 'None'}...")
+    
+    # Create client with API key
+    client = openai.OpenAI(api_key=api_key)
     
     try:
-        response = openai.embeddings.create(
+        response = client.embeddings.create(
             input=text,
             model=model
         )
